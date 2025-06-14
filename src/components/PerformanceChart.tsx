@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { Position } from '../types/portfolio';
+import { calculatePosition } from '../utils/calculations';
 
 ChartJS.register(
     CategoryScale,
@@ -30,47 +31,51 @@ interface PerformanceChartProps {
 export const PerformanceChart = ({ positions }: PerformanceChartProps) => {
     // Sort positions by date
     const sortedPositions = [...positions].sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
+        new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
     );
 
     const data = {
-        labels: sortedPositions.map(pos => pos.date),
+        labels: sortedPositions.map(pos => pos.transactionDate),
         datasets: [
             {
-                label: 'Portfolio Value (JPY)',
-                data: sortedPositions.map(pos => pos.totalValue),
-                borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
-            },
-            {
-                label: 'Portfolio Cost (JPY)',
-                data: sortedPositions.map(pos => pos.totalCost),
-                borderColor: 'rgb(153, 102, 255)',
-                tension: 0.1
+                label: 'P&L (JPY)',
+                data: sortedPositions.map(pos => pos.pnlJPY),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                tension: 0.1,
+                fill: true
             }
         ]
     };
 
     const options = {
         responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
         plugins: {
             legend: {
                 position: 'top' as const,
             },
             title: {
                 display: true,
-                text: 'Portfolio Performance Over Time'
+                text: 'Portfolio P&L Over Time'
             }
         },
         scales: {
             y: {
-                beginAtZero: true
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value: number | string) {
+                        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+                        return `¥${(numValue / 1000).toFixed(0)}k`;
+                    }
+                }
             }
         }
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-6 rounded-lg shadow h-[400px]">
             <Line data={data} options={options} />
         </div>
     );

@@ -1,22 +1,22 @@
 export type Currency = 'JPY' | 'USD' | string;
 
-export interface Position {
-    date: string;
-    ticker: string;
+export interface RawPosition {
+    transactionDate: string;
+    ticker: string | number;
     fullName: string;
     account: string;
     quantity: number;
     costPerUnit: number;
-    totalCost: number;
-    currency: Currency;
-    fxRate: number;
-    unitValue: number;
-    totalValue: number;
-    localCCY: Currency;
+    baseCcy: Currency;
+    transactionFx: number;
+    currentCostInBaseCcy: number;
+}
+
+export interface Position extends RawPosition {
+    costInJPY: number;
+    currentValueJPY: number;
     pnlJPY: number;
     pnlPercentage: number;
-    annualizedPnl: number;
-    dividends?: number;
 }
 
 export interface PortfolioSummary {
