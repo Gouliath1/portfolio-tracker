@@ -9,10 +9,10 @@ export interface RawPosition {
     costPerUnit: number;
     baseCcy: Currency;
     transactionFx: number;
-    currentCostInBaseCcy: number;
 }
 
 export interface Position extends RawPosition {
+    currentPrice: number | null;
     costInJPY: number;
     currentValueJPY: number;
     pnlJPY: number;
