@@ -1,0 +1,24 @@
+{
+  "positions": [
+    {
+      "transactionDate": "2024/01/01",
+      "ticker": "AAPL",
+      "fullName": "Apple Inc.",
+      "account": "General",
+      "quantity": 10.0,
+      "costPerUnit": 100.0,
+      "baseCcy": "USD",
+      "transactionFx": 145.0
+    },
+    {
+      "transactionDate": "2024/01/01",
+      "ticker": "9999.T",
+      "fullName": "Sample Japanese Stock",
+      "account": "NISA",
+      "quantity": 100.0,
+      "costPerUnit": 1000.0,
+      "baseCcy": "JPY",
+      "transactionFx": 1.0
+    }
+  ]
+}
