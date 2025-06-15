@@ -182,13 +182,26 @@ const columns = [
             );
         },
     }),
-    columnHelper.accessor(row => ({
-        return: calculateAnnualizedReturn(row.pnlPercentage, row.transactionDate),
-        days: Math.floor((new Date().getTime() - new Date(row.transactionDate).getTime()) / (1000 * 60 * 60 * 24))
-    }), {
+    columnHelper.accessor(row => {
+        const days = Math.floor((new Date().getTime() - new Date(row.transactionDate).getTime()) / (1000 * 60 * 60 * 24));
+        const annualReturn = calculateAnnualizedReturn(row.pnlPercentage, row.transactionDate);
+        // For sorting: use annualized return if available, otherwise use negative days to sort newer positions last
+        const sortValue = annualReturn !== null ? annualReturn : -days;
+        
+        return {
+            return: annualReturn,
+            days,
+            sortValue
+        };
+    }, {
         id: 'annualizedReturn',
         header: 'Annual Return %',
         size: 100,
+        sortingFn: (rowA, rowB) => {
+            const a = (rowA.getValue('annualizedReturn') as { sortValue: number }).sortValue;
+            const b = (rowB.getValue('annualizedReturn') as { sortValue: number }).sortValue;
+            return a - b;
+        },
         cell: props => {
             if (props.row.original.currentPrice === null) {
                 return <span className="text-gray-400">Loading...</span>;
