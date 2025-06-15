@@ -12,7 +12,7 @@ try {
 }
 
 // Convert any numeric tickers to strings
-export const rawPositions: RawPosition[] = positionsData.positions.map(pos => ({
+export const rawPositions: RawPosition[] = positionsData.positions.map((pos: { ticker: { toString: () => any; }; }) => ({
     ...pos,
     ticker: pos.ticker.toString()
 }));
