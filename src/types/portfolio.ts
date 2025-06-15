@@ -26,3 +26,11 @@ export interface PortfolioSummary {
     totalPnlPercentage: number;
     positions: Position[];
 }
+
+export interface HistoricalPortfolioSnapshot {
+    date: Date;
+    totalValueJPY: number;
+    totalCostJPY: number;
+    pnlJPY: number;
+    pnlPercentage: number;
+}

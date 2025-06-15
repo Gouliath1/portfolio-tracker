@@ -35,16 +35,32 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
     );
 
+    // Calculate cumulative costs at each point in time
+    let runningCostTotal = 0;
+    const cumulativeCosts = sortedPositions.map(pos => {
+        runningCostTotal += pos.costInJPY;
+        return runningCostTotal;
+    });
+
     const data = {
         labels: sortedPositions.map(pos => pos.transactionDate),
         datasets: [
             {
-                label: showValues ? 'P&L (JPY)' : 'P&L %',
-                data: sortedPositions.map(pos => showValues ? pos.pnlJPY : pos.pnlPercentage),
+                label: showValues ? 'Total Value (JPY)' : 'Value %',
+                data: sortedPositions.map(pos => showValues ? pos.currentValueJPY : ((pos.currentValueJPY / pos.costInJPY - 1) * 100)),
                 borderColor: 'rgb(34, 197, 94)',
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 tension: 0.1,
                 fill: true
+            },
+            {
+                label: 'Total Cost (JPY)',
+                data: showValues ? cumulativeCosts : Array(sortedPositions.length).fill(0),
+                borderColor: 'rgb(148, 163, 184)',
+                backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                tension: 0.1,
+                fill: false,
+                hidden: !showValues // Hide cost line when showing percentages
             }
         ]
     };
