@@ -24,10 +24,10 @@ export default function Home() {
     localStorage.setItem('showValues', JSON.stringify(showValues));
   }, [showValues]);
 
-  async function loadData(showRefreshing = false) {
+  async function loadData(showRefreshing = false, forceRefresh = false) {
     if (showRefreshing) setRefreshing(true);
     try {
-      const summary = await calculatePortfolioSummary(rawPositions);
+      const summary = await calculatePortfolioSummary(rawPositions, forceRefresh);
       setPortfolioSummary(summary);
       setError(null);
     } catch (err) {
@@ -46,11 +46,15 @@ export default function Home() {
   // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      loadData();
+      loadData(false, false); // Regular update without force refresh
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleRefreshClick = () => {
+    loadData(true, true); // Show refresh indicator and force refresh
+  };
 
   if (loading) return <div className="min-h-screen p-8 bg-gray-100">Loading...</div>;
   if (error) return <div className="min-h-screen p-8 bg-gray-100">Error: {error}</div>;
@@ -63,16 +67,32 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => setShowValues(!showValues)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`px-4 py-2 rounded-lg ${
+              showValues ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+            } text-white transition-colors`}
           >
             {showValues ? 'Hide Values' : 'Show Values'}
           </button>
           <button
-            onClick={() => loadData(true)}
+            onClick={handleRefreshClick}
             disabled={refreshing}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors flex items-center gap-2"
           >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+            {refreshing ? (
+              <>
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Refreshing...
+              </>
+            ) : (
+              'Refresh Prices'
+            )}
           </button>
         </div>
       </div>

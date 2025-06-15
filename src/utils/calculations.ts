@@ -19,13 +19,13 @@ export const calculatePosition = (rawPosition: RawPosition, currentPrice: number
     };
 };
 
-export const calculatePortfolioSummary = async (rawPositions: RawPosition[]): Promise<PortfolioSummary> => {
+export const calculatePortfolioSummary = async (rawPositions: RawPosition[], forceRefresh: boolean = false): Promise<PortfolioSummary> => {
     // Fetch all current prices
     const currentPrices: { [key: string]: number | null } = {};
     for (const pos of rawPositions) {
         const ticker = pos.ticker.toString();
         if (!currentPrices[ticker]) {
-            currentPrices[ticker] = await fetchStockPrice(ticker);
+            currentPrices[ticker] = await fetchStockPrice(ticker, forceRefresh);
         }
     }
     

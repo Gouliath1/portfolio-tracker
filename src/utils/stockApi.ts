@@ -1,3 +1,5 @@
+import { getCachedPrice, updatePriceCache } from './priceCache';
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function fetchWithRetry(url: string, retries = 3, baseDelay = 1000): Promise<Response> {
@@ -32,8 +34,17 @@ async function fetchWithRetry(url: string, retries = 3, baseDelay = 1000): Promi
 let lastRequestTime = 0;
 const MIN_REQUEST_DELAY = 500; // Minimum 500ms between requests
 
-export async function fetchStockPrice(symbol: string): Promise<number | null> {
+export async function fetchStockPrice(symbol: string, forceRefresh: boolean = false): Promise<number | null> {
     try {
+        // Check cache first if not forcing refresh
+        if (!forceRefresh) {
+            const cachedPrice = await getCachedPrice(symbol);
+            if (cachedPrice !== null) {
+                console.log('Using cached price for:', symbol);
+                return cachedPrice;
+            }
+        }
+
         // Rate limiting
         const now = Date.now();
         const timeSinceLastRequest = now - lastRequestTime;
@@ -50,8 +61,10 @@ export async function fetchStockPrice(symbol: string): Promise<number | null> {
         const data = await response.json();
         console.log('Response for', symbol, ':', data);
         
-        if (data.chart?.result?.[0]?.meta?.regularMarketPrice) {
-            return data.chart.result[0].meta.regularMarketPrice;
+        const price = data.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (price) {
+            await updatePriceCache(symbol, price);
+            return price;
         }
         
         return null;
