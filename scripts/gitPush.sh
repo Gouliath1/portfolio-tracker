@@ -18,9 +18,20 @@ fi
 echo "${GREEN}Current changes:${NC}"
 git status -s
 
-# Get commit message
-echo "${GREEN}Enter commit message:${NC}"
-read MESSAGE
+# Check if commit message was provided as argument
+if [[ -n "$1" ]]; then
+    MESSAGE="$1"
+else
+    # If no message provided, prompt for one
+    echo "${GREEN}Enter commit message:${NC}"
+    read MESSAGE
+fi
+
+# Check if message is empty
+if [[ -z "$MESSAGE" ]]; then
+    echo "${YELLOW}Error: Commit message cannot be empty${NC}"
+    exit 1
+fi
 
 # Add all changes, commit and push
 git add .
