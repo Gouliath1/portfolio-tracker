@@ -1,24 +1,14 @@
 import { RawPosition } from '../types/portfolio';
-import fs from 'fs';
-import path from 'path';
 
-// Try to load local positions file, fall back to template if it doesn't exist
+// In development, we'll use the local positions.json if it exists,
+// otherwise fall back to the template
 let positionsData;
-const localPositionsPath = path.join(process.cwd(), 'src/data/positions.json');
-const templatePositionsPath = path.join(process.cwd(), 'src/data/positions.template.json');
-
 try {
-    positionsData = JSON.parse(fs.readFileSync(localPositionsPath, 'utf8'));
+    positionsData = require('./positions.json');
     console.log('Using local positions data');
 } catch (error) {
-    positionsData = JSON.parse(fs.readFileSync(templatePositionsPath, 'utf8'));
-    console.log('Using template positions data');
-    
-    // Copy template to positions.json if it doesn't exist
-    if (!fs.existsSync(localPositionsPath)) {
-        fs.copyFileSync(templatePositionsPath, localPositionsPath);
-        console.log('Created local positions.json from template');
-    }
+    positionsData = require('./positions.template.json');
+    console.log('Using template positions data. Create a positions.json file based on positions.template.json to use your own data.');
 }
 
 // Convert any numeric tickers to strings

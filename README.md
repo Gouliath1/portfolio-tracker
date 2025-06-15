@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Portfolio Data Setup
+
+To track your portfolio:
+
+1. Create a `src/data/positions.json` file by copying `src/data/positions.template.json`
+2. Edit `positions.json` with your portfolio data
+3. The template includes examples for both USD and JPY stocks
+
+Note: `positions.json` is gitignored to keep your portfolio data private. Use the template as a reference for the required data structure.
