@@ -5,9 +5,12 @@ import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
 
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
+    showValues: boolean;
 }
 
-export const PortfolioSummary = ({ summary }: PortfolioSummaryProps) => {
+const getHiddenValue = (value: number) => '•'.repeat(Math.min(8, Math.ceil(Math.log10(Math.abs(value) + 1))));
+
+export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps) => {
     const prevSummary = useRef<PortfolioSummaryType>(summary);
     const valueChanged = summary.totalValueJPY !== prevSummary.current.totalValueJPY;
 
@@ -27,7 +30,9 @@ export const PortfolioSummary = ({ summary }: PortfolioSummaryProps) => {
                         {hasNullPrices ? (
                             <span className="text-gray-400">Updating...</span>
                         ) : (
-                            <>¥{summary.totalValueJPY.toLocaleString()}</>
+                            showValues ? 
+                                <>¥{summary.totalValueJPY.toLocaleString()}</> :
+                                <>¥{getHiddenValue(summary.totalValueJPY)}</>
                         )}
                     </p>
                 </div>
@@ -35,7 +40,10 @@ export const PortfolioSummary = ({ summary }: PortfolioSummaryProps) => {
             <div className="bg-white p-6 rounded-lg shadow">
                 <h3 className="text-lg font-medium text-gray-900">Total Cost</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-600">
-                    ¥{summary.totalCostJPY.toLocaleString()}
+                    {showValues ? 
+                        <>¥{summary.totalCostJPY.toLocaleString()}</> :
+                        <>¥{getHiddenValue(summary.totalCostJPY)}</>
+                    }
                 </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
@@ -46,7 +54,9 @@ export const PortfolioSummary = ({ summary }: PortfolioSummaryProps) => {
                         {hasNullPrices ? (
                             'Updating...'
                         ) : (
-                            <>¥{summary.totalPnlJPY.toLocaleString()}</>
+                            showValues ? 
+                                <>¥{summary.totalPnlJPY.toLocaleString()}</> :
+                                <>¥{getHiddenValue(summary.totalPnlJPY)}</>
                         )}
                     </p>
                 </div>

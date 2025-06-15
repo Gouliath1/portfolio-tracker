@@ -13,6 +13,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showValues, setShowValues] = useState(() => {
+    // Initialize from localStorage, default to true
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
+    return saved ? JSON.parse(saved) : true;
+  });
+
+  // Save showValues preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('showValues', JSON.stringify(showValues));
+  }, [showValues]);
 
   async function loadData(showRefreshing = false) {
     if (showRefreshing) setRefreshing(true);
@@ -49,20 +59,29 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 bg-gray-100">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Portfolio Tracker</h1>
-        <button 
-          onClick={() => loadData(true)} 
-          disabled={refreshing}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed ${refreshing ? 'opacity-50' : ''}`}
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh Prices'}
-        </button>
+        <h1 className="text-3xl font-bold text-gray-900">Portfolio Tracker</h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowValues(!showValues)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {showValues ? 'Hide Values' : 'Show Values'}
+          </button>
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
-      <PortfolioSummary summary={portfolioSummary} />
-      <div className="mb-8">
-        <PerformanceChart positions={portfolioSummary.positions} />
+
+      <div className="space-y-8">
+        <PortfolioSummary summary={portfolioSummary} showValues={showValues} />
+        <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} />
+        <PositionsTable positions={portfolioSummary.positions} showValues={showValues} />
       </div>
-      <PositionsTable positions={portfolioSummary.positions} />
     </main>
   );
 }
