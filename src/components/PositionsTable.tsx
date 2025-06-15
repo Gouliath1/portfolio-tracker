@@ -317,7 +317,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                         id="column-button"
                         onClick={() => setIsColumnMenuOpen(!isColumnMenuOpen)}
                         onKeyDown={handleColumnMenuKeyDown}
-                        className="px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2 text-gray-900 bg-white border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         aria-expanded={isColumnMenuOpen}
                         aria-controls="column-menu"
                     >
@@ -332,13 +332,13 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                         >
                             <div className="py-1">
                                 <button
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
                                     onClick={() => table.toggleAllColumnsVisible(true)}
                                 >
                                     Show All
                                 </button>
                                 <button
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
                                     onClick={() => table.toggleAllColumnsVisible(false)}
                                 >
                                     Hide All
@@ -347,7 +347,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                                 {table.getAllColumns().map(column => (
                                     <label
                                         key={column.id}
-                                        className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center px-4 py-2 text-gray-900 hover:bg-gray-100 cursor-pointer"
                                     >
                                         <input
                                             type="checkbox"
@@ -365,7 +365,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                 <input
                     type="text"
                     placeholder="Filter by ticker, name, or account..."
-                    className="w-full sm:w-auto px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full sm:w-auto px-4 py-2 text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={filterText}
                     onChange={(e) => setFilterText(e.target.value)}
                 />
@@ -378,7 +378,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                                 {headerGroup.headers.map(header => (
                                     <th
                                         key={header.id}
-                                        className="relative px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                                        className="relative px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider cursor-pointer select-none"
                                         onClick={header.column.getToggleSortingHandler()}
                                         style={{ width: header.getSize() }}
                                     >
@@ -413,7 +413,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                                 {row.getVisibleCells().map(cell => (
                                     <td
                                         key={cell.id}
-                                        className="px-6 py-4 whitespace-nowrap text-sm truncate"
+                                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate"
                                         style={{ width: cell.column.getSize() }}
                                     >
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
