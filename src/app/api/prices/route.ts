@@ -38,13 +38,20 @@ export async function GET(request: Request) {
     if (!symbol) {
         return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
     }
-    
+
     const cache = await readPriceCache();
-    if (!isCacheValid(cache.lastUpdated)) {
+    const cacheIsValid = isCacheValid(cache.lastUpdated);
+    const hasSymbolInCache = symbol in cache.prices;
+    
+    if (!cacheIsValid) {
         return NextResponse.json({ price: null });
     }
-    
-    return NextResponse.json({ price: cache.prices[symbol] ?? null });
+
+    if (hasSymbolInCache) {
+        return NextResponse.json({ price: cache.prices[symbol] });
+    } else {
+        return NextResponse.json({ price: null });
+    }
 }
 
 export async function POST(request: Request) {

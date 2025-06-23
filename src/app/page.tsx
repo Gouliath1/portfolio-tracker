@@ -43,14 +43,14 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData(false, false); // Regular update without force refresh
-    }, 30000);
+  // // Auto-refresh every 30 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     loadData(false, false); // Regular update without force refresh
+  //   }, 30000);
 
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const handleRefreshClick = () => {
     loadData(true, true); // Show refresh indicator and force refresh
