@@ -15,7 +15,7 @@ async function readPriceCache(): Promise<DailyPricesCache> {
     try {
         const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
         return JSON.parse(data);
-    } catch (error) {
+    } catch {
         return { lastUpdated: '', prices: {} };
     }
 }

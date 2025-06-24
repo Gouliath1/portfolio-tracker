@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "push": "./scripts/gitPush.sh"
+    "push": "./projectDevUtils/gitPush.sh",
+    "setup": "node projectDevUtils/setup.js",
+    "setup:unix": "./projectDevUtils/setup.sh",
+    "setup:windows": "projectDevUtils/setup.bat"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

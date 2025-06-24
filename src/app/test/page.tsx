@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { fetchStockPrice } from '../../utils/stockApi';
 
 export default function TestApi() {
@@ -8,7 +8,7 @@ export default function TestApi() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const testStocks = ['AAPL', 'NVDA', '8897.T', '8604.T', '7974.T'];
+    const testStocks = useMemo(() => ['AAPL', 'NVDA', '8897.T', '8604.T', '7974.T'], []);
 
     useEffect(() => {
         async function fetchPrices() {
@@ -27,7 +27,7 @@ export default function TestApi() {
         }
 
         fetchPrices();
-    }, []);
+    }, [testStocks]);
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;

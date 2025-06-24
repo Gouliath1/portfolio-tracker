@@ -1,10 +1,5 @@
 import { RawPosition, HistoricalPortfolioSnapshot } from '../types/portfolio';
 
-interface PositionKey {
-    ticker: string;
-    account: string;
-}
-
 interface MonthlyPortfolio {
     positions: RawPosition[];
     date: Date;
@@ -78,6 +73,7 @@ export function calculateHistoricalSnapshots(
     return dates.map(date => getPortfolioStateAtDate(positions, date));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchHistoricalPrices(symbol: string, dates: Date[]): Promise<{ [date: string]: number }> {
     // This is a placeholder. We'll implement the actual historical price fetching later
     // We'll need to modify the Yahoo Finance API call to fetch historical data
