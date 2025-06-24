@@ -1,24 +1,84 @@
 {
   "positions": [
     {
-      "transactionDate": "2024/01/01",
+      "transactionDate": "201⒏/03/12",
       "ticker": "AAPL",
-      "fullName": "Apple Inc.",
+      "fullName": "Apple",
       "account": "General",
-      "quantity": 10.0,
-      "costPerUnit": 100.0,
+      "quantity": 1.0,
+      "costPerUnit": 38.9012,
       "baseCcy": "USD",
-      "transactionFx": 145.0
+      "transactionFx": 121.61
     },
     {
-      "transactionDate": "2024/01/01",
-      "ticker": "9999.T",
-      "fullName": "Sample Japanese Stock",
+      "transactionDate": "2020/03/12",
+      "ticker": "GOOG",
+      "fullName": "Alphabet Class C",
+      "account": "General",
+      "quantity": 2.0,
+      "costPerUnit": 30.7702,
+      "baseCcy": "USD",
+      "transactionFx": 121.61
+    },
+    {
+      "transactionDate": "2023/05/30",
+      "ticker": "7940.T",
+      "fullName": "Wavelock HLDGS",
       "account": "NISA",
       "quantity": 100.0,
-      "costPerUnit": 1000.0,
+      "costPerUnit": 572.0,
       "baseCcy": "JPY",
       "transactionFx": 1.0
+    },
+    {
+      "transactionDate": "2012/03/01",
+      "ticker": "8953.T",
+      "fullName": "Japan City Fund",
+      "account": "General",
+      "quantity": 1.0,
+      "costPerUnit": 118000.0,
+      "baseCcy": "JPY",
+      "transactionFx": 1.0
+    },
+    {
+      "transactionDate": "2022/03/01",
+      "ticker": "8986.T",
+      "fullName": "Daiwa Securities Living Investment",
+      "account": "General",
+      "quantity": 1.0,
+      "costPerUnit": 106342.0,
+      "baseCcy": "JPY",
+      "transactionFx": 1.0
+    },
+    {
+      "transactionDate": "2024/11/11",
+      "ticker": "4246.T",
+      "fullName": "Daikyo Nishikawa",
+      "account": "General",
+      "quantity": 100.0,
+      "costPerUnit": 605.35,
+      "baseCcy": "JPY",
+      "transactionFx": 1.0
+    },
+    {
+      "transactionDate": "2024/11/11",
+      "ticker": "4246.T",
+      "fullName": "Daikyo Nishikawa",
+      "account": "NISA",
+      "quantity": 100.0,
+      "costPerUnit": 605.0,
+      "baseCcy": "JPY",
+      "transactionFx": 1.0
+    },
+    {
+      "transactionDate": "2025/03/05",
+      "ticker": "NVDA",
+      "fullName": "Nvidia",
+      "account": "General",
+      "quantity": 2.0,
+      "costPerUnit": 110.71,
+      "baseCcy": "USD",
+      "transactionFx": 150.12
     }
   ]
 }
