@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { rawPositions } from '../data/positions';
+import { loadPositions } from '../data/positions';
 import { calculatePortfolioSummary } from '../utils/calculations';
 import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
 import { PortfolioSummary } from '../components/PortfolioSummary';
@@ -27,7 +27,11 @@ export default function Home() {
   async function loadData(showRefreshing = false, forceRefresh = false) {
     if (showRefreshing) setRefreshing(true);
     try {
-      const summary = await calculatePortfolioSummary(rawPositions, forceRefresh);
+      // Load positions dynamically
+      const currentPositions = await loadPositions();
+      
+      // Calculate portfolio summary with the loaded positions
+      const summary = await calculatePortfolioSummary(currentPositions, forceRefresh);
       setPortfolioSummary(summary);
       setError(null);
     } catch (err) {
