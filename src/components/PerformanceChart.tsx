@@ -30,7 +30,7 @@ interface PerformanceChartProps {
     showValues: boolean;
 }
 
-type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '5Y' | 'All';
+type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | 'All';
 
 export const PerformanceChart = ({ positions, showValues }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
@@ -42,6 +42,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         { key: '6M', label: '6M' },
         { key: 'YTD', label: 'YTD' },
         { key: '1Y', label: '1Y' },
+        { key: '2Y', label: '2Y' },
         { key: '5Y', label: '5Y' },
         { key: 'All', label: 'All' }
     ];
@@ -78,6 +79,10 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
                 interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
                 break;
+            case '2Y':
+                startDate = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+                interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
+                break;
             case '5Y':
                 startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
                 interval = 90 * 24 * 60 * 60 * 1000; // 3 month intervals
@@ -110,6 +115,18 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         return dates;
     };
 
+    // Get transactions that occurred near a specific date (within the interval range)
+    const getTransactionsNearDate = (targetDate: Date, intervalMs: number) => {
+        const halfInterval = intervalMs / 2;
+        const startRange = new Date(targetDate.getTime() - halfInterval);
+        const endRange = new Date(targetDate.getTime() + halfInterval);
+        
+        return positions.filter(pos => {
+            const posDate = new Date(pos.transactionDate);
+            return posDate >= startRange && posDate <= endRange;
+        });
+    };
+
     // Calculate portfolio value at specific dates
     const calculatePortfolioValueAtDate = (targetDate: Date) => {
         // Get all positions that existed at the target date
@@ -118,7 +135,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         );
 
         if (relevantPositions.length === 0) {
-            return { totalValue: 0, totalCost: 0 };
+            return { totalValue: 0, totalCost: 0, transactions: [] };
         }
 
         // Calculate cumulative cost and current value for positions held at target date
@@ -131,7 +148,15 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             totalValue += pos.currentValueJPY;
         });
 
-        return { totalValue, totalCost };
+        // Get transactions that occurred near this date (using current interval for range)
+        const currentInterval = selectedTimeline === '1D' ? 60 * 60 * 1000 :
+                               selectedTimeline === '5D' || selectedTimeline === '1M' ? 24 * 60 * 60 * 1000 :
+                               selectedTimeline === '6M' || selectedTimeline === 'YTD' || selectedTimeline === '1Y' || selectedTimeline === '2Y' ? 7 * 24 * 60 * 60 * 1000 :
+                               30 * 24 * 60 * 60 * 1000; // Default to monthly for longer periods
+        
+        const transactions = getTransactionsNearDate(targetDate, currentInterval);
+
+        return { totalValue, totalCost, transactions };
     };
 
     // Generate the chart data based on selected timeline
@@ -148,6 +173,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             case '6M':
             case 'YTD':
             case '1Y':
+            case '2Y':
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             case '5Y':
             case 'All':
@@ -158,9 +184,14 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
 
     const valueData: number[] = [];
     const costData: number[] = [];
+    const transactionDates: boolean[] = []; // Track which dates have transactions
 
     dateIntervals.forEach(date => {
         const portfolioAtDate = calculatePortfolioValueAtDate(date);
+        const hasTransactions = portfolioAtDate.transactions && portfolioAtDate.transactions.length > 0;
+        
+        transactionDates.push(hasTransactions);
+        
         if (showValues) {
             valueData.push(portfolioAtDate.totalValue);
             costData.push(portfolioAtDate.totalCost);
@@ -183,7 +214,27 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 borderColor: 'rgb(34, 197, 94)',
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 tension: 0.1,
-                fill: true
+                fill: true,
+                pointRadius: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 8 : 3; // Larger dots for transaction dates
+                },
+                pointHoverRadius: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 10 : 5;
+                },
+                pointBackgroundColor: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 'rgb(34, 197, 94)' : 'rgba(34, 197, 94, 0.8)';
+                },
+                pointBorderColor: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 'rgb(22, 163, 74)' : 'rgba(34, 197, 94, 0.8)';
+                },
+                pointBorderWidth: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 2 : 1;
+                }
             },
             {
                 label: 'Total Cost (JPY)',
@@ -192,7 +243,27 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 backgroundColor: 'rgba(148, 163, 184, 0.1)',
                 tension: 0.1,
                 fill: false,
-                hidden: !showValues // Hide cost line when showing percentages
+                hidden: !showValues, // Hide cost line when showing percentages
+                pointRadius: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 8 : 3;
+                },
+                pointHoverRadius: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 10 : 5;
+                },
+                pointBackgroundColor: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 'rgb(148, 163, 184)' : 'rgba(148, 163, 184, 0.8)';
+                },
+                pointBorderColor: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 'rgb(100, 116, 139)' : 'rgba(148, 163, 184, 0.8)';
+                },
+                pointBorderWidth: (context: any) => {
+                    const index = context.dataIndex;
+                    return transactionDates[index] ? 2 : 1;
+                }
             }
         ]
     };
@@ -224,14 +295,49 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             },
             tooltip: {
                 callbacks: {
+                    title: (tooltipItems) => {
+                        const index = tooltipItems[0].dataIndex;
+                        const date = dateIntervals[index];
+                        return date.toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                    },
                     label: (context) => {
                         const value = context.raw as number;
+                        const datasetLabel = context.dataset.label;
+                        
                         if (showValues) {
-                            return `P&L: ¥${value.toLocaleString()}`;
+                            return `${datasetLabel}: ¥${Math.round(value).toLocaleString()}`;
                         } else {
-                            return `P&L: ${value.toFixed(2)}%`;
+                            return `${datasetLabel}: ${value.toFixed(2)}%`;
                         }
+                    },
+                    afterBody: (tooltipItems) => {
+                        const index = tooltipItems[0].dataIndex;
+                        const date = dateIntervals[index];
+                        const portfolioAtDate = calculatePortfolioValueAtDate(date);
+                        
+                        if (portfolioAtDate.transactions && portfolioAtDate.transactions.length > 0) {
+                            const transactionLines = ['', 'Transactions on this date:'];
+                            portfolioAtDate.transactions.forEach((transaction: Position) => {
+                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * transaction.transactionFx).toLocaleString();
+                                transactionLines.push(
+                                    `${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}`
+                                );
+                            });
+                            return transactionLines;
+                        }
+                        return [];
                     }
+                },
+                displayColors: true,
+                bodyFont: {
+                    size: 12
+                },
+                titleFont: {
+                    size: 13
                 }
             }
         },
