@@ -57,6 +57,8 @@ export default function Home() {
   // }, []);
 
   const handleRefreshClick = () => {
+    console.log(`🔴 FORCE REFRESH BUTTON CLICKED at ${new Date().toISOString()}`);
+    console.log(`🔴 This should trigger exactly 10 API calls to Yahoo Finance (one per unique symbol)`);
     loadData(true, true); // Show refresh indicator and force refresh
   };
 

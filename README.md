@@ -99,7 +99,7 @@ portfolio-tracker/
 │   ├── data/              # Data files
 │   │   ├── positions.template.json  # Template for portfolio data
 │   │   ├── positions.json          # Your portfolio data (gitignored)
-│   │   └── dailyPrices.json        # Price cache
+│   │   └── positionsPrices.json        # Price cache
 │   ├── types/             # TypeScript type definitions
 │   └── utils/             # Utility functions
 ├── projectDevUtils/       # Development utilities and setup scripts

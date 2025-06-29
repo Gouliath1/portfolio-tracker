@@ -215,23 +215,23 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 tension: 0.1,
                 fill: true,
-                pointRadius: (context: any) => {
+                pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 8 : 3; // Larger dots for transaction dates
                 },
-                pointHoverRadius: (context: any) => {
+                pointHoverRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 10 : 5;
                 },
-                pointBackgroundColor: (context: any) => {
+                pointBackgroundColor: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 'rgb(34, 197, 94)' : 'rgba(34, 197, 94, 0.8)';
                 },
-                pointBorderColor: (context: any) => {
+                pointBorderColor: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 'rgb(22, 163, 74)' : 'rgba(34, 197, 94, 0.8)';
                 },
-                pointBorderWidth: (context: any) => {
+                pointBorderWidth: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 2 : 1;
                 }
@@ -244,23 +244,23 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 tension: 0.1,
                 fill: false,
                 hidden: !showValues, // Hide cost line when showing percentages
-                pointRadius: (context: any) => {
+                pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 8 : 3;
                 },
-                pointHoverRadius: (context: any) => {
+                pointHoverRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 10 : 5;
                 },
-                pointBackgroundColor: (context: any) => {
+                pointBackgroundColor: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 'rgb(148, 163, 184)' : 'rgba(148, 163, 184, 0.8)';
                 },
-                pointBorderColor: (context: any) => {
+                pointBorderColor: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 'rgb(100, 116, 139)' : 'rgba(148, 163, 184, 0.8)';
                 },
-                pointBorderWidth: (context: any) => {
+                pointBorderWidth: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 2 : 1;
                 }

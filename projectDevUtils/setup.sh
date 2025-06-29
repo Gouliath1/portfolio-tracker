@@ -125,7 +125,7 @@ EOF
     fi
     
     # Check other data files
-    for file in "dailyPrices.json"; do
+    for file in "positionsPrices.json"; do
         if [ -f "src/data/$file" ]; then
             log_info "$file exists"
         else

@@ -151,7 +151,7 @@ function checkDataFiles() {
     
     // Check other data files
     const requiredDataFiles = [
-        'dailyPrices.json'
+        'positionsPrices.json'
     ];
     
     requiredDataFiles.forEach(file => {

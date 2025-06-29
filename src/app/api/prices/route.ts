@@ -2,33 +2,42 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-const CACHE_FILE_PATH = path.join(process.cwd(), 'src/data/dailyPrices.json');
+const CACHE_FILE_PATH = path.join(process.cwd(), 'src/data/positionsPrices.json');
 
-interface DailyPricesCache {
-    lastUpdated: string;
-    prices: {
-        [symbol: string]: number;
+interface HistoricalPricesData {
+    [symbol: string]: {
+        [date: string]: number;
     };
 }
 
-async function readPriceCache(): Promise<DailyPricesCache> {
+async function readHistoricalPrices(): Promise<HistoricalPricesData> {
     try {
         const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
         return JSON.parse(data);
     } catch {
-        return { lastUpdated: '', prices: {} };
+        return {};
     }
 }
 
-async function writePriceCache(cache: DailyPricesCache): Promise<void> {
-    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
+async function writeHistoricalPrices(data: HistoricalPricesData): Promise<void> {
+    // Sort each symbol's dates in descending order (newest to oldest)
+    const sortedData: HistoricalPricesData = {};
+    
+    for (const [symbol, prices] of Object.entries(data)) {
+        const sortedDates = Object.keys(prices).sort((a, b) => b.localeCompare(a));
+        sortedData[symbol] = {};
+        
+        for (const date of sortedDates) {
+            sortedData[symbol][date] = prices[date];
+        }
+    }
+    
+    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(sortedData, null, 2), 'utf-8');
 }
 
-function isCacheValid(lastUpdated: string): boolean {
-    if (!lastUpdated) return false;
-    
+function getTodaysPrice(data: HistoricalPricesData, symbol: string): number | null {
     const today = new Date().toISOString().split('T')[0];
-    return lastUpdated === today;
+    return data[symbol]?.[today] || null;
 }
 
 export async function GET(request: Request) {
@@ -39,19 +48,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
     }
 
-    const cache = await readPriceCache();
-    const cacheIsValid = isCacheValid(cache.lastUpdated);
-    const hasSymbolInCache = symbol in cache.prices;
+    const historicalData = await readHistoricalPrices();
+    const todaysPrice = getTodaysPrice(historicalData, symbol);
     
-    if (!cacheIsValid) {
-        return NextResponse.json({ price: null });
-    }
-
-    if (hasSymbolInCache) {
-        return NextResponse.json({ price: cache.prices[symbol] });
-    } else {
-        return NextResponse.json({ price: null });
-    }
+    return NextResponse.json({ price: todaysPrice });
 }
 
 export async function POST(request: Request) {
@@ -62,17 +62,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Symbol and price are required' }, { status: 400 });
     }
     
-    const cache = await readPriceCache();
+    const historicalData = await readHistoricalPrices();
     const today = new Date().toISOString().split('T')[0];
     
-    if (cache.lastUpdated !== today) {
-        cache.prices = {};
+    // Initialize symbol data if it doesn't exist
+    if (!historicalData[symbol]) {
+        historicalData[symbol] = {};
     }
     
-    cache.lastUpdated = today;
-    cache.prices[symbol] = price;
+    // Update only today's price for this symbol
+    historicalData[symbol][today] = price;
     
-    await writePriceCache(cache);
+    await writeHistoricalPrices(historicalData);
     
     return NextResponse.json({ success: true });
 }

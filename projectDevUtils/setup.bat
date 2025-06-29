@@ -98,7 +98,7 @@ if not exist "src\data\positions.json" (
 )
 
 REM Check other data files
-for %%f in (dailyPrices.json) do (
+for %%f in (positionsPrices.json) do (
     if exist "src\data\%%f" (
         echo    %%f exists
     ) else (
