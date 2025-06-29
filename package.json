@@ -11,8 +11,7 @@
     "push": "./projectDevUtils/gitPush.sh",
     "setup": "node projectDevUtils/setup.js",
     "setup:unix": "./projectDevUtils/setup.sh",
-    "setup:windows": "projectDevUtils/setup.bat",
-    "populate-data": "npx tsx projectDevUtils/populateHistoricalData.ts"
+    "setup:windows": "projectDevUtils/setup.bat"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
