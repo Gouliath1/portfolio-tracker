@@ -1,19 +1,16 @@
 // Script to populate sample historical price data
-// This demonstrates the new historical price structure
+// This demonstrates the existing price structure used by the portfolio tracker
 
 import { promises as fs } from 'fs';
 import path from 'path';
 
-interface HistoricalPriceData {
-    lastUpdated: string;
-    currentPrices: { [symbol: string]: number };
-    historicalPrices: { [date: string]: { [symbol: string]: number } };
-}
+// Structure: { [symbol: string]: { [date: string]: number } }
+type PriceData = { [symbol: string]: { [date: string]: number } };
 
-const HISTORICAL_PRICES_FILE = path.join(process.cwd(), 'src', 'data', 'dailyPrices.json');
+const PRICES_FILE = path.join(process.cwd(), 'src', 'data', 'positionsPrices.json');
 
 // Generate sample historical data for the past year
-function generateSampleHistoricalData(): HistoricalPriceData {
+function generateSampleHistoricalData(): PriceData {
     const today = new Date();
     const symbols = ['7940.T', '8604.T', '8953.T', '8966.T', '3465.T', '4246.T', 'NVDA', '8897.T', '8986.T', 'AAPL'];
     
@@ -31,14 +28,17 @@ function generateSampleHistoricalData(): HistoricalPriceData {
         'AAPL': 201.08
     };
     
-    const historicalPrices: { [date: string]: { [symbol: string]: number } } = {};
+    const priceData: PriceData = {};
+    
+    // Initialize each symbol
+    symbols.forEach(symbol => {
+        priceData[symbol] = {};
+    });
     
     // Generate monthly data for the past 2 years
     for (let monthsBack = 0; monthsBack <= 24; monthsBack++) {
         const date = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
         const dateStr = date.toISOString().split('T')[0];
-        
-        historicalPrices[dateStr] = {};
         
         symbols.forEach(symbol => {
             const currentPrice = currentPrices[symbol] || 100;
@@ -52,28 +52,34 @@ function generateSampleHistoricalData(): HistoricalPriceData {
             // Round to appropriate decimal places
             if (symbol.includes('.T')) {
                 // Japanese stocks - round to whole numbers
-                historicalPrices[dateStr][symbol] = Math.round(historicalPrice);
+                priceData[symbol][dateStr] = Math.round(historicalPrice);
             } else {
                 // US stocks - round to 2 decimal places
-                historicalPrices[dateStr][symbol] = Math.round(historicalPrice * 100) / 100;
+                priceData[symbol][dateStr] = Math.round(historicalPrice * 100) / 100;
             }
         });
     }
     
-    return {
-        lastUpdated: today.toISOString().split('T')[0],
-        currentPrices,
-        historicalPrices
-    };
+    // Sort dates for each symbol (newest first, as in existing file)
+    symbols.forEach(symbol => {
+        const sortedDates = Object.keys(priceData[symbol]).sort((a, b) => b.localeCompare(a));
+        const sortedPrices: { [date: string]: number } = {};
+        sortedDates.forEach(date => {
+            sortedPrices[date] = priceData[symbol][date];
+        });
+        priceData[symbol] = sortedPrices;
+    });
+    
+    return priceData;
 }
 
 async function populateHistoricalData() {
     try {
         const data = generateSampleHistoricalData();
-        await fs.writeFile(HISTORICAL_PRICES_FILE, JSON.stringify(data, null, 2));
+        await fs.writeFile(PRICES_FILE, JSON.stringify(data, null, 2));
         console.log('Historical price data populated successfully!');
-        console.log(`Generated data for ${Object.keys(data.historicalPrices).length} dates`);
-        console.log(`Covering ${Object.keys(data.currentPrices).length} symbols`);
+        console.log(`Generated data for ${Object.keys(data).length} symbols`);
+        console.log(`Each symbol has historical data for multiple dates`);
     } catch (error) {
         console.error('Error populating historical data:', error);
     }
