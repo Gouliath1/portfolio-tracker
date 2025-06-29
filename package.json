@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack --port 3000",
+    "dev:clean": "./projectDevUtils/startDev.sh",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "push": "./projectDevUtils/gitPush.sh",
     "setup": "node projectDevUtils/setup.js",
     "setup:unix": "./projectDevUtils/setup.sh",
-    "setup:windows": "projectDevUtils/setup.bat"
+    "setup:windows": "projectDevUtils/setup.bat",
+    "populate-data": "npx tsx projectDevUtils/populateHistoricalData.ts"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
