@@ -13,6 +13,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [historicalRefreshing, setHistoricalRefreshing] = useState(false);
   const [showValues, setShowValues] = useState(() => {
     // Initialize from localStorage, default to true
     const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
@@ -62,6 +63,35 @@ export default function Home() {
     loadData(true, true); // Show refresh indicator and force refresh
   };
 
+  const handleHistoricalRefreshClick = async () => {
+    console.log(`📈 HISTORICAL REFRESH BUTTON CLICKED at ${new Date().toISOString()}`);
+    setHistoricalRefreshing(true);
+    try {
+      const response = await fetch('/api/historical-prices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log(`✅ Historical refresh completed:`, result);
+      
+      // Reload the data to show updated historical prices
+      await loadData(false, false);
+      
+    } catch (error) {
+      console.error('Error refreshing historical data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to refresh historical data');
+    } finally {
+      setHistoricalRefreshing(false);
+    }
+  };
+
   if (loading) return <div className="min-h-screen p-8 bg-gray-100">Loading...</div>;
   if (error) return <div className="min-h-screen p-8 bg-gray-100">Error: {error}</div>;
   if (!portfolioSummary) return <div className="min-h-screen p-8 bg-gray-100">No data available</div>;
@@ -81,7 +111,7 @@ export default function Home() {
           </button>
           <button
             onClick={handleRefreshClick}
-            disabled={refreshing}
+            disabled={refreshing || historicalRefreshing}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors flex items-center gap-2"
           >
             {refreshing ? (
@@ -98,6 +128,27 @@ export default function Home() {
               </>
             ) : (
               'Refresh Prices'
+            )}
+          </button>
+          <button
+            onClick={handleHistoricalRefreshClick}
+            disabled={refreshing || historicalRefreshing}
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-purple-300 transition-colors flex items-center gap-2"
+          >
+            {historicalRefreshing ? (
+              <>
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Refreshing Historical...
+              </>
+            ) : (
+              'Refresh Historical Data'
             )}
           </button>
         </div>
