@@ -679,19 +679,24 @@ export async function getHistoricalFxRateForTransaction(position: Position | Raw
     
     // Read FX rates directly from file in server context
     try {
-        const fs = await import('fs/promises');
-        const path = await import('path');
-        const fxRatesPath = path.join(process.cwd(), 'src/data/fxRates.json');
-        const data = await fs.readFile(fxRatesPath, 'utf-8');
-        const fxRates = JSON.parse(data);
-        
-        if (fxRates[fxPair] && fxRates[fxPair][transactionDate]) {
-            const rate = fxRates[fxPair][transactionDate];
-            console.log(`📈 Historical FX ${fxPair} for ${position.transactionDate}: ${rate} (exact date match)`);
-            return rate;
+        // Only execute file system operations on server side
+        if (typeof window === 'undefined') {
+            const fs = await import('fs/promises');
+            const path = await import('path');
+            const fxRatesPath = path.join(process.cwd(), 'src/data/fxRates.json');
+            const data = await fs.readFile(fxRatesPath, 'utf-8');
+            const fxRates = JSON.parse(data);
+            
+            if (fxRates[fxPair] && fxRates[fxPair][transactionDate]) {
+                const rate = fxRates[fxPair][transactionDate];
+                console.log(`📈 Historical FX ${fxPair} for ${position.transactionDate}: ${rate} (exact date match)`);
+                return rate;
+            }
+            
+            console.warn(`⚠️ No FX rate found for ${fxPair} on ${transactionDate}, will need to refresh FX rates`);
+        } else {
+            console.warn(`⚠️ Cannot read FX rates from file system in client context for ${fxPair} on ${transactionDate}`);
         }
-        
-        console.warn(`⚠️ No FX rate found for ${fxPair} on ${transactionDate}, will need to refresh FX rates`);
     } catch (error) {
         console.warn(`Failed to get historical FX rate for ${fxPair} on ${position.transactionDate}:`, error);
     }

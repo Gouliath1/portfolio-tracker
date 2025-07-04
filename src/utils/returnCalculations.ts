@@ -19,16 +19,17 @@ export const calculateAnnualizedReturn = (totalReturn: number, startDate: string
 };
 
 /**
- * Calculate portfolio-level weighted annualized return
+ * Calculate portfolio-level weighted annualized return with date information
  * @param summary - Portfolio summary containing positions
- * @returns Weighted annualized return percentage or null if no valid positions
+ * @returns Object with return percentage and earliest qualifying date, or null if no valid positions
  */
-export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): number | null => {
+export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): { return: number; earliestDate: string } | null => {
     if (summary.positions.length === 0) return null;
     
     let totalWeightedReturn = 0;
     let totalValidCost = 0;
     let hasAnyValidReturns = false;
+    let earliestDate: string | null = null;
     
     summary.positions.forEach(position => {
         const annualizedReturn = calculateAnnualizedReturn(position.pnlPercentage, position.transactionDate);
@@ -39,10 +40,18 @@ export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): n
             totalWeightedReturn += annualizedReturn * weight;
             totalValidCost += weight;
             hasAnyValidReturns = true;
+            
+            // Track earliest date
+            if (!earliestDate || position.transactionDate < earliestDate) {
+                earliestDate = position.transactionDate;
+            }
         }
     });
     
-    if (!hasAnyValidReturns || totalValidCost === 0) return null;
+    if (!hasAnyValidReturns || totalValidCost === 0 || !earliestDate) return null;
     
-    return totalWeightedReturn / totalValidCost;
+    return {
+        return: totalWeightedReturn / totalValidCost,
+        earliestDate
+    };
 };
