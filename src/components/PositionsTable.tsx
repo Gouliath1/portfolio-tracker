@@ -13,6 +13,7 @@ import {
     type ColumnSizingState,
 } from '@tanstack/react-table';
 import { Position } from '../types/portfolio';
+import { calculateAnnualizedReturn } from '../utils/returnCalculations';
 
 // Extend the TableMeta type from @tanstack/react-table
 declare module '@tanstack/react-table' {
@@ -54,18 +55,6 @@ const defaultColumnVisibility: VisibilityState = {
 };
 
 const getHiddenValue = (value: number) => '•'.repeat(Math.min(8, Math.ceil(Math.log10(Math.abs(value) + 1))));
-
-const calculateAnnualizedReturn = (totalReturn: number, startDate: string) => {
-    const start = new Date(startDate);
-    const now = new Date();
-    const years = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-    
-    if (years < 1) {
-        return null; // Return null for positions held less than a year
-    }
-    
-    return (Math.pow(1 + (totalReturn / 100), 1/years) - 1) * 100;
-};
 
 const columns = [
     columnHelper.accessor('transactionDate', {
