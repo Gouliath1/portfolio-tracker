@@ -22,6 +22,11 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
     const hasNullPrices = summary.positions.some(p => p.currentPrice === null);
     const portfolioAnnualizedReturn = calculatePortfolioAnnualizedReturn(summary);
 
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+    };
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="bg-white p-6 rounded-lg shadow">
@@ -62,18 +67,27 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
                 </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
-                <div className={`absolute inset-0 ${portfolioAnnualizedReturn !== null && portfolioAnnualizedReturn >= 0 ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
+                <div className={`absolute inset-0 ${portfolioAnnualizedReturn !== null && portfolioAnnualizedReturn.return >= 0 ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
                 <div className="relative">
                     <h3 className="text-lg font-medium text-gray-900">Annualized P&L %</h3>
-                    <p className={`mt-2 text-3xl font-semibold ${hasNullPrices ? 'text-gray-400' : portfolioAnnualizedReturn === null ? 'text-gray-400' : portfolioAnnualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`mt-2 ${hasNullPrices ? 'text-gray-400' : portfolioAnnualizedReturn === null ? 'text-gray-400' : portfolioAnnualizedReturn.return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {hasNullPrices ? (
-                            'Updating...'
+                            <div className="text-3xl font-semibold">Updating...</div>
                         ) : portfolioAnnualizedReturn === null ? (
-                            <span className="text-sm" title="Annualized return calculated for positions held 1+ years">-</span>
+                            <div className="text-3xl font-semibold" title="Annualized return calculated for positions held 1+ years">
+                                <span className="text-sm">-</span>
+                            </div>
                         ) : (
-                            <>{portfolioAnnualizedReturn.toFixed(2)}%</>
+                            <>
+                                <div className="text-3xl font-semibold">
+                                    {portfolioAnnualizedReturn.return.toFixed(2)}%
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                    (since {formatDate(portfolioAnnualizedReturn.earliestDate)})
+                                </div>
+                            </>
                         )}
-                    </p>
+                    </div>
                 </div>
             </div>
         </div>
