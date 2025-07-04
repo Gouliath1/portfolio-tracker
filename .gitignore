@@ -44,3 +44,7 @@ next-env.d.ts
 src/data/positions.json
 src/data/positions.json.*
 !src/data/positions.template.json
+src/data/positionsPrices.json
+src/data/fxRates.json
+!src/data/positionsPrices.template.json
+!src/data/fxRates.template.json
