@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { fetchStockPrice } from '../../utils/stockApi';
+import { fetchStockPrice } from '../../utils/yahooFinanceApi';
 
 export default function TestApi() {
     const [prices, setPrices] = useState<{[key: string]: number | null}>({});

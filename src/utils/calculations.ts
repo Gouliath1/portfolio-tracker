@@ -1,10 +1,14 @@
 import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
-import { fetchStockPrice, updateAllPositions } from './stockApi';
+import { fetchStockPrice, updateAllPositions, getCurrentFxRateForPosition, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
 
-export const calculatePosition = (rawPosition: RawPosition, currentPrice: number | null): Position => {
+export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null): Promise<Position> => {
     const costInJPY = rawPosition.quantity * rawPosition.costPerUnit * rawPosition.transactionFx;
+    
+    // Get current FX rate for value calculation
+    const currentFxRate = await getCurrentFxRateForPosition(rawPosition);
+    
     const currentValueJPY = currentPrice !== null 
-        ? rawPosition.quantity * currentPrice * (rawPosition.baseCcy === 'JPY' ? 1 : rawPosition.transactionFx)
+        ? rawPosition.quantity * currentPrice * (rawPosition.baseCcy === BASE_CURRENCY_CONSTANT ? 1 : currentFxRate)
         : 0;
     const pnlJPY = currentPrice !== null ? currentValueJPY - costInJPY : 0;
     const pnlPercentage = currentPrice !== null ? (pnlJPY / costInJPY) * 100 : 0;
@@ -42,10 +46,11 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         }
     }
     
-    // Calculate positions with current prices
-    const positions = rawPositions.map(pos => 
+    // Calculate positions with current prices (async)
+    const positionPromises = rawPositions.map(pos => 
         calculatePosition(pos, currentPrices[pos.ticker.toString()])
     );
+    const positions = await Promise.all(positionPromises);
     
     // Calculate totals
     const totalCostJPY = positions.reduce((sum, pos) => sum + pos.costInJPY, 0);

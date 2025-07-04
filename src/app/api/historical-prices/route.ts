@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { refreshAllHistoricalData } from '@/utils/stockApi';
+import { refreshAllHistoricalData, refreshFxRatesForDates } from '@/utils/yahooFinanceApi';
 
 const POSITIONS_FILE_PATH = path.join(process.cwd(), 'src/data/positions.json');
 const PRICES_FILE_PATH = path.join(process.cwd(), 'src/data/positionsPrices.json');
+const FX_RATES_FILE_PATH = path.join(process.cwd(), 'src/data/fxRates.json');
 const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'src/data/positions.template.json');
 
 export async function POST(request: NextRequest) {
@@ -65,18 +66,69 @@ export async function POST(request: NextRequest) {
         // Write updated prices to file
         await fs.writeFile(PRICES_FILE_PATH, JSON.stringify(updatedPrices, null, 2));
         
+        // Refresh FX rates for all available dates
+        console.log('💱 Starting FX rates refresh...');
+        const fxResults = await refreshFxRatesForDates(updatedPrices, positionsData.positions);
+        
+        // Load existing FX rates data
+        let existingFxRates: {[fxPair: string]: {[date: string]: number}} = {};
+        try {
+            const existingFxData = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
+            existingFxRates = JSON.parse(existingFxData);
+        } catch (error) {
+            console.log('No existing FX rates file found, creating new one');
+        }
+        
+        // Merge FX data with existing data
+        const updatedFxRates: {[fxPair: string]: {[date: string]: number}} = { ...existingFxRates };
+        
+        for (const [fxPair, fxData] of Object.entries(fxResults)) {
+            if (fxData) {
+                updatedFxRates[fxPair] = fxData;
+                console.log(`✅ Updated FX rates for ${fxPair}: ${Object.keys(fxData).length} data points`);
+            } else {
+                console.log(`❌ Failed to get FX rates for ${fxPair}`);
+            }
+        }
+        
+        // Sort dates for each FX pair (newest first)
+        for (const fxPair of Object.keys(updatedFxRates)) {
+            if (updatedFxRates[fxPair] && typeof updatedFxRates[fxPair] === 'object') {
+                const sortedDates = Object.keys(updatedFxRates[fxPair]).sort((a, b) => b.localeCompare(a));
+                const sortedRates: {[date: string]: number} = {};
+                sortedDates.forEach(date => {
+                    sortedRates[date] = updatedFxRates[fxPair][date];
+                });
+                updatedFxRates[fxPair] = sortedRates;
+            }
+        }
+        
+        // Write updated FX rates to file
+        await fs.writeFile(FX_RATES_FILE_PATH, JSON.stringify(updatedFxRates, null, 2));
+        
         const successfulUpdates = Object.entries(historicalResults).filter(([_, data]) => data !== null).length;
         const failedUpdates = Object.entries(historicalResults).filter(([_, data]) => data === null).length;
         
+        const successfulFxUpdates = Object.entries(fxResults).filter(([_, data]) => data !== null).length;
+        const failedFxUpdates = Object.entries(fxResults).filter(([_, data]) => data === null).length;
+        
         console.log(`🏁 Historical refresh completed: ${successfulUpdates} successful, ${failedUpdates} failed`);
+        console.log(`🏁 FX rates refresh completed: ${successfulFxUpdates} successful, ${failedFxUpdates} failed`);
         
         return NextResponse.json({
             success: true,
-            message: `Historical data refreshed for ${successfulUpdates} symbols`,
+            message: `Historical data refreshed for ${successfulUpdates} symbols and ${successfulFxUpdates} FX pairs`,
             results: {
-                successful: successfulUpdates,
-                failed: failedUpdates,
-                symbols: Object.keys(historicalResults)
+                prices: {
+                    successful: successfulUpdates,
+                    failed: failedUpdates,
+                    symbols: Object.keys(historicalResults)
+                },
+                fxRates: {
+                    successful: successfulFxUpdates,
+                    failed: failedFxUpdates,
+                    pairs: Object.keys(fxResults)
+                }
             }
         });
         
