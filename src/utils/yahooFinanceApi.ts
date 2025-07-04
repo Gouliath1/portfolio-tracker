@@ -18,7 +18,7 @@ interface Position {
     transactionDate: string;
     ticker: string;
     baseCcy?: string;
-    [key: string]: any;
+    transactionFx?: number;
 }
 
 // Interface for raw position data (from file)
@@ -26,7 +26,11 @@ interface RawPosition {
     transactionDate: string;
     ticker: string | number;
     baseCcy: string;
-    [key: string]: any;
+    transactionFx?: number;
+    fullName?: string;
+    account?: string;
+    quantity?: number;
+    costPerUnit?: number;
 }
 
 // Calculate how long ago a position was purchased
@@ -186,7 +190,7 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
             // Note: In server-side context, cache updates are handled by the endpoint that called this function
             try {
                 await updatePriceCache(symbol, price);
-            } catch (error) {
+            } catch {
                 // This is expected in server contexts where relative URLs don't work
                 // The calling endpoint should handle cache updates directly
             }
@@ -461,7 +465,7 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
             // Note: In server-side context, cache updates are handled by the endpoint that called this function
             try {
                 await updateFxRateCache(fxPair, roundedRate);
-            } catch (error) {
+            } catch {
                 // This is expected in server contexts where relative URLs don't work
                 // The calling endpoint should handle cache updates directly
             }
@@ -670,7 +674,7 @@ export async function getHistoricalFxRateForTransaction(position: Position | Raw
     
     if (!transactionDate) {
         console.warn(`⚠️ No transaction date for position ${position.ticker}, using fallback`);
-        return (position as any).transactionFx || 1;
+        return position.transactionFx || 1;
     }
     
     // Read FX rates directly from file in server context
@@ -693,7 +697,7 @@ export async function getHistoricalFxRateForTransaction(position: Position | Raw
     }
     
     // Fallback to transactionFx if available, otherwise 1
-    return (position as any).transactionFx || 1;
+    return position.transactionFx || 1;
 }
 
 // Export BASE_CURRENCY for use in other modules

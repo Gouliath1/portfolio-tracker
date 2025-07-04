@@ -54,7 +54,7 @@ export function getPortfolioStateAtDate(positions: RawPosition[], targetDate: Da
     
     const consolidatedPositions = Array.from(groupedPositions.values());
     const totalCost = consolidatedPositions.reduce(
-        (sum, pos) => sum + (pos.quantity * pos.costPerUnit * pos.transactionFx),
+        (sum, pos) => sum + (pos.quantity * pos.costPerUnit * (pos.transactionFx || 1)),
         0
     );
     
@@ -102,7 +102,7 @@ export async function calculateHistoricalValues(positions: RawPosition[]): Promi
         let totalValue = 0;
         for (const pos of snapshot.positions) {
             const price = historicalPrices[pos.ticker] || 0;
-            const value = pos.quantity * price * (pos.baseCcy === 'JPY' ? 1 : pos.transactionFx);
+            const value = pos.quantity * price * (pos.baseCcy === 'JPY' ? 1 : (pos.transactionFx || 1));
             totalValue += value;
         }
         

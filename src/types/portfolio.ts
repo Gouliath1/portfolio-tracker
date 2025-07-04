@@ -17,6 +17,8 @@ export interface Position extends RawPosition {
     currentValueJPY: number;
     pnlJPY: number;
     pnlPercentage: number;
+    transactionFxRate: number; // FX rate used for cost calculation (historical or transaction)
+    currentFxRate: number; // Current FX rate used for value calculation
 }
 
 export interface PortfolioSummary {

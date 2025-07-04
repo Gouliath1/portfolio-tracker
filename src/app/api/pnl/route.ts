@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RawPosition, Position } from '@/types/portfolio';
+import { RawPosition } from '@/types/portfolio';
 import { calculatePortfolioSummary } from '@/utils/calculations';
 
 const POSITIONS_FILE_PATH = path.join(process.cwd(), 'src/data/positions.json');
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         const positionsData = await readPositionsData();
         
         // Convert any numeric tickers to strings and ensure proper typing
-        const rawPositions: RawPosition[] = positionsData.positions.map((pos: any) => ({
+        const rawPositions: RawPosition[] = positionsData.positions.map((pos: RawPosition) => ({
             ...pos,
             ticker: pos.ticker.toString()
         }));

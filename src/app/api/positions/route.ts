@@ -34,7 +34,7 @@ export async function GET() {
         const positionsData = await readPositionsData();
         
         // Convert any numeric tickers to strings and ensure proper typing
-        const processedPositions: RawPosition[] = positionsData.positions.map((pos: any) => ({
+        const processedPositions: RawPosition[] = positionsData.positions.map((pos: RawPosition) => ({
             ...pos,
             ticker: pos.ticker.toString()
         }));

@@ -38,11 +38,19 @@ const defaultColumnSizing: ColumnSizingState = {
     quantity: 100,
     costPerUnit: 120,
     currentPrice: 120,
+    transactionFxRate: 120,
+    currentFxRate: 120,
     costInJPY: 130,
     currentValueJPY: 130,
     pnlJPY: 130,
     pnlPercentage: 100,
     annualizedReturn: 100,
+};
+
+// Default column visibility (FX rate columns hidden by default)
+const defaultColumnVisibility: VisibilityState = {
+    transactionFxRate: false,
+    currentFxRate: false,
 };
 
 const getHiddenValue = (value: number) => '•'.repeat(Math.min(8, Math.ceil(Math.log10(Math.abs(value) + 1))));
@@ -124,6 +132,50 @@ const columns = [
             return (
                 <span className={value >= row.costPerUnit ? 'text-green-600' : 'text-red-600'}>
                     {ccy}{displayValue}
+                </span>
+            );
+        },
+    }),
+    columnHelper.accessor('transactionFxRate', {
+        header: 'FX Rate (Transaction)',
+        size: 120,
+        cell: props => {
+            const value = props.getValue();
+            const row = props.row.original;
+            
+            // Only show FX rate for non-JPY currencies
+            if (row.baseCcy === 'JPY') {
+                return <span className="text-gray-400">N/A</span>;
+            }
+            
+            return props.table.options.meta?.showValues
+                ? value.toFixed(4)
+                : getHiddenValue(value);
+        },
+    }),
+    columnHelper.accessor('currentFxRate', {
+        header: 'FX Rate (Current)',
+        size: 120,
+        cell: props => {
+            const value = props.getValue();
+            const row = props.row.original;
+            
+            // Only show FX rate for non-JPY currencies
+            if (row.baseCcy === 'JPY') {
+                return <span className="text-gray-400">N/A</span>;
+            }
+            
+            const displayValue = props.table.options.meta?.showValues
+                ? value.toFixed(4)
+                : getHiddenValue(value);
+                
+            // Color code based on comparison with transaction rate
+            const isHigher = value > row.transactionFxRate;
+            const colorClass = isHigher ? 'text-green-600' : 'text-red-600';
+            
+            return (
+                <span className={colorClass} title={`Transaction: ${row.transactionFxRate.toFixed(4)}`}>
+                    {displayValue}
                 </span>
             );
         },
@@ -237,7 +289,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
         const saved = typeof window !== 'undefined' ? localStorage.getItem('columnVisibility') : null;
-        return saved ? JSON.parse(saved) : {};
+        return saved ? JSON.parse(saved) : defaultColumnVisibility;
     });
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => {
         const saved = typeof window !== 'undefined' ? localStorage.getItem('columnSizing') : null;

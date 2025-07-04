@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { refreshAllHistoricalData, refreshFxRatesForDates } from '@/utils/yahooFinanceApi';
@@ -8,7 +8,7 @@ const PRICES_FILE_PATH = path.join(process.cwd(), 'src/data/positionsPrices.json
 const FX_RATES_FILE_PATH = path.join(process.cwd(), 'src/data/fxRates.json');
 const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'src/data/positions.template.json');
 
-export async function POST(request: NextRequest) {
+export async function POST() {
     try {
         console.log('🔄 Historical price refresh initiated...');
         
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
         try {
             const data = await fs.readFile(POSITIONS_FILE_PATH, 'utf-8');
             positionsData = JSON.parse(data);
-        } catch (error) {
+        } catch {
             console.log('positions.json not found, using template data');
             const data = await fs.readFile(POSITIONS_TEMPLATE_PATH, 'utf-8');
             positionsData = JSON.parse(data);
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         try {
             const existingData = await fs.readFile(PRICES_FILE_PATH, 'utf-8');
             existingPrices = JSON.parse(existingData);
-        } catch (error) {
+        } catch {
             console.log('No existing prices file found, creating new one');
         }
         
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         try {
             const existingFxData = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
             existingFxRates = JSON.parse(existingFxData);
-        } catch (error) {
+        } catch {
             console.log('No existing FX rates file found, creating new one');
         }
         
@@ -106,11 +106,11 @@ export async function POST(request: NextRequest) {
         // Write updated FX rates to file
         await fs.writeFile(FX_RATES_FILE_PATH, JSON.stringify(updatedFxRates, null, 2));
         
-        const successfulUpdates = Object.entries(historicalResults).filter(([_, data]) => data !== null).length;
-        const failedUpdates = Object.entries(historicalResults).filter(([_, data]) => data === null).length;
+        const successfulUpdates = Object.entries(historicalResults).filter(([, data]) => data !== null).length;
+        const failedUpdates = Object.entries(historicalResults).filter(([, data]) => data === null).length;
         
-        const successfulFxUpdates = Object.entries(fxResults).filter(([_, data]) => data !== null).length;
-        const failedFxUpdates = Object.entries(fxResults).filter(([_, data]) => data === null).length;
+        const successfulFxUpdates = Object.entries(fxResults).filter(([, data]) => data !== null).length;
+        const failedFxUpdates = Object.entries(fxResults).filter(([, data]) => data === null).length;
         
         console.log(`🏁 Historical refresh completed: ${successfulUpdates} successful, ${failedUpdates} failed`);
         console.log(`🏁 FX rates refresh completed: ${successfulFxUpdates} successful, ${failedFxUpdates} failed`);
@@ -147,7 +147,7 @@ export async function GET() {
         const data = await fs.readFile(PRICES_FILE_PATH, 'utf-8');
         const prices = JSON.parse(data);
         return NextResponse.json({ prices });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ 
             error: 'Historical prices file not found',
             message: 'Use POST to refresh historical data first'

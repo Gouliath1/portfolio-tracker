@@ -21,7 +21,9 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         costInJPY,
         currentValueJPY,
         pnlJPY,
-        pnlPercentage
+        pnlPercentage,
+        transactionFxRate: historicalFxRate,
+        currentFxRate: currentFxRate
     };
 };
 

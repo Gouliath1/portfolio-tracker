@@ -322,7 +322,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                         if (portfolioAtDate.transactions && portfolioAtDate.transactions.length > 0) {
                             const transactionLines = ['', 'Transactions on this date:'];
                             portfolioAtDate.transactions.forEach((transaction: Position) => {
-                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * transaction.transactionFx).toLocaleString();
+                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1)).toLocaleString();
                                 transactionLines.push(
                                     `${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}`
                                 );
