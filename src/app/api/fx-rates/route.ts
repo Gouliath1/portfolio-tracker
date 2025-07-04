@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     try {
         const url = new URL(request.url);
         const fxPair = url.searchParams.get('pair');
+        const requestedDate = url.searchParams.get('date');
         
         if (!fxPair) {
             return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
@@ -31,6 +32,25 @@ export async function GET(request: NextRequest) {
         
         if (!fxRates[fxPair]) {
             return NextResponse.json({ rate: null });
+        }
+        
+        // If specific date requested, try to find closest match
+        if (requestedDate) {
+            const targetDate = new Date(requestedDate.replace(/\//g, '-'));
+            const availableDates = Object.keys(fxRates[fxPair])
+                .map(dateStr => ({ dateStr, date: new Date(dateStr) }))
+                .sort((a, b) => Math.abs(a.date.getTime() - targetDate.getTime()) - Math.abs(b.date.getTime() - targetDate.getTime()));
+            
+            if (availableDates.length > 0) {
+                const closestDate = availableDates[0].dateStr;
+                const rate = fxRates[fxPair][closestDate];
+                return NextResponse.json({ 
+                    rate,
+                    date: closestDate,
+                    requestedDate,
+                    pair: fxPair
+                });
+            }
         }
         
         // Get the most recent rate (first key since dates are sorted newest first)

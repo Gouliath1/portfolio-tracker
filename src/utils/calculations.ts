@@ -1,8 +1,10 @@
 import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
-import { fetchStockPrice, updateAllPositions, getCurrentFxRateForPosition, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
+import { fetchStockPrice, updateAllPositions, getCurrentFxRateForPosition, getHistoricalFxRateForTransaction, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
 
 export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null): Promise<Position> => {
-    const costInJPY = rawPosition.quantity * rawPosition.costPerUnit * rawPosition.transactionFx;
+    // Get historical FX rate for cost calculation (at transaction date)
+    const historicalFxRate = await getHistoricalFxRateForTransaction(rawPosition);
+    const costInJPY = rawPosition.quantity * rawPosition.costPerUnit * historicalFxRate;
     
     // Get current FX rate for value calculation
     const currentFxRate = await getCurrentFxRateForPosition(rawPosition);

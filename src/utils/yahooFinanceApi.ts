@@ -477,6 +477,21 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
     }
 }
 
+// Utility function to extract unique transaction dates from positions
+function getTransactionDates(positions: (Position | RawPosition)[]): string[] {
+    const transactionDates = new Set<string>();
+    
+    for (const position of positions) {
+        if (position.transactionDate) {
+            // Convert date format from YYYY/MM/DD to YYYY-MM-DD
+            const formattedDate = position.transactionDate.replace(/\//g, '-');
+            transactionDates.add(formattedDate);
+        }
+    }
+    
+    return Array.from(transactionDates).sort();
+}
+
 // Function to refresh FX rates for all available dates
 export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[date: string]: number}}, positions: (Position | RawPosition)[]): Promise<{[fxPair: string]: {[date: string]: number} | null}> {
     const results: {[fxPair: string]: {[date: string]: number} | null} = {};
@@ -484,13 +499,19 @@ export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[dat
     const startCallCount = apiCallCounter;
     
     // Extract all unique dates from price data
-    const allDates = new Set<string>();
+    const priceDates = new Set<string>();
     for (const symbolData of Object.values(priceData)) {
         for (const date of Object.keys(symbolData)) {
-            allDates.add(date);
+            priceDates.add(date);
         }
     }
     
+    // Extract all unique transaction dates from positions
+    const transactionDates = getTransactionDates(positions);
+    console.log(`📅 Found ${transactionDates.length} unique transaction dates: ${transactionDates.join(', ')}`);
+    
+    // Combine both price dates and transaction dates
+    const allDates = new Set([...priceDates, ...transactionDates]);
     const availableDates = Array.from(allDates).sort();
     
     if (availableDates.length === 0) {
@@ -498,7 +519,7 @@ export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[dat
         return results;
     }
     
-    console.log(`💱 FX RATES REFRESH STARTED for ${availableDates.length} dates`);
+    console.log(`💱 FX RATES REFRESH STARTED for ${availableDates.length} dates (${priceDates.size} price dates + ${transactionDates.length} transaction dates)`);
     console.log(`💱 Starting API call count: ${apiCallCounter}`);
     console.log(`💱 Date range: ${availableDates[0]} to ${availableDates[availableDates.length - 1]}`);
     
@@ -636,6 +657,43 @@ export async function getCurrentFxRateForPosition(position: Position | RawPositi
     // If not in cache, fetch from Yahoo Finance
     const freshRate = await fetchCurrentFxRate(fxPair, false);
     return freshRate || position.transactionFx || 1; // Fallback to transactionFx or 1
+}
+
+// Utility function to get historical FX rate for a transaction date
+export async function getHistoricalFxRateForTransaction(position: Position | RawPosition): Promise<number> {
+    const fxPair = getFxPairForPosition(position);
+    if (!fxPair) {
+        return 1; // Base currency, no conversion needed
+    }
+    
+    const transactionDate = position.transactionDate?.replace(/\//g, '-'); // Convert YYYY/MM/DD to YYYY-MM-DD
+    
+    if (!transactionDate) {
+        console.warn(`⚠️ No transaction date for position ${position.ticker}, using fallback`);
+        return (position as any).transactionFx || 1;
+    }
+    
+    // Read FX rates directly from file in server context
+    try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const fxRatesPath = path.join(process.cwd(), 'src/data/fxRates.json');
+        const data = await fs.readFile(fxRatesPath, 'utf-8');
+        const fxRates = JSON.parse(data);
+        
+        if (fxRates[fxPair] && fxRates[fxPair][transactionDate]) {
+            const rate = fxRates[fxPair][transactionDate];
+            console.log(`📈 Historical FX ${fxPair} for ${position.transactionDate}: ${rate} (exact date match)`);
+            return rate;
+        }
+        
+        console.warn(`⚠️ No FX rate found for ${fxPair} on ${transactionDate}, will need to refresh FX rates`);
+    } catch (error) {
+        console.warn(`Failed to get historical FX rate for ${fxPair} on ${position.transactionDate}:`, error);
+    }
+    
+    // Fallback to transactionFx if available, otherwise 1
+    return (position as any).transactionFx || 1;
 }
 
 // Export BASE_CURRENCY for use in other modules

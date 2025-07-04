@@ -8,7 +8,7 @@ export interface RawPosition {
     quantity: number;
     costPerUnit: number;
     baseCcy: Currency;
-    transactionFx: number;
+    transactionFx?: number; // Optional, will be derived from historical FX rates
 }
 
 export interface Position extends RawPosition {
