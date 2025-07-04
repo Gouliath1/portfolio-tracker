@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { loadPositions } from '../data/positions';
+import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '../utils/calculations';
 import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
 import { PortfolioSummary } from '../components/PortfolioSummary';
