@@ -501,9 +501,22 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                                 </div>`;
                             }
                         } else {
-                            innerHTML += `<div style="margin-bottom: 12px; font-weight: 500;">
+                            innerHTML += `<div style="margin-bottom: 8px; font-weight: 500;">
                                 ${label}: ${mainValue.toFixed(2)}%
                             </div>`;
+                            
+                            // In percentage mode, only show percentage P&L summary
+                            if (snapshot) {
+                                const isPositive = snapshot.pnlPercentage >= 0;
+                                const pnlColor = isPositive ? '#22c55e' : '#ef4444';
+                                const pnlSign = snapshot.pnlPercentage >= 0 ? '+' : '';
+                                
+                                innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
+                                    <div style="color: ${pnlColor}; font-weight: 600;">
+                                        Portfolio P&L: ${pnlSign}${snapshot.pnlPercentage.toFixed(2)}%
+                                    </div>
+                                </div>`;
+                            }
                         }
                         
                         // Show position breakdown if available
@@ -514,22 +527,32 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                             const sortedPositions = [...snapshot.positionDetails].sort((a, b) => b.valueInJPY - a.valueInJPY);
                             
                             sortedPositions.forEach((position) => {
-                                const valueFormatted = Math.round(position.valueInJPY).toLocaleString();
-                                const pnlFormatted = Math.round(Math.abs(position.pnlJPY)).toLocaleString();
-                                const isPositive = position.pnlJPY >= 0;
+                                const isPositive = position.pnlPercentage >= 0;
                                 const pnlColor = isPositive ? '#22c55e' : '#ef4444';
-                                const pnlSign = isPositive ? '+' : '-';
                                 const pnlPercentSign = position.pnlPercentage >= 0 ? '+' : '';
                                 
-                                // Create inline display with quantity and colored P&L
-                                const quantityInfo = `${position.quantity} shares`;
-                                
-                                innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                                    • ${position.fullName}: ¥${valueFormatted} | ${quantityInfo} | 
-                                    <span style="color: ${pnlColor}; font-weight: 600;">
-                                        ${pnlSign}¥${pnlFormatted} (${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%)
-                                    </span>
-                                </div>`;
+                                if (showValues) {
+                                    // Show full details with JPY values
+                                    const valueFormatted = Math.round(position.valueInJPY).toLocaleString();
+                                    const pnlFormatted = Math.round(Math.abs(position.pnlJPY)).toLocaleString();
+                                    const pnlSign = isPositive ? '+' : '-';
+                                    const quantityInfo = `${position.quantity} shares`;
+                                    
+                                    innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                        • ${position.fullName}: ¥${valueFormatted} | ${quantityInfo} | 
+                                        <span style="color: ${pnlColor}; font-weight: 600;">
+                                            ${pnlSign}¥${pnlFormatted} (${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%)
+                                        </span>
+                                    </div>`;
+                                } else {
+                                    // Show only percentage P&L
+                                    innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                        • ${position.fullName}: 
+                                        <span style="color: ${pnlColor}; font-weight: 600;">
+                                            ${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%
+                                        </span>
+                                    </div>`;
+                                }
                             });
                         }
                         
@@ -545,10 +568,16 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                             innerHTML += '<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">';
                             innerHTML += '<div style="margin-bottom: 6px; font-weight: 500;">Transactions on this date:</div>';
                             transactions.forEach((transaction: Position) => {
-                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1)).toLocaleString();
-                                innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                                    • ${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}
-                                </div>`;
+                                if (showValues) {
+                                    const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1)).toLocaleString();
+                                    innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                        • ${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}
+                                    </div>`;
+                                } else {
+                                    innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                        • ${transaction.fullName}: ${transaction.quantity} shares
+                                    </div>`;
+                                }
                             });
                             innerHTML += '</div>';
                         }
