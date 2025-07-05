@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { Position } from '../types/portfolio';
+import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '../utils/historicalPortfolioCalculations';
 
 ChartJS.register(
     CategoryScale,
@@ -34,6 +35,9 @@ type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | '
 
 export const PerformanceChart = ({ positions, showValues }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
+    const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const timelineButtons: { key: TimelineFilter; label: string }[] = [
         { key: '1D', label: '1D' },
@@ -115,6 +119,33 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         return dates;
     };
 
+    // Effect to calculate historical data when timeline or positions change
+    useEffect(() => {
+        const calculateHistoricalData = async () => {
+            if (positions.length === 0) {
+                setHistoricalData([]);
+                return;
+            }
+
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const dateIntervals = generateDateIntervals(selectedTimeline);
+                const snapshots = await calculateHistoricalPortfolioValues(positions, dateIntervals, true); // Include details for tooltips
+                setHistoricalData(snapshots);
+            } catch (err) {
+                console.error('Error calculating historical data:', err);
+                setError('Failed to calculate historical portfolio data');
+                setHistoricalData([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        calculateHistoricalData();
+    }, [positions, selectedTimeline]); // generateDateIntervals is defined inline and doesn't need to be in deps
+
     // Get transactions that occurred near a specific date (within the interval range)
     const getTransactionsNearDate = (targetDate: Date, intervalMs: number) => {
         const halfInterval = intervalMs / 2;
@@ -127,39 +158,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         });
     };
 
-    // Calculate portfolio value at specific dates
-    const calculatePortfolioValueAtDate = (targetDate: Date) => {
-        // Get all positions that existed at the target date
-        const relevantPositions = positions.filter(pos => 
-            new Date(pos.transactionDate) <= targetDate
-        );
-
-        if (relevantPositions.length === 0) {
-            return { totalValue: 0, totalCost: 0, transactions: [] };
-        }
-
-        // Calculate cumulative cost and current value for positions held at target date
-        let totalCost = 0;
-        let totalValue = 0;
-
-        relevantPositions.forEach(pos => {
-            totalCost += pos.costInJPY;
-            // For now, use current prices as placeholder until historical prices are implemented
-            totalValue += pos.currentValueJPY;
-        });
-
-        // Get transactions that occurred near this date (using current interval for range)
-        const currentInterval = selectedTimeline === '1D' ? 60 * 60 * 1000 :
-                               selectedTimeline === '5D' || selectedTimeline === '1M' ? 24 * 60 * 60 * 1000 :
-                               selectedTimeline === '6M' || selectedTimeline === 'YTD' || selectedTimeline === '1Y' || selectedTimeline === '2Y' ? 7 * 24 * 60 * 60 * 1000 :
-                               30 * 24 * 60 * 60 * 1000; // Default to monthly for longer periods
-        
-        const transactions = getTransactionsNearDate(targetDate, currentInterval);
-
-        return { totalValue, totalCost, transactions };
-    };
-
-    // Generate the chart data based on selected timeline
+    // Generate the chart data based on historical snapshots
     const dateIntervals = generateDateIntervals(selectedTimeline);
     
     const chartLabels = dateIntervals.map(date => {
@@ -186,22 +185,33 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
     const costData: number[] = [];
     const transactionDates: boolean[] = []; // Track which dates have transactions
 
-    dateIntervals.forEach(date => {
-        const portfolioAtDate = calculatePortfolioValueAtDate(date);
-        const hasTransactions = portfolioAtDate.transactions && portfolioAtDate.transactions.length > 0;
+    dateIntervals.forEach((date, index) => {
+        const snapshot = historicalData[index];
+        
+        // Get transactions that occurred near this date
+        const currentInterval = selectedTimeline === '1D' ? 60 * 60 * 1000 :
+                               selectedTimeline === '5D' || selectedTimeline === '1M' ? 24 * 60 * 60 * 1000 :
+                               selectedTimeline === '6M' || selectedTimeline === 'YTD' || selectedTimeline === '1Y' || selectedTimeline === '2Y' ? 7 * 24 * 60 * 60 * 1000 :
+                               30 * 24 * 60 * 60 * 1000; // Default to monthly for longer periods
+        
+        const transactions = getTransactionsNearDate(date, currentInterval);
+        const hasTransactions = transactions.length > 0;
         
         transactionDates.push(hasTransactions);
         
-        if (showValues) {
-            valueData.push(portfolioAtDate.totalValue);
-            costData.push(portfolioAtDate.totalCost);
+        if (snapshot) {
+            if (showValues) {
+                valueData.push(snapshot.totalValueJPY);
+                costData.push(snapshot.totalCostJPY);
+            } else {
+                // For percentage view, use the calculated P&L percentage
+                valueData.push(snapshot.pnlPercentage);
+                costData.push(0); // No cost line for percentage view
+            }
         } else {
-            // For percentage view, calculate P&L percentage relative to cost
-            const pnlPercentage = portfolioAtDate.totalCost > 0 
-                ? ((portfolioAtDate.totalValue - portfolioAtDate.totalCost) / portfolioAtDate.totalCost) * 100 
-                : 0;
-            valueData.push(pnlPercentage);
-            costData.push(0); // No cost line for percentage view
+            // No data available for this date
+            valueData.push(0);
+            costData.push(0);
         }
     });
 
@@ -294,50 +304,148 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 }
             },
             tooltip: {
-                callbacks: {
-                    title: (tooltipItems) => {
-                        const index = tooltipItems[0].dataIndex;
+                enabled: false, // Disable default tooltip to use custom HTML tooltip
+                external: (context) => {
+                    // Custom HTML tooltip for color support
+                    const { chart, tooltip } = context;
+                    
+                    // Get or create tooltip element
+                    let tooltipEl = document.getElementById('chartjs-tooltip');
+                    if (!tooltipEl) {
+                        tooltipEl = document.createElement('div');
+                        tooltipEl.id = 'chartjs-tooltip';
+                        tooltipEl.style.background = 'rgba(0, 0, 0, 0.9)';
+                        tooltipEl.style.borderRadius = '8px';
+                        tooltipEl.style.color = 'white';
+                        tooltipEl.style.padding = '12px 16px';
+                        tooltipEl.style.pointerEvents = 'none';
+                        tooltipEl.style.position = 'fixed'; // Fixed positioning for floating effect
+                        tooltipEl.style.fontSize = '12px';
+                        tooltipEl.style.fontFamily = 'Inter, system-ui, sans-serif';
+                        tooltipEl.style.lineHeight = '1.4';
+                        tooltipEl.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                        tooltipEl.style.maxWidth = '400px';
+                        tooltipEl.style.zIndex = '9999';
+                        tooltipEl.style.transition = 'opacity 0.2s ease';
+                        document.body.appendChild(tooltipEl);
+                    }
+                    
+                    // Hide if no tooltip
+                    if (tooltip.opacity === 0) {
+                        tooltipEl.style.opacity = '0';
+                        tooltipEl.style.visibility = 'hidden';
+                        return;
+                    }
+                    
+                    if (tooltip.body) {
+                        const index = tooltip.dataPoints[0].dataIndex;
                         const date = dateIntervals[index];
-                        return date.toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric' 
-                        });
-                    },
-                    label: (context) => {
-                        const value = context.raw as number;
-                        const datasetLabel = context.dataset.label;
+                        const snapshot = historicalData[index];
+                        
+                        let innerHTML = `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            ${date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </div>`;
+                        
+                        // Add main values
+                        const mainValue = tooltip.dataPoints[0].raw as number;
+                        const label = tooltip.dataPoints[0].dataset.label;
                         
                         if (showValues) {
-                            return `${datasetLabel}: ¥${Math.round(value).toLocaleString()}`;
+                            innerHTML += `<div style="margin-bottom: 12px; font-weight: 500;">
+                                ${label}: ¥${Math.round(mainValue).toLocaleString()}
+                            </div>`;
                         } else {
-                            return `${datasetLabel}: ${value.toFixed(2)}%`;
+                            innerHTML += `<div style="margin-bottom: 12px; font-weight: 500;">
+                                ${label}: ${mainValue.toFixed(2)}%
+                            </div>`;
                         }
-                    },
-                    afterBody: (tooltipItems) => {
-                        const index = tooltipItems[0].dataIndex;
-                        const date = dateIntervals[index];
-                        const portfolioAtDate = calculatePortfolioValueAtDate(date);
                         
-                        if (portfolioAtDate.transactions && portfolioAtDate.transactions.length > 0) {
-                            const transactionLines = ['', 'Transactions on this date:'];
-                            portfolioAtDate.transactions.forEach((transaction: Position) => {
-                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1)).toLocaleString();
-                                transactionLines.push(
-                                    `${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}`
-                                );
+                        // Show position breakdown if available
+                        if (snapshot?.positionDetails && snapshot.positionDetails.length > 0) {
+                            innerHTML += '<div style="margin-bottom: 6px; font-weight: 500;">Portfolio Breakdown:</div>';
+                            
+                            // Sort positions by value (largest first)
+                            const sortedPositions = [...snapshot.positionDetails].sort((a, b) => b.valueInJPY - a.valueInJPY);
+                            
+                            sortedPositions.forEach((position) => {
+                                const valueFormatted = Math.round(position.valueInJPY).toLocaleString();
+                                const pnlFormatted = Math.round(Math.abs(position.pnlJPY)).toLocaleString();
+                                const isPositive = position.pnlJPY >= 0;
+                                const pnlColor = isPositive ? '#22c55e' : '#ef4444';
+                                const pnlSign = isPositive ? '+' : '-';
+                                const pnlPercentSign = position.pnlPercentage >= 0 ? '+' : '';
+                                
+                                // Create inline display with quantity and colored P&L
+                                const quantityInfo = `${position.quantity} shares`;
+                                
+                                innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                    • ${position.fullName}: ¥${valueFormatted} | ${quantityInfo} | 
+                                    <span style="color: ${pnlColor}; font-weight: 600;">
+                                        ${pnlSign}¥${pnlFormatted} (${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%)
+                                    </span>
+                                </div>`;
                             });
-                            return transactionLines;
                         }
-                        return [];
+                        
+                        // Get transactions that occurred near this date
+                        const currentInterval = selectedTimeline === '1D' ? 60 * 60 * 1000 :
+                                               selectedTimeline === '5D' || selectedTimeline === '1M' ? 24 * 60 * 60 * 1000 :
+                                               selectedTimeline === '6M' || selectedTimeline === 'YTD' || selectedTimeline === '1Y' || selectedTimeline === '2Y' ? 7 * 24 * 60 * 60 * 1000 :
+                                               30 * 24 * 60 * 60 * 1000; // Default to monthly for longer periods
+                        
+                        const transactions = getTransactionsNearDate(date, currentInterval);
+                        
+                        if (transactions.length > 0) {
+                            innerHTML += '<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">';
+                            innerHTML += '<div style="margin-bottom: 6px; font-weight: 500;">Transactions on this date:</div>';
+                            transactions.forEach((transaction: Position) => {
+                                const totalCost = Math.round(transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1)).toLocaleString();
+                                innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
+                                    • ${transaction.fullName}: ${transaction.quantity} shares @ ¥${totalCost}
+                                </div>`;
+                            });
+                            innerHTML += '</div>';
+                        }
+                        
+                        tooltipEl.innerHTML = innerHTML;
                     }
-                },
-                displayColors: true,
-                bodyFont: {
-                    size: 12
-                },
-                titleFont: {
-                    size: 13
+                    
+                    // Position tooltip based on mouse position but keep it in viewport
+                    const canvasRect = chart.canvas.getBoundingClientRect();
+                    
+                    // Get mouse position relative to viewport
+                    const mouseX = canvasRect.left + tooltip.caretX;
+                    const mouseY = canvasRect.top + tooltip.caretY;
+                    
+                    // Make tooltip visible to measure its dimensions
+                    tooltipEl.style.visibility = 'visible';
+                    tooltipEl.style.opacity = '1';
+                    
+                    // Get tooltip dimensions after content is set
+                    const tooltipRect = tooltipEl.getBoundingClientRect();
+                    
+                    // Calculate position with viewport constraints
+                    let left = mouseX + 15; // 15px offset from cursor
+                    let top = mouseY - tooltipRect.height / 2; // Center vertically on cursor
+                    
+                    // Keep tooltip within viewport horizontally
+                    if (left + tooltipRect.width > window.innerWidth - 10) {
+                        left = mouseX - tooltipRect.width - 15; // Show on left side of cursor
+                    }
+                    if (left < 10) {
+                        left = 10;
+                    }
+                    
+                    // Keep tooltip within viewport vertically
+                    if (top < 10) {
+                        top = 10;
+                    }
+                    if (top + tooltipRect.height > window.innerHeight - 10) {
+                        top = window.innerHeight - tooltipRect.height - 10;
+                    }
+                    
+                    tooltipEl.style.left = left + 'px';
+                    tooltipEl.style.top = top + 'px';
                 }
             }
         },
@@ -397,7 +505,21 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             
             {/* Chart */}
             <div style={{ height: '450px' }}>
-                {dateIntervals.length > 0 ? (
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            <p>Calculating historical portfolio data...</p>
+                        </div>
+                    </div>
+                ) : error ? (
+                    <div className="flex items-center justify-center h-full text-red-500">
+                        <div className="text-center">
+                            <p className="font-medium">Error loading chart data</p>
+                            <p className="text-sm">{error}</p>
+                        </div>
+                    </div>
+                ) : dateIntervals.length > 0 && historicalData.length > 0 ? (
                     <Line data={data} options={options} />
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
