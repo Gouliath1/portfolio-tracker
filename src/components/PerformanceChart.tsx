@@ -36,15 +36,19 @@ const pnlAreaPlugin = {
         // Type guards and null checks
         if (!ctx || !data?.datasets || !scales) return;
         
-        // Find the P&L dataset
+        // Find the P&L dataset (could be JPY or percentage)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pnlDatasetIndex = data.datasets.findIndex((dataset: any) => dataset.label === 'P&L (JPY)');
+        const pnlDatasetIndex = data.datasets.findIndex((dataset: any) => 
+            dataset.label === 'P&L (JPY)' || dataset.label === 'P&L (%)'
+        );
         if (pnlDatasetIndex === -1) return;
         
         const pnlDataset = data.datasets[pnlDatasetIndex];
         if (!pnlDataset?.data) return;
         
-        const yScale = scales.y1; // P&L uses secondary Y-axis
+        // Use the correct Y-axis based on the dataset's yAxisID
+        const yAxisId = pnlDataset.yAxisID || 'y'; // Default to main Y-axis if not specified
+        const yScale = scales[yAxisId];
         const xScale = scales.x;
         
         if (!yScale || !xScale) return;
@@ -297,10 +301,10 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 costData.push(snapshot.totalCostJPY);
                 pnlData.push(snapshot.pnlJPY);
             } else {
-                // For percentage view, use the calculated P&L percentage
-                valueData.push(snapshot.pnlPercentage);
-                costData.push(0); // No cost line for percentage view
-                pnlData.push(0); // No P&L value line for percentage view
+                // For percentage view, show P&L percentage in the P&L line (with colored areas)
+                valueData.push(0); // Hide the value line
+                costData.push(0); // Hide the cost line  
+                pnlData.push(snapshot.pnlPercentage); // Show P&L percentage in the black line
             }
         } else {
             // No data available for this date
@@ -320,6 +324,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                 tension: 0.1,
                 fill: true,
+                hidden: !showValues, // Hide value line when showing percentages
                 pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
                     return transactionDates[index] ? 4 : 0; // Only show dots at transaction dates
@@ -353,14 +358,14 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 pointBorderWidth: 1
             },
             {
-                label: 'P&L (JPY)',
+                label: showValues ? 'P&L (JPY)' : 'P&L (%)',
                 data: pnlData,
                 borderColor: 'rgb(0, 0, 0)', // Black line
                 backgroundColor: 'rgba(0, 0, 0, 0)', // Transparent - plugin will handle coloring
                 tension: 0.1,
                 fill: false, // Don't fill - plugin will handle areas
-                hidden: !showValues,
-                yAxisID: 'y1',
+                hidden: false, // Always show P&L line
+                yAxisID: showValues ? 'y1' : 'y', // Use main Y-axis for percentages
                 borderWidth: 2,
                 pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
@@ -419,7 +424,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                         return labels;
                     },
                     // Custom filter function to ensure line thickness is respected
-                    filter: function(legendItem, chartData) {
+                    filter: function() {
                         return true; // Show all legend items
                     }
                 }
@@ -663,7 +668,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             },
             y1: {
                 type: 'linear',
-                display: true,
+                display: showValues, // Only show secondary axis in JPY mode
                 position: 'right',
                 beginAtZero: false, // Allow negative values for P&L
                 title: {
