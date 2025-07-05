@@ -410,7 +410,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                         tooltipEl.innerHTML = innerHTML;
                     }
                     
-                    // Position tooltip based on mouse position but keep it in viewport
+                    // Position tooltip based on mouse position but constrain to chart area
                     const canvasRect = chart.canvas.getBoundingClientRect();
                     
                     // Get mouse position relative to viewport
@@ -424,9 +424,8 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                     // Get tooltip dimensions after content is set
                     const tooltipRect = tooltipEl.getBoundingClientRect();
                     
-                    // Calculate position with viewport constraints
+                    // Calculate horizontal position with viewport constraints
                     let left = mouseX + 15; // 15px offset from cursor
-                    let top = mouseY - tooltipRect.height / 2; // Center vertically on cursor
                     
                     // Keep tooltip within viewport horizontally
                     if (left + tooltipRect.width > window.innerWidth - 10) {
@@ -436,10 +435,23 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                         left = 10;
                     }
                     
-                    // Keep tooltip within viewport vertically
-                    if (top < 10) {
-                        top = 10;
+                    // Calculate vertical position with chart area constraints
+                    let top = mouseY - tooltipRect.height / 2; // Try to center vertically on cursor
+                    
+                    // Ensure tooltip top starts within or just above the chart area
+                    const chartTop = canvasRect.top;
+                    
+                    // Don't let tooltip top go above the chart area (with some margin)
+                    if (top < chartTop - 20) {
+                        top = chartTop - 20;
                     }
+                    
+                    // If tooltip would extend too far above the chart, position it to start at chart top
+                    if (top < chartTop && top + tooltipRect.height > chartTop + 50) {
+                        top = chartTop - 10;
+                    }
+                    
+                    // Allow tooltip to extend below chart area but not below viewport
                     if (top + tooltipRect.height > window.innerHeight - 10) {
                         top = window.innerHeight - tooltipRect.height - 10;
                     }
