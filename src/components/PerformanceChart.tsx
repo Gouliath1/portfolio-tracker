@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -25,6 +25,97 @@ ChartJS.register(
     Tooltip,
     Legend
 );
+
+// Custom plugin to draw colored areas for P&L
+const pnlAreaPlugin = {
+    id: 'pnlArea',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    beforeDatasetsDraw(chart: any) {
+        const { ctx, data, scales } = chart;
+        
+        // Type guards and null checks
+        if (!ctx || !data?.datasets || !scales) return;
+        
+        // Find the P&L dataset
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pnlDatasetIndex = data.datasets.findIndex((dataset: any) => dataset.label === 'P&L (JPY)');
+        if (pnlDatasetIndex === -1) return;
+        
+        const pnlDataset = data.datasets[pnlDatasetIndex];
+        if (!pnlDataset?.data) return;
+        
+        const yScale = scales.y1; // P&L uses secondary Y-axis
+        const xScale = scales.x;
+        
+        if (!yScale || !xScale) return;
+        
+        const zeroY = yScale.getPixelForValue(0);
+        
+        ctx.save();
+        
+        // Draw areas for each segment
+        for (let i = 0; i < pnlDataset.data.length - 1; i++) {
+            const currentValue = pnlDataset.data[i] as number;
+            const nextValue = pnlDataset.data[i + 1] as number;
+            
+            if (typeof currentValue !== 'number' || typeof nextValue !== 'number') continue;
+            
+            const x1 = xScale.getPixelForValue(i);
+            const x2 = xScale.getPixelForValue(i + 1);
+            const y1 = yScale.getPixelForValue(currentValue);
+            const y2 = yScale.getPixelForValue(nextValue);
+            
+            // Determine color based on values
+            const isPositive = currentValue >= 0 && nextValue >= 0;
+            const isNegative = currentValue <= 0 && nextValue <= 0;
+            
+            if (isPositive) {
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)'; // Green for positive
+            } else if (isNegative) {
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)'; // Red for negative
+            } else {
+                // Mixed segment - draw two parts
+                const intersectionX = x1 + (x2 - x1) * (Math.abs(currentValue) / (Math.abs(currentValue) + Math.abs(nextValue)));
+                
+                // Draw positive part
+                if (currentValue > 0) {
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, zeroY);
+                    ctx.lineTo(x1, y1);
+                    ctx.lineTo(intersectionX, zeroY);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // Draw negative part
+                if (nextValue < 0) {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                    ctx.beginPath();
+                    ctx.moveTo(intersectionX, zeroY);
+                    ctx.lineTo(x2, y2);
+                    ctx.lineTo(x2, zeroY);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                continue;
+            }
+            
+            // Draw the area
+            ctx.beginPath();
+            ctx.moveTo(x1, zeroY);
+            ctx.lineTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.lineTo(x2, zeroY);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+};
+
+ChartJS.register(pnlAreaPlugin);
 
 interface PerformanceChartProps {
     positions: Position[];
@@ -52,7 +143,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
     ];
 
     // Generate fixed date intervals for the selected timeline
-    const generateDateIntervals = (timeline: TimelineFilter) => {
+    const generateDateIntervals = useCallback((timeline: TimelineFilter) => {
         const now = new Date();
         const dates: Date[] = [];
         let startDate: Date;
@@ -117,7 +208,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         }
 
         return dates;
-    };
+    }, [positions]);
 
     // Effect to calculate historical data when timeline or positions change
     useEffect(() => {
@@ -144,7 +235,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         };
 
         calculateHistoricalData();
-    }, [positions, selectedTimeline]); // generateDateIntervals is defined inline and doesn't need to be in deps
+    }, [positions, selectedTimeline, generateDateIntervals]);
 
     // Get transactions that occurred near a specific date (within the interval range)
     const getTransactionsNearDate = (targetDate: Date, intervalMs: number) => {
@@ -183,6 +274,7 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
 
     const valueData: number[] = [];
     const costData: number[] = [];
+    const pnlData: number[] = [];
     const transactionDates: boolean[] = []; // Track which dates have transactions
 
     dateIntervals.forEach((date, index) => {
@@ -203,15 +295,18 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
             if (showValues) {
                 valueData.push(snapshot.totalValueJPY);
                 costData.push(snapshot.totalCostJPY);
+                pnlData.push(snapshot.pnlJPY);
             } else {
                 // For percentage view, use the calculated P&L percentage
                 valueData.push(snapshot.pnlPercentage);
                 costData.push(0); // No cost line for percentage view
+                pnlData.push(0); // No P&L value line for percentage view
             }
         } else {
             // No data available for this date
             valueData.push(0);
             costData.push(0);
+            pnlData.push(0);
         }
     });
 
@@ -227,24 +322,15 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 fill: true,
                 pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 8 : 3; // Larger dots for transaction dates
+                    return transactionDates[index] ? 4 : 0; // Only show dots at transaction dates
                 },
                 pointHoverRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 10 : 5;
+                    return transactionDates[index] ? 6 : 3;
                 },
-                pointBackgroundColor: (context: { dataIndex: number }) => {
-                    const index = context.dataIndex;
-                    return transactionDates[index] ? 'rgb(34, 197, 94)' : 'rgba(34, 197, 94, 0.8)';
-                },
-                pointBorderColor: (context: { dataIndex: number }) => {
-                    const index = context.dataIndex;
-                    return transactionDates[index] ? 'rgb(22, 163, 74)' : 'rgba(34, 197, 94, 0.8)';
-                },
-                pointBorderWidth: (context: { dataIndex: number }) => {
-                    const index = context.dataIndex;
-                    return transactionDates[index] ? 2 : 1;
-                }
+                pointBackgroundColor: 'rgb(34, 197, 94)',
+                pointBorderColor: 'rgb(22, 163, 74)',
+                pointBorderWidth: 1
             },
             {
                 label: 'Total Cost (JPY)',
@@ -256,24 +342,37 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 hidden: !showValues, // Hide cost line when showing percentages
                 pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 8 : 3;
+                    return transactionDates[index] ? 4 : 0; // Only show dots at transaction dates
                 },
                 pointHoverRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 10 : 5;
+                    return transactionDates[index] ? 6 : 3;
                 },
-                pointBackgroundColor: (context: { dataIndex: number }) => {
+                pointBackgroundColor: 'rgb(148, 163, 184)',
+                pointBorderColor: 'rgb(100, 116, 139)',
+                pointBorderWidth: 1
+            },
+            {
+                label: 'P&L (JPY)',
+                data: pnlData,
+                borderColor: 'rgb(0, 0, 0)', // Black line
+                backgroundColor: 'rgba(0, 0, 0, 0)', // Transparent - plugin will handle coloring
+                tension: 0.1,
+                fill: false, // Don't fill - plugin will handle areas
+                hidden: !showValues,
+                yAxisID: 'y1',
+                borderWidth: 2,
+                pointRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 'rgb(148, 163, 184)' : 'rgba(148, 163, 184, 0.8)';
+                    return transactionDates[index] ? 4 : 1;
                 },
-                pointBorderColor: (context: { dataIndex: number }) => {
+                pointHoverRadius: (context: { dataIndex: number }) => {
                     const index = context.dataIndex;
-                    return transactionDates[index] ? 'rgb(100, 116, 139)' : 'rgba(148, 163, 184, 0.8)';
+                    return transactionDates[index] ? 6 : 3;
                 },
-                pointBorderWidth: (context: { dataIndex: number }) => {
-                    const index = context.dataIndex;
-                    return transactionDates[index] ? 2 : 1;
-                }
+                pointBackgroundColor: 'rgb(0, 0, 0)',
+                pointBorderColor: 'rgb(0, 0, 0)',
+                pointBorderWidth: 1
             }
         ]
     };
@@ -291,6 +390,37 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 labels: {
                     font: {
                         size: 14
+                    },
+                    usePointStyle: true,
+                    pointStyle: 'line',
+                    generateLabels: function(chart) {
+                        const original = ChartJS.defaults.plugins.legend.labels.generateLabels;
+                        const labels = original.call(this, chart);
+                        
+                        // Customize each label to match the dataset properties
+                        labels.forEach((label, index) => {
+                            const dataset = chart.data.datasets[index];
+                            if (dataset) {
+                                label.strokeStyle = dataset.borderColor as string;
+                                label.fillStyle = dataset.borderColor as string;
+                                
+                                // Set line width to match dataset border width
+                                const borderWidth = (dataset.borderWidth as number) || 1;
+                                label.lineWidth = borderWidth;
+                                
+                                // Override pointStyle for specific datasets to show thicker lines
+                                if (borderWidth > 1) {
+                                    // For thick lines, we'll handle this with a custom draw function
+                                    label.pointStyle = 'line';
+                                }
+                            }
+                        });
+                        
+                        return labels;
+                    },
+                    // Custom filter function to ensure line thickness is respected
+                    filter: function(legendItem, chartData) {
+                        return true; // Show all legend items
                     }
                 }
             },
@@ -351,9 +481,25 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                         const label = tooltip.dataPoints[0].dataset.label;
                         
                         if (showValues) {
-                            innerHTML += `<div style="margin-bottom: 12px; font-weight: 500;">
+                            innerHTML += `<div style="margin-bottom: 8px; font-weight: 500;">
                                 ${label}: ¥${Math.round(mainValue).toLocaleString()}
                             </div>`;
+                            
+                            // Add P&L summary if available
+                            if (snapshot) {
+                                const pnlFormatted = Math.round(Math.abs(snapshot.pnlJPY)).toLocaleString();
+                                const isPositive = snapshot.pnlJPY >= 0;
+                                const pnlColor = isPositive ? '#22c55e' : '#ef4444';
+                                const pnlSign = isPositive ? '+' : '-';
+                                
+                                innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
+                                    <div>Total Value: ¥${Math.round(snapshot.totalValueJPY).toLocaleString()}</div>
+                                    <div>Total Cost: ¥${Math.round(snapshot.totalCostJPY).toLocaleString()}</div>
+                                    <div style="color: ${pnlColor}; font-weight: 600;">
+                                        P&L: ${pnlSign}¥${pnlFormatted} (${snapshot.pnlPercentage >= 0 ? '+' : ''}${snapshot.pnlPercentage.toFixed(2)}%)
+                                    </div>
+                                </div>`;
+                            }
                         } else {
                             innerHTML += `<div style="margin-bottom: 12px; font-weight: 500;">
                                 ${label}: ${mainValue.toFixed(2)}%
@@ -463,6 +609,9 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
         },
         scales: {
             y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
                 beginAtZero: true,
                 ticks: {
                     callback: function(value) {
@@ -481,6 +630,34 @@ export const PerformanceChart = ({ positions, showValues }: PerformanceChartProp
                 },
                 grid: {
                     color: 'rgba(0, 0, 0, 0.1)'
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                beginAtZero: false, // Allow negative values for P&L
+                title: {
+                    display: true,
+                    text: 'P&L (JPY)',
+                    font: {
+                        size: 12
+                    }
+                },
+                ticks: {
+                    callback: function(value) {
+                        if (typeof value === 'number') {
+                            const sign = value >= 0 ? '+' : '';
+                            return `${sign}¥${Math.round(value).toLocaleString()}`;
+                        }
+                        return value;
+                    },
+                    font: {
+                        size: 12
+                    }
+                },
+                grid: {
+                    drawOnChartArea: false, // Don't draw grid lines for secondary axis
                 }
             },
             x: {

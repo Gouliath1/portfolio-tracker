@@ -9,6 +9,9 @@ export interface HistoricalSnapshot {
     pnlPercentage: number;
     positionsCount: number;
     positionDetails?: PositionDetail[]; // Optional detailed breakdown for tooltips
+    // Additional tracking for cumulative vs daily P&L
+    cumulativePnlJPY: number; // Total P&L from inception to this date
+    cumulativePnlPercentage: number; // Total P&L % from inception to this date
 }
 
 export interface PositionDetail {
@@ -134,7 +137,9 @@ export async function calculatePortfolioValueAtDate(
             pnlJPY: 0,
             pnlPercentage: 0,
             positionsCount: 0,
-            positionDetails: includeDetails ? [] : undefined
+            positionDetails: includeDetails ? [] : undefined,
+            cumulativePnlJPY: 0,
+            cumulativePnlPercentage: 0
         };
     }
     
@@ -212,6 +217,11 @@ export async function calculatePortfolioValueAtDate(
     const pnlJPY = totalValueJPY - totalCostJPY;
     const pnlPercentage = totalCostJPY > 0 ? (pnlJPY / totalCostJPY) * 100 : 0;
     
+    // For now, cumulative P&L is the same as regular P&L
+    // In the future, we could track this differently if needed
+    const cumulativePnlJPY = pnlJPY;
+    const cumulativePnlPercentage = pnlPercentage;
+    
     return {
         date: targetDate,
         totalValueJPY,
@@ -219,7 +229,9 @@ export async function calculatePortfolioValueAtDate(
         pnlJPY,
         pnlPercentage,
         positionsCount: positionsAtDate.length,
-        positionDetails: includeDetails ? positionDetails : undefined
+        positionDetails: includeDetails ? positionDetails : undefined,
+        cumulativePnlJPY,
+        cumulativePnlPercentage
     };
 }
 
@@ -252,13 +264,46 @@ export async function calculateHistoricalPortfolioValues(
         }
     }
     
+    // Sort dates to ensure chronological order
+    const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
+    
     // Calculate values for each date
     const results: HistoricalSnapshot[] = [];
-    for (const date of dates) {
+    let previousSnapshot: HistoricalSnapshot | null = null;
+    
+    for (const date of sortedDates) {
         const snapshot = await calculatePortfolioValueAtDate(positions, date, historicalPricesCache, includeDetails);
+        
+        // Enhance with additional metrics
+        if (previousSnapshot) {
+            // We could add day-over-day change calculations here if needed
+            // For now, the cumulative P&L is just the same as regular P&L since it's calculated from inception
+        }
+        
         results.push(snapshot);
+        previousSnapshot = snapshot;
     }
     
+    // Sort results back to match original date order if needed
+    const dateIndexMap = new Map(dates.map((date, index) => [date.getTime(), index]));
+    results.sort((a, b) => {
+        const aIndex = dateIndexMap.get(a.date.getTime()) ?? 0;
+        const bIndex = dateIndexMap.get(b.date.getTime()) ?? 0;
+        return aIndex - bIndex;
+    });
+    
     console.log(`✅ Completed historical calculations for ${results.length} snapshots`);
+    
+    // Log some key metrics for debugging
+    if (results.length > 0) {
+        const firstSnapshot = results[0];
+        const lastSnapshot = results[results.length - 1];
+        console.log(`📈 Historical P&L Summary:`);
+        console.log(`   First date (${firstSnapshot.date.toISOString().split('T')[0]}): ¥${Math.round(firstSnapshot.pnlJPY).toLocaleString()} (${firstSnapshot.pnlPercentage.toFixed(2)}%)`);
+        console.log(`   Last date (${lastSnapshot.date.toISOString().split('T')[0]}): ¥${Math.round(lastSnapshot.pnlJPY).toLocaleString()} (${lastSnapshot.pnlPercentage.toFixed(2)}%)`);
+        console.log(`   Total cost progression: ¥${Math.round(firstSnapshot.totalCostJPY).toLocaleString()} → ¥${Math.round(lastSnapshot.totalCostJPY).toLocaleString()}`);
+        console.log(`   Total value progression: ¥${Math.round(firstSnapshot.totalValueJPY).toLocaleString()} → ¥${Math.round(lastSnapshot.totalValueJPY).toLocaleString()}`);
+    }
+    
     return results;
 }
