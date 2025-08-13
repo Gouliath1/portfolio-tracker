@@ -660,17 +660,55 @@ async function getCurrentFxRate(fxPair: string): Promise<number> {
 
 // Helper function to get historical FX rate for a pair and date
 async function getHistoricalFxRate(fxPair: string, transactionDate: string): Promise<number> {
+    console.log(`🔍 getHistoricalFxRate called for ${fxPair} on ${transactionDate}`);
     try {
         // Try to read from file system first (server-side)
         if (typeof window === 'undefined') {
+            console.log(`📂 Running in server-side context, reading fxRates.json`);
             const fs = await import('fs/promises');
             const path = await import('path');
             const fxRatesPath = path.join(process.cwd(), 'src/data/fxRates.json');
             const data = await fs.readFile(fxRatesPath, 'utf-8');
             const fxRates = JSON.parse(data);
             
-            if (fxRates[fxPair] && fxRates[fxPair][transactionDate]) {
-                return fxRates[fxPair][transactionDate];
+            if (fxRates[fxPair]) {
+                console.log(`✅ ${fxPair} data exists in fxRates.json`);
+                // First try exact date match
+                if (fxRates[fxPair][transactionDate]) {
+                    const rate = fxRates[fxPair][transactionDate];
+                    console.log(`✅ Exact historical FX rate for ${fxPair} on ${transactionDate}: ${rate}`);
+                    return rate;
+                }
+                
+                console.log(`⚠️ No exact date match for ${fxPair} on ${transactionDate}, trying forward-fill`);
+                // If no exact match, find the closest earlier date (forward fill)
+                const availableDates = Object.keys(fxRates[fxPair]).sort((a, b) => b.localeCompare(a)); // Descending order
+                const targetDate = new Date(transactionDate);
+                
+                for (const availableDate of availableDates) {
+                    const availableDateTime = new Date(availableDate);
+                    if (availableDateTime <= targetDate) {
+                        const rate = fxRates[fxPair][availableDate];
+                        console.log(`📅 Using forward-fill historical FX rate for ${fxPair}: ${availableDate} -> ${transactionDate}, rate: ${rate}`);
+                        return rate;
+                    }
+                }
+            } else {
+                console.warn(`❌ No ${fxPair} data found in fxRates.json`);
+            }
+            
+            console.warn(`⚠️ No historical FX rate found for ${fxPair} on or before ${transactionDate}`);
+        } else {
+            console.log(`🌐 Running in client-side context, calling FX rates API`);
+            // Client-side: call the API endpoint
+            const response = await fetch(`/api/fx-rates?pair=${fxPair}&date=${transactionDate}`);
+            const data = await response.json();
+            
+            if (data.rate) {
+                console.log(`✅ Got historical FX rate from API for ${fxPair} on ${transactionDate}: ${data.rate}`);
+                return data.rate;
+            } else {
+                console.warn(`⚠️ API returned no historical FX rate for ${fxPair} on ${transactionDate}`);
             }
         }
     } catch (error) {
@@ -678,7 +716,9 @@ async function getHistoricalFxRate(fxPair: string, transactionDate: string): Pro
     }
     
     // Fallback to current rate
-    return await getCurrentFxRate(fxPair);
+    const fallbackRate = await getCurrentFxRate(fxPair);
+    console.warn(`⚠️ Using current rate as fallback for historical ${fxPair}: ${fallbackRate}`);
+    return fallbackRate;
 }
 
 // Utility function to convert amount to JPY, handling chain conversions
@@ -721,8 +761,6 @@ export async function convertToJPY(amount: number, position: Position | RawPosit
             
             // Calculate the effective rate (e.g., EUR->JPY = EUR->USD * USD->JPY)
             const effectiveRate = firstRate * secondRate;
-            
-            console.log(`🔗 Chain conversion for ${position.baseCcy}->${BASE_CURRENCY}: ${position.fxPair} (${firstRate}) * ${to}/${BASE_CURRENCY} (${secondRate}) = ${effectiveRate}`);
             
             return { 
                 convertedAmount: intermediateAmount * secondRate, 

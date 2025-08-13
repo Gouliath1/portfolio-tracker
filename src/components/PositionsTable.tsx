@@ -134,7 +134,7 @@ const columns = [
         },
     }),
     columnHelper.accessor('costPerUnit', {
-        header: 'Unit Price (Local)',
+        header: 'Orig Unit Price',
         size: 120,
         cell: props => {
             const value = props.getValue();
@@ -155,7 +155,7 @@ const columns = [
         },
     }),
     columnHelper.accessor('transactionFxRate', {
-        header: 'Orig FX',
+        header: 'Orig FX (Local-JPY)',
         size: 120,
         cell: props => {
             const value = props.getValue();
