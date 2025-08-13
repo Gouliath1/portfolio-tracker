@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
-    "dev:clean": "./projectDevUtils/startDev.sh",
+    "dev:clean": "./utils/startDev.sh",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "push": "./projectDevUtils/gitPush.sh",
-    "setup": "node projectDevUtils/setup.js",
-    "setup:unix": "./projectDevUtils/setup.sh",
-    "setup:windows": "projectDevUtils/setup.bat"
+    "push": "./utils/gitPush.sh",
+    "setup": "node utils/setup.js",
+    "setup:unix": "./utils/setup.sh",
+    "setup:windows": "utils/setup.bat"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

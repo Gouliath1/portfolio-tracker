@@ -14,6 +14,36 @@ import {
 } from '@tanstack/react-table';
 import { Position } from '../types/portfolio';
 import { calculateAnnualizedReturn } from '../utils/returnCalculations';
+import { formatBrokerDisplay } from '../utils/brokerInformationMapping';
+import { BASE_CURRENCY_CONSTANT } from '../utils/yahooFinanceApi';
+
+// Simple currency mapping
+const CURRENCY_SYMBOLS: Record<string, string> = {
+    'JPY': '¥',
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£'
+};
+
+function getCurrencySymbol(currencyCode: string): string {
+    return CURRENCY_SYMBOLS[currencyCode] || currencyCode;
+}
+
+function formatCurrencyValue(amount: number, currencyCode: string, showValues: boolean): string {
+    const symbol = getCurrencySymbol(currencyCode);
+    
+    if (!showValues) {
+        return `${symbol}${getHiddenValue(amount)}`;
+    }
+    
+    // JPY doesn't use decimal places
+    if (currencyCode === 'JPY') {
+        return `${symbol}${Math.round(amount).toLocaleString()}`;
+    }
+    
+    // Other currencies use 2 decimal places
+    return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 // Extend the TableMeta type from @tanstack/react-table
 declare module '@tanstack/react-table' {
@@ -35,9 +65,11 @@ const defaultColumnSizing: ColumnSizingState = {
     transactionDate: 100,
     ticker: 100,
     fullName: 150,
+    broker: 140,
     account: 100,
     quantity: 100,
     costPerUnit: 120,
+    totalCost: 120,
     currentPrice: 120,
     transactionFxRate: 120,
     currentFxRate: 120,
@@ -79,6 +111,14 @@ const columns = [
         header: 'Name',
         size: 150,
     }),
+    columnHelper.accessor('broker', {
+        header: 'Broker',
+        size: 140,
+        cell: props => {
+            const brokerName = props.row.original.broker;
+            return formatBrokerDisplay(brokerName);
+        },
+    }),
     columnHelper.accessor('account', {
         header: 'Account',
         size: 100,
@@ -94,102 +134,140 @@ const columns = [
         },
     }),
     columnHelper.accessor('costPerUnit', {
-        header: 'Cost/Unit',
+        header: 'Unit Price (Local)',
         size: 120,
         cell: props => {
-            const ccy = props.row.original.baseCcy === 'JPY' ? '¥' : '$';
             const value = props.getValue();
-            return ccy + (props.table.options.meta?.showValues 
-                ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : getHiddenValue(value)
-            );
+            const row = props.row.original;
+            const currencyCode = row.baseCcy;
+            return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
+        },
+    }),
+    columnHelper.accessor(row => row.costPerUnit * row.quantity, {
+        id: 'totalCost',
+        header: 'Orig Position (Local)',
+        size: 120,
+        cell: props => {
+            const value = props.getValue();
+            const row = props.row.original;
+            const currencyCode = row.baseCcy;
+            return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
+        },
+    }),
+    columnHelper.accessor('transactionFxRate', {
+        header: 'Orig FX',
+        size: 120,
+        cell: props => {
+            const value = props.getValue();
+            const row = props.row.original;
+            
+            // Only show FX rate for non-base currencies
+            if (row.baseCcy === BASE_CURRENCY_CONSTANT) {
+                return <span className="text-gray-400">N/A</span>;
+            }
+            
+            // Create tooltip showing the currency pair being calculated
+            const fxPairDisplay = `${row.baseCcy}-JPY`;
+            let tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)}`;
+            
+            // If it's a chain conversion, show the breakdown
+            if (row.transactionFxDetails && Object.keys(row.transactionFxDetails).length > 1) {
+                const rateEntries = Object.entries(row.transactionFxDetails);
+                const rateBreakdown = rateEntries.map(([pair, rate]) => `${pair}: ${rate.toFixed(4)}`).join(' × ');
+                tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)} = ${rateBreakdown}`;
+            } else if (row.fxPair && row.fxPair !== `${row.baseCcy}/JPY`) {
+                const [from, to] = row.fxPair.split('/');
+                if (from === row.baseCcy && to !== 'JPY') {
+                    tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)} (via ${row.fxPair}: ${row.transactionFx?.toFixed(4) || 'N/A'})`;
+                }
+            }
+            
+            return props.table.options.meta?.showValues
+                ? <span title={tooltipText}>{value.toFixed(4)}</span>
+                : getHiddenValue(value);
+        },
+    }),
+    columnHelper.accessor('costInJPY', {
+        header: 'Orig Position (JPY)',
+        size: 130,
+        cell: props => {
+            const value = props.getValue();
+            return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
         },
     }),
     columnHelper.accessor('currentPrice', {
-        header: 'Current Price',
+        header: 'Curr Price (Local)',
         size: 120,
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
             if (value === null) return <span className="text-gray-400">Loading...</span>;
             
-            const ccy = row.baseCcy === 'JPY' ? '¥' : '$';
-            const displayValue = props.table.options.meta?.showValues 
-                ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : getHiddenValue(value);
+            const currencyCode = row.baseCcy;
+            const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
                 
             return (
                 <span className={value >= row.costPerUnit ? 'text-green-600' : 'text-red-600'}>
-                    {ccy}{displayValue}
+                    {displayValue}
                 </span>
             );
         },
     }),
-    columnHelper.accessor('transactionFxRate', {
-        header: 'FX Rate (Transaction)',
-        size: 120,
-        cell: props => {
-            const value = props.getValue();
-            const row = props.row.original;
-            
-            // Only show FX rate for non-JPY currencies
-            if (row.baseCcy === 'JPY') {
-                return <span className="text-gray-400">N/A</span>;
-            }
-            
-            return props.table.options.meta?.showValues
-                ? value.toFixed(4)
-                : getHiddenValue(value);
-        },
-    }),
     columnHelper.accessor('currentFxRate', {
-        header: 'FX Rate (Current)',
+        header: 'Curr FX Rate',
         size: 120,
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
             
-            // Only show FX rate for non-JPY currencies
-            if (row.baseCcy === 'JPY') {
+            // Only show FX rate for non-base currencies
+            if (row.baseCcy === BASE_CURRENCY_CONSTANT) {
                 return <span className="text-gray-400">N/A</span>;
             }
             
-            const displayValue = props.table.options.meta?.showValues
-                ? value.toFixed(4)
-                : getHiddenValue(value);
+            if (!props.table.options.meta?.showValues) {
+                return getHiddenValue(value);
+            }
+            
+            // Create tooltip showing the currency pair being calculated
+            const fxPairDisplay = `${row.baseCcy}-JPY`;
+            let tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
+            
+            // If it's a chain conversion, show the breakdown
+            if (row.currentFxDetails && Object.keys(row.currentFxDetails).length > 1) {
+                const currentRateEntries = Object.entries(row.currentFxDetails);
+                const currentRateBreakdown = currentRateEntries.map(([pair, rate]) => `${pair}: ${rate.toFixed(4)}`).join(' × ');
+                tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} = ${currentRateBreakdown} | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
+            } else if (row.fxPair && row.fxPair !== `${row.baseCcy}/JPY`) {
+                const [from, to] = row.fxPair.split('/');
+                if (from === row.baseCcy && to !== 'JPY') {
+                    tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} (via ${row.fxPair}) | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
+                }
+            }
                 
             // Color code based on comparison with transaction rate
             const isHigher = value > row.transactionFxRate;
             const colorClass = isHigher ? 'text-green-600' : 'text-red-600';
             
             return (
-                <span className={colorClass} title={`Transaction: ${row.transactionFxRate.toFixed(4)}`}>
-                    {displayValue}
+                <span 
+                    className={colorClass} 
+                    title={tooltipText}
+                >
+                    {value.toFixed(4)}
                 </span>
             );
         },
     }),
-    columnHelper.accessor('costInJPY', {
-        header: 'Cost (JPY)',
-        size: 130,
-        cell: props => {
-            const value = props.getValue();
-            return props.table.options.meta?.showValues
-                ? `¥${value.toLocaleString()}`
-                : `¥${getHiddenValue(value)}`;
-        },
-    }),
     columnHelper.accessor('currentValueJPY', {
-        header: 'Value (JPY)',
+        header: 'Curr Value (JPY)',
         size: 130,
         cell: props => {
             if (props.row.original.currentPrice === null) {
                 return <span className="text-gray-400">Loading...</span>;
             }
             const value = props.getValue();
-            return props.table.options.meta?.showValues
-                ? `¥${value.toLocaleString()}`
-                : `¥${getHiddenValue(value)}`;
+            return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
         },
     }),
     columnHelper.accessor('pnlJPY', {
@@ -200,11 +278,10 @@ const columns = [
             if (props.row.original.currentPrice === null) {
                 return <span className="text-gray-400">Loading...</span>;
             }
+            const displayValue = formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
             return (
                 <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {props.table.options.meta?.showValues
-                        ? `¥${value.toLocaleString()}`
-                        : `¥${getHiddenValue(value)}`}
+                    {displayValue}
                 </span>
             );
         },
@@ -424,11 +501,11 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
                                         onClick={header.column.getToggleSortingHandler()}
                                         style={{ width: header.getSize() }}
                                     >
-                                        <div className="flex items-center">
-                                            <span className="truncate">
+                                        <div className="flex items-center justify-between w-full">
+                                            <span className="flex-1 min-w-0 pr-1">
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
                                             </span>
-                                            <span className="ml-1 inline-block min-w-[16px]">
+                                            <span className="ml-1 inline-block min-w-[16px] flex-shrink-0">
                                                 {{
                                                     asc: '↑',
                                                     desc: '↓',

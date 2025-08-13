@@ -19,6 +19,7 @@ interface Position {
     ticker: string;
     baseCcy?: string;
     transactionFx?: number;
+    fxPair?: string;
 }
 
 // Interface for raw position data (from file)
@@ -27,6 +28,7 @@ interface RawPosition {
     ticker: string | number;
     baseCcy: string;
     transactionFx?: number;
+    fxPair?: string;
     fullName?: string;
     account?: string;
     quantity?: number;
@@ -629,11 +631,9 @@ function getRequiredFxPairs(positions: (Position | RawPosition)[]): string[] {
 
 // Convert FX pair to Yahoo Finance symbol format
 function getYahooFxSymbol(fxPair: string): string {
-    // Yahoo Finance FX symbols are in format: JPY=X for USDJPY
+    // Yahoo Finance FX symbols are in format: [FROM_CURRENCY][TO_CURRENCY]=X
+    // Special case: USDJPY maps to JPY=X in Yahoo Finance
     if (fxPair === 'USDJPY') return 'JPY=X';
-    if (fxPair === 'EURJPY') return 'EURJPY=X';
-    if (fxPair === 'GBPJPY') return 'GBPJPY=X';
-    // Add more mappings as needed
     return `${fxPair}=X`;
 }
 
@@ -642,44 +642,26 @@ export function getFxPairForPosition(position: Position | RawPosition): string |
     if (!position.baseCcy || position.baseCcy === BASE_CURRENCY) {
         return null; // No FX conversion needed for base currency
     }
+    
+    // Use the fxPair from the position data if available
+    if (position.fxPair) {
+        return position.fxPair.replace('/', ''); // Convert "EUR/USD" to "EURUSD"
+    }
+    
+    // Fallback to old logic for backwards compatibility
     return `${position.baseCcy}${BASE_CURRENCY}`;
 }
 
-// Utility function to get current FX rate for a position  
-export async function getCurrentFxRateForPosition(position: Position | RawPosition): Promise<number> {
-    const fxPair = getFxPairForPosition(position);
-    if (!fxPair) {
-        return 1; // Base currency, no conversion needed
-    }
-    
-    // Try to get current FX rate from cache first
-    const cachedRate = await getCachedFxRate(fxPair);
-    if (cachedRate !== null) {
-        return cachedRate;
-    }
-    
-    // If not in cache, fetch from Yahoo Finance
-    const freshRate = await fetchCurrentFxRate(fxPair, false);
-    return freshRate || position.transactionFx || 1; // Fallback to transactionFx or 1
+// Helper function to get current FX rate for a pair
+async function getCurrentFxRate(fxPair: string): Promise<number> {
+    const rate = await fetchCurrentFxRate(fxPair);
+    return rate || 1; // Fallback to 1 if rate is null
 }
 
-// Utility function to get historical FX rate for a transaction date
-export async function getHistoricalFxRateForTransaction(position: Position | RawPosition): Promise<number> {
-    const fxPair = getFxPairForPosition(position);
-    if (!fxPair) {
-        return 1; // Base currency, no conversion needed
-    }
-    
-    const transactionDate = position.transactionDate?.replace(/\//g, '-'); // Convert YYYY/MM/DD to YYYY-MM-DD
-    
-    if (!transactionDate) {
-        console.warn(`⚠️ No transaction date for position ${position.ticker}, using fallback`);
-        return position.transactionFx || 1;
-    }
-    
-    // Read FX rates directly from file in server context
+// Helper function to get historical FX rate for a pair and date
+async function getHistoricalFxRate(fxPair: string, transactionDate: string): Promise<number> {
     try {
-        // Only execute file system operations on server side
+        // Try to read from file system first (server-side)
         if (typeof window === 'undefined') {
             const fs = await import('fs/promises');
             const path = await import('path');
@@ -688,21 +670,86 @@ export async function getHistoricalFxRateForTransaction(position: Position | Raw
             const fxRates = JSON.parse(data);
             
             if (fxRates[fxPair] && fxRates[fxPair][transactionDate]) {
-                const rate = fxRates[fxPair][transactionDate];
-                console.log(`📈 Historical FX ${fxPair} for ${position.transactionDate}: ${rate} (exact date match)`);
-                return rate;
+                return fxRates[fxPair][transactionDate];
             }
-            
-            console.warn(`⚠️ No FX rate found for ${fxPair} on ${transactionDate}, will need to refresh FX rates`);
-        } else {
-            console.warn(`⚠️ Cannot read FX rates from file system in client context for ${fxPair} on ${transactionDate}`);
         }
     } catch (error) {
-        console.warn(`Failed to get historical FX rate for ${fxPair} on ${position.transactionDate}:`, error);
+        console.warn(`Failed to get historical FX rate for ${fxPair} on ${transactionDate}:`, error);
     }
     
-    // Fallback to transactionFx if available, otherwise 1
-    return position.transactionFx || 1;
+    // Fallback to current rate
+    return await getCurrentFxRate(fxPair);
+}
+
+// Utility function to convert amount to JPY, handling chain conversions
+export async function convertToJPY(amount: number, position: Position | RawPosition, isHistorical: boolean = false): Promise<{ convertedAmount: number, effectiveRate: number, rates: { [pair: string]: number } }> {
+    if (position.baseCcy === BASE_CURRENCY) {
+        return { convertedAmount: amount, effectiveRate: 1, rates: {} };
+    }
+    
+    const rates: { [pair: string]: number } = {};
+    const transactionDate = position.transactionDate?.replace(/\//g, '-');
+    
+    if (position.fxPair && position.fxPair !== `${position.baseCcy}/${BASE_CURRENCY}`) {
+        // Handle chain conversion (e.g., EUR/USD then USD/JPY)
+        const [from, to] = position.fxPair.split('/');
+        
+        if (from === position.baseCcy && to !== BASE_CURRENCY) {
+            // First conversion: get the rate for the fxPair
+            let firstRate: number;
+            if (isHistorical) {
+                // For historical, use the transactionFx (this is the EUR/USD rate)
+                firstRate = position.transactionFx || 1;
+            } else {
+                // For current, fetch current rate for the fxPair
+                const fxPairFormatted = position.fxPair.replace('/', '');
+                firstRate = await getCurrentFxRate(fxPairFormatted);
+            }
+            rates[position.fxPair] = firstRate;
+            
+            const intermediateAmount = amount * firstRate;
+            
+            // Second conversion: intermediate currency -> JPY
+            const secondPair = `${to}${BASE_CURRENCY}`;
+            let secondRate: number;
+            if (isHistorical && transactionDate) {
+                secondRate = await getHistoricalFxRate(secondPair, transactionDate);
+            } else {
+                secondRate = await getCurrentFxRate(secondPair);
+            }
+            rates[`${to}/${BASE_CURRENCY}`] = secondRate;
+            
+            // Calculate the effective rate (e.g., EUR->JPY = EUR->USD * USD->JPY)
+            const effectiveRate = firstRate * secondRate;
+            
+            console.log(`🔗 Chain conversion for ${position.baseCcy}->${BASE_CURRENCY}: ${position.fxPair} (${firstRate}) * ${to}/${BASE_CURRENCY} (${secondRate}) = ${effectiveRate}`);
+            
+            return { 
+                convertedAmount: intermediateAmount * secondRate, 
+                effectiveRate: effectiveRate,
+                rates 
+            };
+        }
+    }
+    
+    // Direct conversion to JPY (fallback or direct pairs like USD/JPY)
+    let directRate: number;
+    if (isHistorical) {
+        directRate = position.transactionFx || 1;
+    } else {
+        // For current rates, fetch the current rate
+        const directPair = position.fxPair?.replace('/', '') || `${position.baseCcy}${BASE_CURRENCY}`;
+        directRate = await getCurrentFxRate(directPair);
+    }
+    
+    const directPairName = position.fxPair || `${position.baseCcy}/${BASE_CURRENCY}`;
+    rates[directPairName] = directRate;
+    
+    return { 
+        convertedAmount: amount * directRate, 
+        effectiveRate: directRate,
+        rates 
+    };
 }
 
 // Export BASE_CURRENCY for use in other modules

@@ -20,17 +20,17 @@ We provide cross-platform setup scripts to get you started quickly:
 
 **For Windows:**
 ```cmd
-projectDevUtils/setup.bat
+utils/setup.bat
 ```
 
 **For macOS/Linux:**
 ```bash
-./projectDevUtils/setup.sh
+./utils/setup.sh
 ```
 
 **Cross-platform (Node.js):**
 ```bash
-node projectDevUtils/setup.js
+node utils/setup.js
 # or
 npm run setup
 ```
@@ -102,7 +102,7 @@ portfolio-tracker/
 │   │   └── positionsPrices.json        # Price cache
 │   ├── types/             # TypeScript type definitions
 │   └── utils/             # Utility functions
-├── projectDevUtils/       # Development utilities and setup scripts
+├── utils/       # Development utilities and setup scripts
 │   ├── setup.js          # Cross-platform setup script
 │   ├── setup.sh          # Unix/macOS setup script
 │   ├── setup.bat         # Windows setup script

@@ -1,17 +1,36 @@
 import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
-import { fetchStockPrice, updateAllPositions, getCurrentFxRateForPosition, getHistoricalFxRateForTransaction, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
+import { fetchStockPrice, updateAllPositions, convertToJPY } from './yahooFinanceApi';
 
 export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null): Promise<Position> => {
-    // Get historical FX rate for cost calculation (at transaction date)
-    const historicalFxRate = await getHistoricalFxRateForTransaction(rawPosition);
-    const costInJPY = rawPosition.quantity * rawPosition.costPerUnit * historicalFxRate;
+    // Convert cost to JPY using chain conversion if needed
+    const costConversion = await convertToJPY(
+        rawPosition.quantity * rawPosition.costPerUnit,
+        rawPosition,
+        true // historical
+    );
+    const costInJPY = costConversion.convertedAmount;
     
-    // Get current FX rate for value calculation
-    const currentFxRate = await getCurrentFxRateForPosition(rawPosition);
+    // Use the effective rate (e.g., for EUR: EUR/USD * USD/JPY)
+    const transactionFxRate = costConversion.effectiveRate;
+    const transactionFxDetails = costConversion.rates;
     
-    const currentValueJPY = currentPrice !== null 
-        ? rawPosition.quantity * currentPrice * (rawPosition.baseCcy === BASE_CURRENCY_CONSTANT ? 1 : currentFxRate)
-        : 0;
+    // Convert current value to JPY
+    let currentValueJPY = 0;
+    let currentFxRate = 1;
+    let currentFxDetails: { [pair: string]: number } = {};
+    
+    if (currentPrice !== null) {
+        const valueConversion = await convertToJPY(
+            rawPosition.quantity * currentPrice,
+            rawPosition,
+            false // current rates
+        );
+        currentValueJPY = valueConversion.convertedAmount;
+        // Use the effective current rate
+        currentFxRate = valueConversion.effectiveRate;
+        currentFxDetails = valueConversion.rates;
+    }
+    
     const pnlJPY = currentPrice !== null ? currentValueJPY - costInJPY : 0;
     const pnlPercentage = currentPrice !== null ? (pnlJPY / costInJPY) * 100 : 0;
 
@@ -22,8 +41,10 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         currentValueJPY,
         pnlJPY,
         pnlPercentage,
-        transactionFxRate: historicalFxRate,
-        currentFxRate: currentFxRate
+        transactionFxRate,
+        currentFxRate,
+        transactionFxDetails,
+        currentFxDetails
     };
 };
 
