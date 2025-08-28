@@ -29,14 +29,20 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-medium text-gray-900">Total Cost</h3>
-                <p className="mt-2 text-3xl font-semibold text-gray-600">
-                    {showValues ? 
-                        <>¥{summary.totalCostJPY.toLocaleString()}</> :
-                        <>¥{getHiddenValue(summary.totalCostJPY)}</>
-                    }
-                </p>
+            <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
+                <div className={`absolute inset-0 ${summary.totalValueJPY >= summary.totalCostJPY ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
+                <div className="relative">
+                    <h3 className="text-lg font-medium text-gray-900">Total Value</h3>
+                    <p className={`mt-2 text-3xl font-semibold ${hasNullPrices ? 'text-gray-400' : summary.totalValueJPY >= summary.totalCostJPY ? 'text-green-600' : 'text-red-600'}`}>
+                        {hasNullPrices ? (
+                            'Updating...'
+                        ) : (
+                            showValues ? 
+                                <>¥{summary.totalValueJPY.toLocaleString()}</> :
+                                <>¥{getHiddenValue(summary.totalValueJPY)}</>
+                        )}
+                    </p>
+                </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
                 <div className={`absolute inset-0 ${summary.totalPnlJPY >= 0 ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
@@ -51,20 +57,19 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
                                 <>¥{getHiddenValue(summary.totalPnlJPY)}</>
                         )}
                     </p>
-                </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
-                <div className={`absolute inset-0 ${summary.totalPnlPercentage >= 0 ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
-                <div className="relative">
-                    <h3 className="text-lg font-medium text-gray-900">P&L %</h3>
-                    <p className={`mt-2 text-3xl font-semibold ${hasNullPrices ? 'text-gray-400' : summary.totalPnlPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {hasNullPrices ? (
-                            'Updating...'
-                        ) : (
-                            <>{summary.totalPnlPercentage.toFixed(2)}%</>
-                        )}
+                    <p className={`text-sm mt-1 ${hasNullPrices ? 'text-gray-400' : summary.totalPnlPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {hasNullPrices ? '' : `${summary.totalPnlPercentage.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`}
                     </p>
                 </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+                <h3 className="text-lg font-medium text-gray-900">Total Cost</h3>
+                <p className="mt-2 text-3xl font-semibold text-gray-600">
+                    {showValues ? 
+                        <>¥{summary.totalCostJPY.toLocaleString()}</> :
+                        <>¥{getHiddenValue(summary.totalCostJPY)}</>
+                    }
+                </p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow relative overflow-hidden">
                 <div className={`absolute inset-0 ${portfolioAnnualizedReturn !== null && portfolioAnnualizedReturn.return >= 0 ? 'bg-green-100' : 'bg-red-100'} transform scale-y-0 origin-bottom transition-transform duration-300 ${valueChanged ? 'scale-y-100' : ''}`} />
