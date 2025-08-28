@@ -1,35 +1,103 @@
 import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
-import { fetchStockPrice, updateAllPositions, convertToJPY } from './yahooFinanceApi';
+import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
+
+// Helper function to get a single historical FX rate for a specific date
+async function getHistoricalFxRate(fxPair: string, date: string): Promise<number> {
+    const rates = await fetchHistoricalFxRates(fxPair, [date]);
+    if (rates && rates[date]) {
+        return rates[date];
+    }
+    
+    // Fallback to current rate if historical not available
+    console.warn(`Historical FX rate not available for ${fxPair} on ${date}, using current rate`);
+    const currentRate = await fetchCurrentFxRate(fxPair);
+    return currentRate || 1;
+}
+
+// Helper function to get current FX rate
+async function getCurrentFxRate(fxPair: string): Promise<number> {
+    const rate = await fetchCurrentFxRate(fxPair);
+    return rate || 1;
+}
+
+// Helper function to convert amount using FX rate (amount * rate)
+async function convertCurrency(amount: number, fromCcy: string, toCcy: string, isHistorical: boolean = false, transactionDate?: string): Promise<{ convertedAmount: number, fxRate: number }> {
+    if (fromCcy === toCcy) {
+        return { convertedAmount: amount, fxRate: 1 };
+    }
+    
+    const fxPair = `${fromCcy}${toCcy}`;
+    let fxRate: number;
+    
+    if (isHistorical && transactionDate) {
+        const dateFormatted = transactionDate.replace(/\//g, '-');
+        fxRate = await getHistoricalFxRate(fxPair, dateFormatted);
+    } else {
+        fxRate = await getCurrentFxRate(fxPair);
+    }
+    
+    return { 
+        convertedAmount: amount * fxRate, 
+        fxRate 
+    };
+}
 
 export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null): Promise<Position> => {
-    // Convert cost to JPY using chain conversion if needed
-    const costConversion = await convertToJPY(
-        rawPosition.quantity * rawPosition.costPerUnit,
-        rawPosition,
-        true // historical
-    );
-    const costInJPY = costConversion.convertedAmount;
+    const baseCcy = BASE_CURRENCY_CONSTANT; // JPY
     
-    // Use the effective rate (e.g., for EUR: EUR/USD * USD/JPY)
-    const transactionFxRate = costConversion.effectiveRate;
+    // 1. Calculate original FX rate (only if transaction was not in stock currency)
+    let origFxRate = 1;
+    let costPerUnitInBase = rawPosition.costPerUnit;
     
-    // Convert current value to JPY
+    if (rawPosition.transactionCcy !== rawPosition.stockCcy) {
+        // Convert transaction currency to stock currency first, then to base currency
+        if (rawPosition.transactionCcy !== baseCcy) {
+            const conversion = await convertCurrency(
+                rawPosition.costPerUnit, 
+                rawPosition.transactionCcy, 
+                baseCcy, 
+                true, // historical
+                rawPosition.transactionDate
+            );
+            costPerUnitInBase = conversion.convertedAmount;
+            origFxRate = conversion.fxRate;
+        }
+    } else if (rawPosition.transactionCcy !== baseCcy) {
+        // Transaction was in stock currency but not base currency
+        const conversion = await convertCurrency(
+            rawPosition.costPerUnit, 
+            rawPosition.transactionCcy, 
+            baseCcy, 
+            true, // historical
+            rawPosition.transactionDate
+        );
+        costPerUnitInBase = conversion.convertedAmount;
+        origFxRate = conversion.fxRate;
+    }
+    
+    // 2. Calculate cost in base currency (JPY)
+    const costInJPY = costPerUnitInBase * rawPosition.quantity;
+    
+    // 3. Calculate current value and FX rate
     let currentValueJPY = 0;
     let currentFxRate = 1;
-    let currentPriceLocal = currentPrice; // Use the fetched price directly
     
     if (currentPrice !== null) {
-        const valueConversion = await convertToJPY(
-            rawPosition.quantity * currentPrice,
-            rawPosition,
-            false // current rates
-        );
-        currentValueJPY = valueConversion.convertedAmount;
-        // Use the effective current rate
-        currentFxRate = valueConversion.effectiveRate;
-        
-        // Since we're using direct FX rates, current price is already in local currency
-        currentPriceLocal = currentPrice;
+        if (rawPosition.stockCcy !== baseCcy) {
+            // Convert current value from stock currency to base currency
+            const valueConversion = await convertCurrency(
+                rawPosition.quantity * currentPrice,
+                rawPosition.stockCcy,
+                baseCcy,
+                false // current rates
+            );
+            currentValueJPY = valueConversion.convertedAmount;
+            currentFxRate = valueConversion.fxRate;
+        } else {
+            // Stock is already in base currency
+            currentValueJPY = rawPosition.quantity * currentPrice;
+            currentFxRate = 1;
+        }
     }
     
     const pnlJPY = currentPrice !== null ? currentValueJPY - costInJPY : 0;
@@ -37,13 +105,13 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 
     return {
         ...rawPosition,
-        currentPrice: currentPriceLocal, // Use the local currency price for display
+        currentPrice, // Current price in stock currency
         costInJPY,
         currentValueJPY,
         pnlJPY,
         pnlPercentage,
-        transactionFxRate,
-        currentFxRate
+        transactionFxRate: origFxRate, // Original FX rate (transaction ccy to base ccy)
+        currentFxRate // Current FX rate (stock ccy to base ccy)
     };
 };
 

@@ -134,35 +134,34 @@ const columns = [
         },
     }),
     columnHelper.accessor('costPerUnit', {
-        header: 'Orig Unit Price',
+        header: 'Orig Unit Price (JPY)',
         size: 120,
         cell: props => {
-            const value = props.getValue();
             const row = props.row.original;
-            const currencyCode = row.transactionCcy;
-            return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
+            // Calculate cost per unit in JPY
+            const costPerUnitJPY = row.costInJPY / row.quantity;
+            return formatCurrencyValue(costPerUnitJPY, 'JPY', props.table.options.meta?.showValues ?? false);
         },
     }),
     columnHelper.accessor(row => row.costPerUnit * row.quantity, {
         id: 'totalCost',
-        header: 'Orig Position (Local)',
+        header: 'Orig Position (JPY)',
         size: 120,
         cell: props => {
-            const value = props.getValue();
             const row = props.row.original;
-            const currencyCode = row.transactionCcy;
-            return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
+            const value = row.costInJPY; // Use the already calculated JPY value
+            return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
         },
     }),
     columnHelper.accessor('transactionFxRate', {
-        header: 'Orig FX (Local-JPY)',
+        header: 'Orig FX Rate',
         size: 120,
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
             
-            // Only show FX rate for non-base currencies
-            if (row.transactionCcy === BASE_CURRENCY_CONSTANT) {
+            // Only show FX rate if transaction was not in stock currency
+            if (row.transactionCcy === row.stockCcy) {
                 return <span className="text-gray-400">N/A</span>;
             }
             
@@ -171,23 +170,15 @@ const columns = [
                 : getHiddenValue(value);
         },
     }),
-    columnHelper.accessor('costInJPY', {
-        header: 'Orig Position (JPY)',
-        size: 130,
-        cell: props => {
-            const value = props.getValue();
-            return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
-        },
-    }),
     columnHelper.accessor('currentPrice', {
-        header: 'Curr Price (Local)',
+        header: 'Curr Price (Stock Ccy)',
         size: 120,
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
             if (value === null) return <span className="text-gray-400">Loading...</span>;
             
-            const currencyCode = row.transactionCcy;
+            const currencyCode = row.stockCcy; // Use stock currency instead of transaction currency
             const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
                 
             return (
@@ -198,14 +189,14 @@ const columns = [
         },
     }),
     columnHelper.accessor('currentFxRate', {
-        header: 'Curr FX Rate',
+        header: 'Curr FX Rate (Stock-JPY)',
         size: 120,
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
             
-            // Only show FX rate for non-base currencies
-            if (row.transactionCcy === BASE_CURRENCY_CONSTANT) {
+            // Only show FX rate for non-JPY stocks
+            if (row.stockCcy === BASE_CURRENCY_CONSTANT) {
                 return <span className="text-gray-400">N/A</span>;
             }
             

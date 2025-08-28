@@ -9,6 +9,7 @@ export interface RawPosition {
     quantity: number;
     costPerUnit: number;
     transactionCcy: Currency;
+    stockCcy: Currency; // The currency the stock trades in (e.g., USD for AAPL, JPY for 7940.T)
 }
 
 export interface Position extends RawPosition {
