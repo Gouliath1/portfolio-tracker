@@ -38,7 +38,7 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
                             'Updating...'
                         ) : (
                             showValues ? 
-                                <>¥{summary.totalValueJPY.toLocaleString()}</> :
+                                <>¥{Math.round(summary.totalValueJPY).toLocaleString()}</> :
                                 <>¥{getHiddenValue(summary.totalValueJPY)}</>
                         )}
                     </p>
@@ -53,7 +53,7 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
                             'Updating...'
                         ) : (
                             showValues ? 
-                                <>¥{summary.totalPnlJPY.toLocaleString()}</> :
+                                <>¥{Math.round(summary.totalPnlJPY).toLocaleString()}</> :
                                 <>¥{getHiddenValue(summary.totalPnlJPY)}</>
                         )}
                     </p>
@@ -66,7 +66,7 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
                 <h3 className="text-lg font-medium text-gray-900">Total Cost</h3>
                 <p className="mt-2 text-3xl font-semibold text-gray-600">
                     {showValues ? 
-                        <>¥{summary.totalCostJPY.toLocaleString()}</> :
+                        <>¥{Math.round(summary.totalCostJPY).toLocaleString()}</> :
                         <>¥{getHiddenValue(summary.totalCostJPY)}</>
                     }
                 </p>
