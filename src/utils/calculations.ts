@@ -12,12 +12,11 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
     
     // Use the effective rate (e.g., for EUR: EUR/USD * USD/JPY)
     const transactionFxRate = costConversion.effectiveRate;
-    const transactionFxDetails = costConversion.rates;
     
     // Convert current value to JPY
     let currentValueJPY = 0;
     let currentFxRate = 1;
-    let currentFxDetails: { [pair: string]: number } = {};
+    let currentPriceLocal = currentPrice; // Use the fetched price directly
     
     if (currentPrice !== null) {
         const valueConversion = await convertToJPY(
@@ -28,7 +27,9 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         currentValueJPY = valueConversion.convertedAmount;
         // Use the effective current rate
         currentFxRate = valueConversion.effectiveRate;
-        currentFxDetails = valueConversion.rates;
+        
+        // Since we're using direct FX rates, current price is already in local currency
+        currentPriceLocal = currentPrice;
     }
     
     const pnlJPY = currentPrice !== null ? currentValueJPY - costInJPY : 0;
@@ -36,15 +37,13 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 
     return {
         ...rawPosition,
-        currentPrice,
+        currentPrice: currentPriceLocal, // Use the local currency price for display
         costInJPY,
         currentValueJPY,
         pnlJPY,
         pnlPercentage,
         transactionFxRate,
-        currentFxRate,
-        transactionFxDetails,
-        currentFxDetails
+        currentFxRate
     };
 };
 

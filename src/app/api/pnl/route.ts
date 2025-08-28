@@ -86,7 +86,7 @@ export async function GET(request: Request) {
                 currentValueJPY: pos.currentValueJPY,
                 pnlJPY: pos.pnlJPY,
                 pnlPercentage: pos.pnlPercentage,
-                baseCcy: pos.baseCcy
+                transactionCcy: pos.transactionCcy
             })),
             count: portfolioSummary.positions.length,
             timestamp: new Date().toISOString()

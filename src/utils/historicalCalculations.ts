@@ -103,7 +103,7 @@ export async function calculateHistoricalValues(positions: RawPosition[]): Promi
         let totalValue = 0;
         for (const pos of snapshot.positions) {
             const price = historicalPrices[pos.ticker] || 0;
-            const value = pos.quantity * price * (pos.baseCcy === BASE_CURRENCY_CONSTANT ? 1 : (pos.transactionFx || 1));
+            const value = pos.quantity * price * (pos.transactionCcy === BASE_CURRENCY_CONSTANT ? 1 : (pos.transactionFx || 1));
             totalValue += value;
         }
         

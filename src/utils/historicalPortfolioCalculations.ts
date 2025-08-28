@@ -161,7 +161,7 @@ export async function calculatePortfolioValueAtDate(
             const positionsForApi = positions.map(p => ({
                 transactionDate: p.transactionDate,
                 ticker: p.ticker.toString(),
-                baseCcy: p.baseCcy,
+                transactionCcy: p.transactionCcy,
                 transactionFx: p.transactionFxRate
             }));
             const historicalPrices = await fetchHistoricalPrices(position.ticker, positionsForApi);
@@ -253,7 +253,7 @@ export async function calculateHistoricalPortfolioValues(
         const positionsForApi = positions.map(p => ({
             transactionDate: p.transactionDate,
             ticker: p.ticker.toString(),
-            baseCcy: p.baseCcy,
+            transactionCcy: p.transactionCcy,
             transactionFx: p.transactionFxRate
         }));
         const historicalPrices = await fetchHistoricalPrices(ticker, positionsForApi);

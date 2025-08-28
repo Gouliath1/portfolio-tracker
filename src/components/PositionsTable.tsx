@@ -139,7 +139,7 @@ const columns = [
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
-            const currencyCode = row.baseCcy;
+            const currencyCode = row.transactionCcy;
             return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
         },
     }),
@@ -150,7 +150,7 @@ const columns = [
         cell: props => {
             const value = props.getValue();
             const row = props.row.original;
-            const currencyCode = row.baseCcy;
+            const currencyCode = row.transactionCcy;
             return formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
         },
     }),
@@ -162,28 +162,12 @@ const columns = [
             const row = props.row.original;
             
             // Only show FX rate for non-base currencies
-            if (row.baseCcy === BASE_CURRENCY_CONSTANT) {
+            if (row.transactionCcy === BASE_CURRENCY_CONSTANT) {
                 return <span className="text-gray-400">N/A</span>;
             }
             
-            // Create tooltip showing the currency pair being calculated
-            const fxPairDisplay = `${row.baseCcy}-JPY`;
-            let tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)}`;
-            
-            // If it's a chain conversion, show the breakdown
-            if (row.transactionFxDetails && Object.keys(row.transactionFxDetails).length > 1) {
-                const rateEntries = Object.entries(row.transactionFxDetails);
-                const rateBreakdown = rateEntries.map(([pair, rate]) => `${pair}: ${rate.toFixed(4)}`).join(' × ');
-                tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)} = ${rateBreakdown}`;
-            } else if (row.fxPair && row.fxPair !== `${row.baseCcy}/JPY`) {
-                const [from, to] = row.fxPair.split('/');
-                if (from === row.baseCcy && to !== 'JPY') {
-                    tooltipText = `${fxPairDisplay} rate: ${value.toFixed(4)} (via ${row.fxPair}: ${row.transactionFx?.toFixed(4) || 'N/A'})`;
-                }
-            }
-            
             return props.table.options.meta?.showValues
-                ? <span title={tooltipText}>{value.toFixed(4)}</span>
+                ? <span>{value.toFixed(2)}</span>
                 : getHiddenValue(value);
         },
     }),
@@ -203,7 +187,7 @@ const columns = [
             const row = props.row.original;
             if (value === null) return <span className="text-gray-400">Loading...</span>;
             
-            const currencyCode = row.baseCcy;
+            const currencyCode = row.transactionCcy;
             const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
                 
             return (
@@ -221,40 +205,18 @@ const columns = [
             const row = props.row.original;
             
             // Only show FX rate for non-base currencies
-            if (row.baseCcy === BASE_CURRENCY_CONSTANT) {
+            if (row.transactionCcy === BASE_CURRENCY_CONSTANT) {
                 return <span className="text-gray-400">N/A</span>;
             }
             
             if (!props.table.options.meta?.showValues) {
                 return getHiddenValue(value);
             }
-            
-            // Create tooltip showing the currency pair being calculated
-            const fxPairDisplay = `${row.baseCcy}-JPY`;
-            let tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
-            
-            // If it's a chain conversion, show the breakdown
-            if (row.currentFxDetails && Object.keys(row.currentFxDetails).length > 1) {
-                const currentRateEntries = Object.entries(row.currentFxDetails);
-                const currentRateBreakdown = currentRateEntries.map(([pair, rate]) => `${pair}: ${rate.toFixed(4)}`).join(' × ');
-                tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} = ${currentRateBreakdown} | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
-            } else if (row.fxPair && row.fxPair !== `${row.baseCcy}/JPY`) {
-                const [from, to] = row.fxPair.split('/');
-                if (from === row.baseCcy && to !== 'JPY') {
-                    tooltipText = `Current ${fxPairDisplay} rate: ${value.toFixed(4)} (via ${row.fxPair}) | Transaction rate: ${row.transactionFxRate.toFixed(4)}`;
-                }
-            }
                 
-            // Color code based on comparison with transaction rate
-            const isHigher = value > row.transactionFxRate;
-            const colorClass = isHigher ? 'text-green-600' : 'text-red-600';
-            
+            // No color coding for FX rates - just show the value
             return (
-                <span 
-                    className={colorClass} 
-                    title={tooltipText}
-                >
-                    {value.toFixed(4)}
+                <span>
+                    {value.toFixed(2)}
                 </span>
             );
         },
@@ -294,9 +256,14 @@ const columns = [
             if (props.row.original.currentPrice === null) {
                 return <span className="text-gray-400">Loading...</span>;
             }
+            
+            if (!props.table.options.meta?.showValues) {
+                return getHiddenValue(value);
+            }
+            
             return (
                 <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {value.toFixed(2)}%
+                    {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                 </span>
             );
         },

@@ -128,7 +128,7 @@ portfolio-tracker/
        "quantity": 100,
        "costPerUnit": 150.00,
        "transactionDate": "2024-01-15",
-       "baseCcy": "USD",
+       "transactionCcy": "USD",
        "transactionFx": 149.50,
        "account": "Brokerage"
      }

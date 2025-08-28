@@ -7,8 +7,7 @@
       "account": "JP General",
       "quantity": 1.0,
       "costPerUnit": 38.9012,
-      "baseCcy": "USD",
-      "transactionFx": 121.61
+      "transactionCcy": "USD"
     },
     {
       "transactionDate": "2020/03/12",
@@ -17,8 +16,7 @@
       "account": "JP General",
       "quantity": 2.0,
       "costPerUnit": 30.7702,
-      "baseCcy": "USD",
-      "transactionFx": 121.61
+      "transactionCcy": "USD"
     },
     {
       "transactionDate": "2023/05/30",
@@ -27,8 +25,7 @@
       "account": "JP NISA",
       "quantity": 100.0,
       "costPerUnit": 572.0,
-      "baseCcy": "JPY",
-      "transactionFx": 1.0
+      "transactionCcy": "JPY"
     },
     {
       "transactionDate": "2012/03/01",
@@ -37,8 +34,7 @@
       "account": "JP General",
       "quantity": 1.0,
       "costPerUnit": 118000.0,
-      "baseCcy": "JPY",
-      "transactionFx": 1.0
+      "transactionCcy": "JPY"
     },
     {
       "transactionDate": "2022/03/01",
@@ -47,8 +43,7 @@
       "account": "JP General",
       "quantity": 1.0,
       "costPerUnit": 106342.0,
-      "baseCcy": "JPY",
-      "transactionFx": 1.0
+      "transactionCcy": "JPY"
     },
     {
       "transactionDate": "2024/11/11",
@@ -57,8 +52,7 @@
       "account": "JP General",
       "quantity": 100.0,
       "costPerUnit": 605.35,
-      "baseCcy": "JPY",
-      "transactionFx": 1.0
+      "transactionCcy": "JPY"
     },
     {
       "transactionDate": "2024/11/11",
@@ -67,8 +61,7 @@
       "account": "JP NISA",
       "quantity": 100.0,
       "costPerUnit": 605.0,
-      "baseCcy": "JPY",
-      "transactionFx": 1.0
+      "transactionCcy": "JPY"
     },
     {
       "transactionDate": "2025/03/05",
@@ -77,8 +70,7 @@
       "account": "JP General",
       "quantity": 2.0,
       "costPerUnit": 110.71,
-      "baseCcy": "USD",
-      "transactionFx": 150.12
+      "transactionCcy": "USD"
     }
   ]
 }

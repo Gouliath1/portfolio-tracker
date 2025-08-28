@@ -8,9 +8,7 @@ export interface RawPosition {
     account: string;
     quantity: number;
     costPerUnit: number;
-    baseCcy: Currency;
-    transactionFx?: number; // Optional, will be derived from historical FX rates
-    fxPair?: string; // FX pair for the transaction (e.g., "EUR/USD", "USD/JPY")
+    transactionCcy: Currency;
 }
 
 export interface Position extends RawPosition {
@@ -21,8 +19,6 @@ export interface Position extends RawPosition {
     pnlPercentage: number;
     transactionFxRate: number; // FX rate used for cost calculation (historical or transaction)
     currentFxRate: number; // Current FX rate used for value calculation
-    transactionFxDetails?: { [pair: string]: number }; // Constituent rates used in transaction
-    currentFxDetails?: { [pair: string]: number }; // Constituent rates used in current valuation
 }
 
 export interface PortfolioSummary {
