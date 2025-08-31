@@ -108,25 +108,34 @@ for %%f in (positionsPrices.json) do (
 
 REM Step 5: Ask if user wants to build
 echo.
-echo 5. Build project (optional)
+echo 5. Build project with tests (optional)
 
-set /p BUILD_CHOICE="Would you like to build the project now? (y/N): "
+set /p BUILD_CHOICE="Would you like to build the project now? This will run tests first. (y/N): "
+set BUILD_SUCCESS=true
 if /i "%BUILD_CHOICE%"=="y" (
-    echo    Running: npm run build
+    echo    Running: npm run build (includes running tests)
     call npm run build
     if %errorlevel% neq 0 (
-        echo ❌ Build failed. You can try running 'npm run build' manually later.
+        echo ❌ Build failed. This could be due to failing tests or compilation errors.
+        echo    You can try running 'npm test' to check tests, or 'npm run build' manually later.
+        set BUILD_SUCCESS=false
     ) else (
-        echo ✅ Project built successfully
+        echo ✅ Project built successfully (tests passed)
     )
 ) else (
     echo ⚠️  Skipping build step. You can run 'npm run build' later.
+    echo    Note: The build process now includes running tests automatically.
 )
 
 REM Completion message
 echo.
 echo ============================================================
-echo 🎉 SETUP COMPLETED SUCCESSFULLY! 🎉
+if "%BUILD_SUCCESS%"=="true" (
+    echo 🎉 SETUP COMPLETED SUCCESSFULLY! 🎉
+) else (
+    echo ⚠️  SETUP COMPLETED WITH ISSUES ⚠️
+    echo Dependencies installed but build failed.
+)
 echo ============================================================
 echo.
 echo Next steps:
@@ -141,10 +150,13 @@ echo    - Edit src\data\positions.json with your stock positions
 echo    - Update environment variables in .env.local if needed
 echo.
 echo Useful commands:
-echo    npm run dev     - Start development server
-echo    npm run build   - Build for production
-echo    npm run start   - Start production server
-echo    npm run lint    - Run linting
+echo    npm run dev         - Start development server
+echo    npm run build       - Build for production (includes tests)
+echo    npm run start       - Start production server
+echo    npm run lint        - Run linting
+echo    npm test            - Run unit tests
+echo    npm run test:watch  - Run tests in watch mode
+echo    npm run test:coverage - Run tests with coverage
 echo.
 echo For more information, check the README.md file.
 echo ============================================================

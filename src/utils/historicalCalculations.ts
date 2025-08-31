@@ -1,5 +1,5 @@
 import { RawPosition, HistoricalPortfolioSnapshot } from '../types/portfolio';
-import { BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
+// import { BASE_CURRENCY_CONSTANT } from './yahooFinanceApi'; // Commented out as currently unused
 
 interface MonthlyPortfolio {
     positions: RawPosition[];
@@ -55,7 +55,7 @@ export function getPortfolioStateAtDate(positions: RawPosition[], targetDate: Da
     
     const consolidatedPositions = Array.from(groupedPositions.values());
     const totalCost = consolidatedPositions.reduce(
-        (sum, pos) => sum + (pos.quantity * pos.costPerUnit * (pos.transactionFx || 1)),
+        (sum, pos) => sum + (pos.quantity * pos.costPerUnit), // Remove FX rate calculation for now
         0
     );
     
@@ -103,7 +103,7 @@ export async function calculateHistoricalValues(positions: RawPosition[]): Promi
         let totalValue = 0;
         for (const pos of snapshot.positions) {
             const price = historicalPrices[pos.ticker] || 0;
-            const value = pos.quantity * price * (pos.transactionCcy === BASE_CURRENCY_CONSTANT ? 1 : (pos.transactionFx || 1));
+            const value = pos.quantity * price; // Simplified - remove FX rate for now
             totalValue += value;
         }
         

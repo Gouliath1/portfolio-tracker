@@ -133,25 +133,34 @@ EOF
         fi
     done
 
-    # Step 5: Ask if user wants to build
-    log_step "5. Build project (optional)"
+    # Step 5: Build project (optional)
+    log_step "5. Build project with tests (optional)"
     
-    read -p "Would you like to build the project now? (y/N): " -n 1 -r
+    build_success=true
+    read -p "Would you like to build the project now? This will run tests first. (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Running: npm run build"
+        log_info "Running: npm run build (includes running tests)"
         if npm run build; then
-            log_success "Project built successfully"
+            log_success "Project built successfully (tests passed)"
         else
-            log_error "Build failed. You can try running 'npm run build' manually later."
+            log_error "Build failed. This could be due to failing tests or compilation errors."
+            log_info "You can try running 'npm test' to check tests, or 'npm run build' manually later."
+            build_success=false
         fi
     else
         log_warning "Skipping build step. You can run 'npm run build' later."
+        log_info "Note: The build process now includes running tests automatically."
     fi
 
     # Completion message
     echo -e "\n${GREEN}============================================================${NC}"
-    echo -e "${GREEN}🎉 SETUP COMPLETED SUCCESSFULLY! 🎉${NC}"
+    if [ "$build_success" = true ]; then
+        echo -e "${GREEN}🎉 SETUP COMPLETED SUCCESSFULLY! 🎉${NC}"
+    else
+        echo -e "${YELLOW}⚠️  SETUP COMPLETED WITH ISSUES ⚠️${NC}"
+        echo -e "${YELLOW}Dependencies installed but build failed.${NC}"
+    fi
     echo -e "${GREEN}============================================================${NC}"
     
     echo -e "\n${CYAN}Next steps:${NC}"
@@ -166,10 +175,13 @@ EOF
     echo -e "${BLUE}   - Update environment variables in .env.local if needed${NC}"
     
     echo -e "\n${CYAN}Useful commands:${NC}"
-    echo -e "${BLUE}   npm run dev     - Start development server${NC}"
-    echo -e "${BLUE}   npm run build   - Build for production${NC}"
-    echo -e "${BLUE}   npm run start   - Start production server${NC}"
-    echo -e "${BLUE}   npm run lint    - Run linting${NC}"
+    echo -e "${BLUE}   npm run dev         - Start development server${NC}"
+    echo -e "${BLUE}   npm run build       - Build for production (includes tests)${NC}"
+    echo -e "${BLUE}   npm run start       - Start production server${NC}"
+    echo -e "${BLUE}   npm run lint        - Run linting${NC}"
+    echo -e "${BLUE}   npm test            - Run unit tests${NC}"
+    echo -e "${BLUE}   npm run test:watch  - Run tests in watch mode${NC}"
+    echo -e "${BLUE}   npm run test:coverage - Run tests with coverage${NC}"
     
     echo -e "\n${YELLOW}For more information, check the README.md file.${NC}"
     echo -e "${GREEN}============================================================${NC}"

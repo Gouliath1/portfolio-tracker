@@ -61,8 +61,15 @@ export const TransactionManager = ({ positions, onPositionsChange }: Transaction
             const formattedDate = formData.transactionDate.replace(/-/g, '/');
             
             const newPosition: RawPosition = {
-                ...formData,
-                transactionDate: formattedDate
+                transactionDate: formattedDate,
+                ticker: formData.ticker,
+                fullName: formData.fullName,
+                account: formData.account,
+                quantity: formData.quantity,
+                costPerUnit: formData.costPerUnit,
+                transactionCcy: formData.baseCcy, // Map baseCcy to transactionCcy
+                stockCcy: formData.baseCcy, // Assume stock currency is same as transaction currency for now
+                broker: 'Default', // Add default broker if not provided
             };
 
             const updatedPositions = [...positions, newPosition];

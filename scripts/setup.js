@@ -167,14 +167,20 @@ function checkDataFiles() {
 }
 
 function buildProject() {
-    logStep(5, 'Building the project');
+    logStep(5, 'Building the project with tests');
+    log('   Note: Build process includes running tests automatically', 'blue');
     
-    return execCommand('npm run build', 'Project built successfully');
+    return execCommand('npm run build', 'Project built successfully (tests passed)');
 }
 
-function showCompletionMessage() {
+function showCompletionMessage(buildSuccess = true) {
     log('\n' + '='.repeat(60), 'green');
-    log('🎉 SETUP COMPLETED SUCCESSFULLY! 🎉', 'green');
+    if (buildSuccess) {
+        log('🎉 SETUP COMPLETED SUCCESSFULLY! 🎉', 'green');
+    } else {
+        log('⚠️  SETUP COMPLETED WITH ISSUES ⚠️', 'yellow');
+        log('Dependencies installed but build failed.', 'yellow');
+    }
     log('='.repeat(60), 'green');
     
     log('\nNext steps:', 'cyan');
@@ -189,10 +195,13 @@ function showCompletionMessage() {
     log('   - Update environment variables in .env.local if needed', 'blue');
     
     log('\nUseful commands:', 'cyan');
-    log('   npm run dev     - Start development server', 'blue');
-    log('   npm run build   - Build for production', 'blue');
-    log('   npm run start   - Start production server', 'blue');
-    log('   npm run lint    - Run linting', 'blue');
+    log('   npm run dev         - Start development server', 'blue');
+    log('   npm run build       - Build for production (includes tests)', 'blue');
+    log('   npm run start       - Start production server', 'blue');
+    log('   npm run lint        - Run linting', 'blue');
+    log('   npm test            - Run unit tests', 'blue');
+    log('   npm run test:watch  - Run tests in watch mode', 'blue');
+    log('   npm run test:coverage - Run tests with coverage', 'blue');
     
     log('\nFor more information, check the README.md file.', 'yellow');
     log('\n' + '='.repeat(60), 'green');
@@ -222,19 +231,21 @@ function main() {
             output: process.stdout
         });
         
-        rl.question('\nWould you like to build the project now? (y/N): ', (answer) => {
+        rl.question('\nWould you like to build the project now? This will run tests first. (y/N): ', (answer) => {
             rl.close();
             
             if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
                 if (buildProject()) {
-                    showCompletionMessage();
+                    showCompletionMessage(true);
                 } else {
-                    logError('Build failed. You can try running "npm run build" manually later.');
-                    showCompletionMessage();
+                    logError('Build failed. This could be due to failing tests or compilation errors.');
+                    log('You can try running "npm test" to check tests, or "npm run build" manually later.', 'blue');
+                    showCompletionMessage(false);
                 }
             } else {
                 log('\nSkipping build step. You can run "npm run build" later.', 'yellow');
-                showCompletionMessage();
+                log('Note: The build process now includes running tests automatically.', 'blue');
+                showCompletionMessage(true);
             }
         });
         
