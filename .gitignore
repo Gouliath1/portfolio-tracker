@@ -44,3 +44,20 @@ next-env.d.ts
 data/positions.json
 data/positions.json.*
 data/portfolio.db
+
+# VSCode auto-generated empty files and directories
+src/components/transactionManager/
+src/components/chart/
+src/utils/database/
+src/app/api/database/
+src/types/table.d.ts
+src/data/
+# Auto-generated script files
+scripts/initDatabase.js
+scripts/testDatabase.js
+# Auto-generated API route variants
+src/app/api/*/route-new.ts
+src/app/api/*/*/route-new.ts
+
+# VSCode workspace settings (local only)
+.vscode/
