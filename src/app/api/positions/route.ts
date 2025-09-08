@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RawPosition } from '@/types/portfolio';
-import { promises as fs } from 'fs';
-import path from 'path';
 
-const POSITIONS_JSON_PATH = path.join(process.cwd(), 'data/positions.json');
-const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'data/positions.template.json');
-
-async function getPositionsFromDatabase(): Promise<RawPosition[] | null> {
+async function getPositionsFromDatabase(): Promise<RawPosition[]> {
     try {
         const { getDbClient } = await import('@/database');
         const client = getDbClient();
@@ -16,7 +11,7 @@ async function getPositionsFromDatabase(): Promise<RawPosition[] | null> {
         const count = Number(countResult.rows[0].count);
         
         if (count === 0) {
-            return null; // No data in database, will fallback to JSON
+            return []; // Return empty array if no positions
         }
         
         // Query positions with joined data
@@ -51,50 +46,59 @@ async function getPositionsFromDatabase(): Promise<RawPosition[] | null> {
         
     } catch (error) {
         console.error('❌ Error reading positions from database:', error);
-        return null;
+        throw error; // Let the caller handle the error
     }
 }
 
-async function getPositionsFromJson(): Promise<RawPosition[]> {
+export async function GET() {
     try {
-        // Try main positions.json first
-        let data: string;
-        let filePath = POSITIONS_JSON_PATH;
+        console.log('📋 GET /api/positions - Fetching positions data');
         
-        try {
-            data = await fs.readFile(POSITIONS_JSON_PATH, 'utf-8');
-            console.log('📋 Loading positions from positions.json');
-        } catch {
-            // If main file doesn't exist, fall back to template
-            console.log('📋 positions.json not found, using template...');
-            data = await fs.readFile(POSITIONS_TEMPLATE_PATH, 'utf-8');
-            filePath = POSITIONS_TEMPLATE_PATH;
+        const positions = await getPositionsFromDatabase();
+        
+        if (positions.length === 0) {
+            console.log('📋 No positions found in database');
+            return NextResponse.json({ 
+                positions: [],
+                message: 'No positions found. You can import positions from a JSON file using the import feature.'
+            });
         }
         
-        const jsonData = JSON.parse(data);
+        console.log(`✅ Successfully fetched ${positions.length} positions`);
+        return NextResponse.json({ positions });
         
-        // Handle both array format and object with positions property
-        let jsonPositions = jsonData;
-        if (jsonData && jsonData.positions) {
-            jsonPositions = jsonData.positions;
-        }
-        
-        const positions = Array.isArray(jsonPositions) ? jsonPositions : [];
-        console.log(`📋 Loaded ${positions.length} positions from ${path.basename(filePath)}`);
-        
-        return positions;
     } catch (error) {
-        console.error('❌ Error reading positions from JSON files:', error);
-        return [];
+        console.error('❌ Error in positions GET:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch positions data' },
+            { status: 500 }
+        );
     }
 }
 
-async function cachePositionsToDatabase(positions: RawPosition[]): Promise<void> {
+export async function POST(request: Request) {
     try {
-        console.log('💾 Caching positions to database...');
+        const body = await request.json();
+        
+        if (!body.positions || !Array.isArray(body.positions)) {
+            return NextResponse.json(
+                { error: 'Invalid request: positions array required' },
+                { status: 400 }
+            );
+        }
+        
+        const positions: RawPosition[] = body.positions;
+        console.log(`📋 POST /api/positions - Importing ${positions.length} positions to database`);
+        
+        // Clear existing positions and import new ones
         const { getDbClient } = await import('@/database');
         const db = getDbClient();
-
+        
+        // Clear existing positions
+        await db.execute('DELETE FROM positions');
+        console.log('🧹 Cleared existing positions from database');
+        
+        // Import each position to database
         for (const position of positions) {
             // Get or create security
             const securityResult = await db.execute({
@@ -103,15 +107,15 @@ async function cachePositionsToDatabase(positions: RawPosition[]): Promise<void>
             });
 
             let securityId: number;
-            if (securityResult.rows.length === 0) {
-                // Create security
-                const insertSecurity = await db.execute({
-                    sql: 'INSERT INTO securities (ticker, name, currency) VALUES (?, ?, ?) RETURNING id',
-                    args: [position.ticker, position.fullName, position.stockCcy || position.transactionCcy]
-                });
-                securityId = insertSecurity.rows[0].id as number;
+            if (securityResult.rows.length > 0) {
+                securityId = Number(securityResult.rows[0].id);
             } else {
-                securityId = securityResult.rows[0].id as number;
+                // Create security
+                const insertResult = await db.execute({
+                    sql: 'INSERT INTO securities (ticker, name, currency) VALUES (?, ?, ?) RETURNING id',
+                    args: [position.ticker, position.fullName || position.ticker, position.stockCcy || position.transactionCcy]
+                });
+                securityId = Number(insertResult.rows[0].id);
             }
 
             // Get or create broker
@@ -121,90 +125,55 @@ async function cachePositionsToDatabase(positions: RawPosition[]): Promise<void>
             });
 
             let brokerId: number;
-            if (brokerResult.rows.length === 0) {
-                // Create broker
-                const code = (position.broker || 'UNKNOWN').toUpperCase().replace(/\s+/g, '_');
-                const insertBroker = await db.execute({
-                    sql: 'INSERT INTO brokers (code, display_name) VALUES (?, ?) RETURNING id',
-                    args: [code, position.broker || 'Unknown']
-                });
-                brokerId = insertBroker.rows[0].id as number;
+            if (brokerResult.rows.length > 0) {
+                brokerId = Number(brokerResult.rows[0].id);
             } else {
-                brokerId = brokerResult.rows[0].id as number;
+                // Create broker
+                const insertResult = await db.execute({
+                    sql: 'INSERT INTO brokers (name, display_name, country_code) VALUES (?, ?, ?) RETURNING id',
+                    args: [position.broker || 'Unknown', position.broker || 'Unknown', 'US']
+                });
+                brokerId = Number(insertResult.rows[0].id);
             }
 
             // Get or create account
             const accountResult = await db.execute({
-                sql: 'SELECT id FROM accounts WHERE broker_id = ? AND name = ?',
-                args: [brokerId, position.account]
+                sql: 'SELECT id FROM accounts WHERE name = ? AND broker_id = ?',
+                args: [position.account || 'Default', brokerId]
             });
 
             let accountId: number;
-            if (accountResult.rows.length === 0) {
-                // Create account
-                const insertAccount = await db.execute({
-                    sql: 'INSERT INTO accounts (broker_id, name, account_type) VALUES (?, ?, ?) RETURNING id',
-                    args: [brokerId, position.account, 'INDIVIDUAL']
-                });
-                accountId = insertAccount.rows[0].id as number;
+            if (accountResult.rows.length > 0) {
+                accountId = Number(accountResult.rows[0].id);
             } else {
-                accountId = accountResult.rows[0].id as number;
+                // Create account
+                const insertResult = await db.execute({
+                    sql: 'INSERT INTO accounts (name, broker_id, account_type, base_currency) VALUES (?, ?, ?, ?) RETURNING id',
+                    args: [position.account || 'Default', brokerId, 'BROKERAGE', position.transactionCcy]
+                });
+                accountId = Number(insertResult.rows[0].id);
             }
 
             // Insert position
             await db.execute({
-                sql: 'INSERT INTO positions (security_id, account_id, quantity, average_cost, position_currency) VALUES (?, ?, ?, ?, ?)',
+                sql: `INSERT INTO positions (security_id, account_id, quantity, average_cost, position_currency) 
+                      VALUES (?, ?, ?, ?, ?)`,
                 args: [securityId, accountId, position.quantity, position.costPerUnit, position.transactionCcy]
             });
         }
         
-        console.log(`✅ Successfully cached ${positions.length} positions to database`);
-    } catch (error) {
-        console.error('❌ Error caching positions to database:', error);
-    }
-}
-
-export async function GET() {
-    try {
-        console.log('📋 GET /api/positions - Fetching positions data');
-        
-        // Try to get positions from database first
-        let positions = await getPositionsFromDatabase();
-        
-        if (!positions) {
-            // No data in database, get from JSON and cache to database
-            console.log('📄 No positions in database, loading from JSON files...');
-            const jsonPositions = await getPositionsFromJson();
-            positions = jsonPositions;
-            
-            // Only cache to database if we loaded from the actual positions.json file
-            // (not template), or if database is truly empty and we want to populate with template
-            if (positions.length > 0) {
-                try {
-                    // Check if main positions.json exists to decide caching behavior
-                    await fs.access(POSITIONS_JSON_PATH);
-                    console.log('💾 Caching actual positions to database...');
-                    await cachePositionsToDatabase(positions);
-                } catch {
-                    // Main file doesn't exist, we're using template - database already has template data
-                    console.log('📋 Using template data, database should already have this data');
-                }
-            }
-        }
-        
-        console.log(`✅ Successfully fetched ${positions.length} positions`);
+        console.log(`✅ Successfully imported ${positions.length} positions to database`);
         
         return NextResponse.json({ 
-            success: true,
-            positions: positions,
-            count: positions.length
+            message: `Successfully imported ${positions.length} positions`,
+            count: positions.length 
         });
+        
     } catch (error) {
-        console.error('❌ Error in positions API:', error);
-        return NextResponse.json({ 
-            success: false,
-            error: 'Failed to load positions data',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
+        console.error('❌ Error importing positions:', error);
+        return NextResponse.json(
+            { error: 'Failed to import positions' },
+            { status: 500 }
+        );
     }
 }

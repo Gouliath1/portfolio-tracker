@@ -1,9 +1,6 @@
 import { setupDatabase } from './schema';
 import { initializeDemoPositions } from './operations/demoDataManagement';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const POSITIONS_JSON_PATH = path.join(process.cwd(), 'data/positions.json');
+import { getDbClient } from './config';
 
 let isInitialized = false;
 
@@ -16,14 +13,16 @@ export async function initializeDatabaseOnStartup(): Promise<void> {
         console.log('🚀 Initializing database on server startup...');
         await setupDatabase();
         
-        // Only load template positions if actual positions.json doesn't exist
-        try {
-            await fs.access(POSITIONS_JSON_PATH);
-            console.log('📋 positions.json exists, will be loaded on-demand by API');
-        } catch {
-            // positions.json doesn't exist, load template data
-            console.log('📋 No positions.json found, loading template positions...');
+        // Only load demo positions if this is a fresh database (no positions exist)
+        const db = getDbClient();
+        const existingPositions = await db.execute('SELECT COUNT(*) as count FROM positions');
+        const positionCount = existingPositions.rows[0].count as number;
+        
+        if (positionCount === 0) {
+            console.log('📋 Fresh database detected, loading demo positions...');
             await initializeDemoPositions();
+        } else {
+            console.log(`📋 Database has ${positionCount} existing positions, skipping demo data`);
         }
         
         console.log('✅ Database initialized successfully');

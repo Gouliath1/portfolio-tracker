@@ -1,156 +1,94 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { refreshAllHistoricalData, refreshFxRatesForDates } from '@/utils/yahooFinanceApi';
+import { refreshAllHistoricalData } from '@/utils/yahooFinanceApi';
 
-const POSITIONS_FILE_PATH = path.join(process.cwd(), 'data/positions.json');
-const PRICES_FILE_PATH = path.join(process.cwd(), 'data/positionsPrices.json');
-const FX_RATES_FILE_PATH = path.join(process.cwd(), 'data/fxRates.json');
-const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'data/positions.template.json');
+async function getPositionsFromDatabase() {
+    try {
+        const { getDbClient } = await import('@/database');
+        const client = getDbClient();
+        
+        // Get all positions from database
+        const result = await client.execute(`
+            SELECT 
+                s.ticker,
+                p.quantity,
+                p.average_cost as costPerUnit,
+                p.position_currency as transactionCcy,
+                MIN(p.created_at) as transactionDate
+            FROM positions p
+            JOIN securities s ON p.security_id = s.id
+            GROUP BY s.ticker, p.quantity, p.average_cost, p.position_currency
+        `);
+        
+        return result.rows.map(row => ({
+            ticker: String(row.ticker),
+            quantity: Number(row.quantity),
+            costPerUnit: Number(row.costPerUnit),
+            transactionCcy: String(row.transactionCcy),
+            transactionDate: String(row.transactionDate).split('T')[0] // Extract date only
+        }));
+        
+    } catch (error) {
+        console.error('❌ Error loading positions from database:', error);
+        throw error;
+    }
+}
 
 export async function POST() {
     try {
         console.log('🔄 Historical price refresh initiated...');
         
-        // Load positions data
-        let positionsData;
-        try {
-            const data = await fs.readFile(POSITIONS_FILE_PATH, 'utf-8');
-            positionsData = JSON.parse(data);
-        } catch {
-            console.log('positions.json not found, using template data');
-            const data = await fs.readFile(POSITIONS_TEMPLATE_PATH, 'utf-8');
-            positionsData = JSON.parse(data);
+        // Load positions from database
+        const positions = await getPositionsFromDatabase();
+        
+        if (positions.length === 0) {
+            return NextResponse.json({ 
+                error: 'No positions found in database. Please import positions first.' 
+            }, { status: 400 });
         }
         
-        if (!positionsData.positions || !Array.isArray(positionsData.positions)) {
-            return NextResponse.json({ error: 'Invalid positions data structure' }, { status: 400 });
-        }
+        console.log(`📋 Found ${positions.length} positions in database`);
         
         // Refresh historical data for all positions
-        const historicalResults = await refreshAllHistoricalData(positionsData.positions);
+        const historicalResults = await refreshAllHistoricalData(positions);
         
-        // Load existing price data to preserve current prices
-        let existingPrices: {[symbol: string]: {[date: string]: number}} = {};
-        try {
-            const existingData = await fs.readFile(PRICES_FILE_PATH, 'utf-8');
-            existingPrices = JSON.parse(existingData);
-        } catch {
-            console.log('No existing prices file found, creating new one');
-        }
-        
-        // Merge historical data with existing data
-        const updatedPrices: {[symbol: string]: {[date: string]: number}} = { ...existingPrices };
-        
-        for (const [symbol, historicalData] of Object.entries(historicalResults)) {
-            if (historicalData) {
-                updatedPrices[symbol] = historicalData;
-                console.log(`✅ Updated historical data for ${symbol}: ${Object.keys(historicalData).length} data points`);
-            } else {
-                console.log(`❌ Failed to get historical data for ${symbol}`);
-            }
-        }
-        
-        // Sort dates for each symbol (newest first)
-        for (const symbol of Object.keys(updatedPrices)) {
-            if (updatedPrices[symbol] && typeof updatedPrices[symbol] === 'object') {
-                const sortedDates = Object.keys(updatedPrices[symbol]).sort((a, b) => b.localeCompare(a));
-                const sortedPrices: {[date: string]: number} = {};
-                sortedDates.forEach(date => {
-                    sortedPrices[date] = updatedPrices[symbol][date];
-                });
-                updatedPrices[symbol] = sortedPrices;
-            }
-        }
-        
-        // Write updated prices to file
-        await fs.writeFile(PRICES_FILE_PATH, JSON.stringify(updatedPrices, null, 2));
-        
-        // Refresh FX rates for all available dates
-        console.log('💱 Starting FX rates refresh...');
-        const fxResults = await refreshFxRatesForDates(updatedPrices, positionsData.positions);
-        
-        // Load existing FX rates data
-        let existingFxRates: {[fxPair: string]: {[date: string]: number}} = {};
-        try {
-            const existingFxData = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
-            existingFxRates = JSON.parse(existingFxData);
-        } catch {
-            console.log('No existing FX rates file found, creating new one');
-        }
-        
-        // Merge FX data with existing data
-        const updatedFxRates: {[fxPair: string]: {[date: string]: number}} = { ...existingFxRates };
-        
-        for (const [fxPair, fxData] of Object.entries(fxResults)) {
-            if (fxData) {
-                updatedFxRates[fxPair] = fxData;
-                console.log(`✅ Updated FX rates for ${fxPair}: ${Object.keys(fxData).length} data points`);
-            } else {
-                console.log(`❌ Failed to get FX rates for ${fxPair}`);
-            }
-        }
-        
-        // Sort dates for each FX pair (newest first)
-        for (const fxPair of Object.keys(updatedFxRates)) {
-            if (updatedFxRates[fxPair] && typeof updatedFxRates[fxPair] === 'object') {
-                const sortedDates = Object.keys(updatedFxRates[fxPair]).sort((a, b) => b.localeCompare(a));
-                const sortedRates: {[date: string]: number} = {};
-                sortedDates.forEach(date => {
-                    sortedRates[date] = updatedFxRates[fxPair][date];
-                });
-                updatedFxRates[fxPair] = sortedRates;
-            }
-        }
-        
-        // Write updated FX rates to file
-        await fs.writeFile(FX_RATES_FILE_PATH, JSON.stringify(updatedFxRates, null, 2));
-        
-        const successfulUpdates = Object.entries(historicalResults).filter(([, data]) => data !== null).length;
-        const failedUpdates = Object.entries(historicalResults).filter(([, data]) => data === null).length;
-        
-        const successfulFxUpdates = Object.entries(fxResults).filter(([, data]) => data !== null).length;
-        const failedFxUpdates = Object.entries(fxResults).filter(([, data]) => data === null).length;
-        
-        console.log(`🏁 Historical refresh completed: ${successfulUpdates} successful, ${failedUpdates} failed`);
-        console.log(`🏁 FX rates refresh completed: ${successfulFxUpdates} successful, ${failedFxUpdates} failed`);
-        
-        return NextResponse.json({
-            success: true,
-            message: `Historical data refreshed for ${successfulUpdates} symbols and ${successfulFxUpdates} FX pairs`,
-            results: {
-                prices: {
-                    successful: successfulUpdates,
-                    failed: failedUpdates,
-                    symbols: Object.keys(historicalResults)
-                },
-                fxRates: {
-                    successful: successfulFxUpdates,
-                    failed: failedFxUpdates,
-                    pairs: Object.keys(fxResults)
-                }
-            }
+        return NextResponse.json({ 
+            message: 'Historical data refresh completed',
+            historicalResults,
+            positionsProcessed: positions.length
         });
         
     } catch (error) {
-        console.error('Error refreshing historical prices:', error);
+        console.error('❌ Error in historical price refresh:', error);
         return NextResponse.json(
-            { error: 'Failed to refresh historical prices', details: error instanceof Error ? error.message : 'Unknown error' },
+            { error: 'Failed to refresh historical data' },
             { status: 500 }
         );
     }
 }
 
 export async function GET() {
-    // Return current historical prices data
     try {
-        const data = await fs.readFile(PRICES_FILE_PATH, 'utf-8');
-        const prices = JSON.parse(data);
-        return NextResponse.json({ prices });
-    } catch {
-        return NextResponse.json({ 
-            error: 'Historical prices file not found',
-            message: 'Use POST to refresh historical data first'
-        }, { status: 404 });
+        console.log('📊 GET /api/historical-prices - Fetching historical data summary');
+        
+        const { getDbClient } = await import('@/database');
+        const client = getDbClient();
+        
+        // Get summary of historical data
+        const pricesCount = await client.execute('SELECT COUNT(*) as count FROM historical_prices');
+        const fxCount = await client.execute('SELECT COUNT(*) as count FROM fx_rates');
+        const securitiesCount = await client.execute('SELECT COUNT(DISTINCT security_id) as count FROM historical_prices');
+        
+        return NextResponse.json({
+            historicalPrices: Number(pricesCount.rows[0].count),
+            fxRates: Number(fxCount.rows[0].count),
+            securitiesWithData: Number(securitiesCount.rows[0].count)
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching historical data summary:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch historical data summary' },
+            { status: 500 }
+        );
     }
 }

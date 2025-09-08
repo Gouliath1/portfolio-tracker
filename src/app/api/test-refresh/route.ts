@@ -1,126 +1,76 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { calculatePortfolioSummary } from '../../../utils/calculations';
-import { refreshCurrentFxRates } from '../../../utils/yahooFinanceApi';
 import { RawPosition } from '../../../types/portfolio';
 
-async function loadPositionsFromFile(): Promise<RawPosition[]> {
+async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
     try {
-        const filePath = path.join(process.cwd(), 'data/positions.json');
-        const data = await fs.readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(data);
-        return parsed.positions || [];
+        const { getDbClient } = await import('@/database');
+        const client = getDbClient();
+        
+        // Query positions with joined data
+        const result = await client.execute(`
+            SELECT 
+                p.quantity,
+                p.average_cost as costPerUnit,
+                p.position_currency as transactionCcy,
+                s.ticker,
+                s.name as fullName,
+                s.currency as stockCcy,
+                a.name as account,
+                b.display_name as broker
+            FROM positions p
+            JOIN securities s ON p.security_id = s.id
+            JOIN accounts a ON p.account_id = a.id
+            JOIN brokers b ON a.broker_id = b.id
+            ORDER BY s.ticker
+        `);
+        
+        return result.rows.map(row => ({
+            transactionDate: '2023/01/01',
+            ticker: String(row.ticker),
+            fullName: String(row.fullName),
+            broker: String(row.broker),
+            account: String(row.account),
+            quantity: Number(row.quantity),
+            costPerUnit: Number(row.costPerUnit),
+            transactionCcy: String(row.transactionCcy),
+            stockCcy: String(row.stockCcy || row.transactionCcy)
+        }));
     } catch (error) {
-        console.error('Error loading positions from file:', error);
+        console.error('Error loading positions from database:', error);
         return [];
     }
 }
 
-async function savePricesToCache(prices: {[symbol: string]: number | null}): Promise<void> {
+export async function POST() {
     try {
-        const cacheFilePath = path.join(process.cwd(), 'data/positionsPrices.json');
+        console.log('🔄 Test refresh initiated...');
         
-        // Read current data
-        let historicalData: {[symbol: string]: {[date: string]: number}} = {};
-        try {
-            const data = await fs.readFile(cacheFilePath, 'utf-8');
-            historicalData = JSON.parse(data);
-        } catch {
-            // File doesn't exist or is invalid, start fresh
+        const currentPositions = await loadPositionsFromDatabase();
+        
+        if (currentPositions.length === 0) {
+            return NextResponse.json({
+                error: 'No positions found in database'
+            }, { status: 400 });
         }
         
-        // Update today's prices for all symbols
-        const today = new Date().toISOString().split('T')[0];
-        for (const [symbol, price] of Object.entries(prices)) {
-            if (price !== null) {
-                if (!historicalData[symbol]) {
-                    historicalData[symbol] = {};
-                }
-                historicalData[symbol][today] = price;
-                console.log(`💾 Saved ${symbol}: ${price} to cache`);
-            }
-        }
+        console.log(`📋 Found ${currentPositions.length} positions for refresh`);
         
-        // Write back to file
-        await fs.writeFile(cacheFilePath, JSON.stringify(historicalData, null, 2), 'utf-8');
-        console.log(`💾 Cache file updated with ${Object.keys(prices).length} symbols`);
-        
-    } catch (error) {
-        console.error('Error saving prices to cache:', error);
-    }
-}
-
-async function saveFxRatesToCache(fxRates: {[fxPair: string]: number | null}): Promise<void> {
-    try {
-        const cacheFilePath = path.join(process.cwd(), 'data/fxRates.json');
-        
-        // Read current data
-        let historicalFxData: {[fxPair: string]: {[date: string]: number}} = {};
-        try {
-            const data = await fs.readFile(cacheFilePath, 'utf-8');
-            historicalFxData = JSON.parse(data);
-        } catch {
-            // File doesn't exist or is invalid, start fresh
-        }
-        
-        // Update today's FX rates for all pairs
-        const today = new Date().toISOString().split('T')[0];
-        for (const [fxPair, rate] of Object.entries(fxRates)) {
-            if (rate !== null) {
-                if (!historicalFxData[fxPair]) {
-                    historicalFxData[fxPair] = {};
-                }
-                historicalFxData[fxPair][today] = rate;
-                console.log(`💾 Saved ${fxPair}: ${rate} to FX cache`);
-            }
-        }
-        
-        // Write back to file
-        await fs.writeFile(cacheFilePath, JSON.stringify(historicalFxData, null, 2), 'utf-8');
-        console.log(`💾 FX cache file updated with ${Object.keys(fxRates).length} FX pairs`);
-        
-    } catch (error) {
-        console.error('Error saving FX rates to cache:', error);
-    }
-}
-
-export async function GET() {
-    try {
-        console.log('🔴 TEST FORCE REFRESH ENDPOINT CALLED');
-        
-        const currentPositions = await loadPositionsFromFile();
-        console.log(`📊 Loaded ${currentPositions.length} positions`);
-        
-        // This should trigger exactly 10 Yahoo Finance API calls
+        // Trigger portfolio calculation with force refresh
         const summary = await calculatePortfolioSummary(currentPositions, true);
         
-        // Extract the prices from the portfolio summary and save them to cache
-        const pricesFromSummary: {[symbol: string]: number | null} = {};
-        for (const position of summary.positions) {
-            pricesFromSummary[position.ticker.toString()] = position.currentPrice;
-        }
-        
-        // Save all the fresh prices to cache
-        await savePricesToCache(pricesFromSummary);
-        
-        // Fetch and save current FX rates to cache (dynamic based on positions)
-        const fxRates = await refreshCurrentFxRates(currentPositions);
-        await saveFxRatesToCache(fxRates);
-        
         return NextResponse.json({ 
-            success: true, 
-            message: 'Force refresh completed',
-            totalPositions: currentPositions.length,
-            totalValue: summary.totalValueJPY,
-            pricesUpdated: Object.keys(pricesFromSummary).length,
-            fxRatesUpdated: Object.keys(fxRates).length
+            message: 'Refresh completed successfully',
+            positionsCount: currentPositions.length,
+            totalValueJPY: summary.totalValueJPY,
+            totalPnlJPY: summary.totalPnlJPY
         });
+        
     } catch (error) {
-        console.error('❌ Test refresh failed:', error);
-        return NextResponse.json({ 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-        }, { status: 500 });
+        console.error('❌ Error in test refresh:', error);
+        return NextResponse.json(
+            { error: 'Failed to refresh data' },
+            { status: 500 }
+        );
     }
 }

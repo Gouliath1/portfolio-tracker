@@ -1,30 +1,44 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { RawPosition } from '@/types/portfolio';
 import { calculatePortfolioSummary } from '@/utils/calculations';
 
-const POSITIONS_FILE_PATH = path.join(process.cwd(), 'data/positions.json');
-const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'data/positions.template.json');
-
-async function readPositionsData() {
+async function readPositionsFromDatabase(): Promise<RawPosition[]> {
     try {
-        // Try to read the local positions.json file first
-        const data = await fs.readFile(POSITIONS_FILE_PATH, 'utf-8');
-        const positions = JSON.parse(data);
-        console.log('💰 Using local positions data for PnL calculation');
-        return positions;
-    } catch {
-        try {
-            // Fallback to template if positions.json doesn't exist
-            const data = await fs.readFile(POSITIONS_TEMPLATE_PATH, 'utf-8');
-            const positions = JSON.parse(data);
-            console.log('💰 Using template positions data for PnL calculation');
-            return positions;
-        } catch (error) {
-            console.error('❌ Error reading positions data:', error);
-            return { positions: [] };
-        }
+        const { getDbClient } = await import('@/database');
+        const client = getDbClient();
+        
+        // Query positions with joined data
+        const result = await client.execute(`
+            SELECT 
+                p.quantity,
+                p.average_cost as costPerUnit,
+                p.position_currency as transactionCcy,
+                s.ticker,
+                s.name as fullName,
+                s.currency as stockCcy,
+                a.name as account,
+                b.display_name as broker
+            FROM positions p
+            JOIN securities s ON p.security_id = s.id
+            JOIN accounts a ON p.account_id = a.id
+            JOIN brokers b ON a.broker_id = b.id
+            ORDER BY s.ticker
+        `);
+        
+        return result.rows.map(row => ({
+            transactionDate: '2023/01/01',
+            ticker: String(row.ticker),
+            fullName: String(row.fullName),
+            broker: String(row.broker),
+            account: String(row.account),
+            quantity: Number(row.quantity),
+            costPerUnit: Number(row.costPerUnit),
+            transactionCcy: String(row.transactionCcy),
+            stockCcy: String(row.stockCcy || row.transactionCcy)
+        }));
+    } catch (error) {
+        console.error('❌ Error reading positions from database:', error);
+        return [];
     }
 }
 
