@@ -1,43 +1,12 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { 
+  storePriceData,
+  getTodaysPrice as getDbTodaysPrice
+} from '@/database';
+import { fetchStockPrice } from '@/utils/yahooFinanceApi';
 
-const CACHE_FILE_PATH = path.join(process.cwd(), 'src/data/positionsPrices.json');
-
-interface HistoricalPricesData {
-    [symbol: string]: {
-        [date: string]: number;
-    };
-}
-
-async function readHistoricalPrices(): Promise<HistoricalPricesData> {
-    try {
-        const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch {
-        return {};
-    }
-}
-
-async function writeHistoricalPrices(data: HistoricalPricesData): Promise<void> {
-    // Sort each symbol's dates in descending order (newest to oldest)
-    const sortedData: HistoricalPricesData = {};
-    
-    for (const [symbol, prices] of Object.entries(data)) {
-        const sortedDates = Object.keys(prices).sort((a, b) => b.localeCompare(a));
-        sortedData[symbol] = {};
-        
-        for (const date of sortedDates) {
-            sortedData[symbol][date] = prices[date];
-        }
-    }
-    
-    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(sortedData, null, 2), 'utf-8');
-}
-
-function getTodaysPrice(data: HistoricalPricesData, symbol: string): number | null {
-    const today = new Date().toISOString().split('T')[0];
-    return data[symbol]?.[today] || null;
+async function getTodaysPrice(symbol: string): Promise<number | null> {
+    return await getDbTodaysPrice(symbol);
 }
 
 export async function GET(request: Request) {
@@ -48,10 +17,38 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
     }
 
-    const historicalData = await readHistoricalPrices();
-    const todaysPrice = getTodaysPrice(historicalData, symbol);
-    
-    return NextResponse.json({ price: todaysPrice });
+    try {
+        // First try to get today's cached price from database
+        const cachedPrice = await getTodaysPrice(symbol);
+        
+        if (cachedPrice !== null) {
+            console.log(`📋 Using cached price for ${symbol}: $${cachedPrice}`);
+            return NextResponse.json({ price: cachedPrice });
+        }
+
+        // If no cached price, fetch from Yahoo Finance
+        console.log(`🌐 Fetching fresh price for ${symbol} from Yahoo Finance`);
+        const freshPrice = await fetchStockPrice(symbol, true); // Force refresh
+        
+        if (freshPrice !== null) {
+            // Store the fresh price in database
+            const today = new Date().toISOString().split('T')[0];
+            await storePriceData(symbol, today, freshPrice);
+            
+            console.log(`✅ Fetched and cached price for ${symbol}: $${freshPrice}`);
+            return NextResponse.json({ price: freshPrice });
+        } else {
+            console.warn(`❌ Unable to fetch price for ${symbol}`);
+            return NextResponse.json({ price: null });
+        }
+
+    } catch (error) {
+        console.error(`❌ Error in price API for ${symbol}:`, error);
+        return NextResponse.json(
+            { error: 'Failed to fetch price data' }, 
+            { status: 500 }
+        );
+    }
 }
 
 export async function POST(request: Request) {
@@ -61,19 +58,20 @@ export async function POST(request: Request) {
     if (!symbol || typeof price !== 'number') {
         return NextResponse.json({ error: 'Symbol and price are required' }, { status: 400 });
     }
-    
-    const historicalData = await readHistoricalPrices();
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Initialize symbol data if it doesn't exist
-    if (!historicalData[symbol]) {
-        historicalData[symbol] = {};
+
+    try {
+        // Store the price in database
+        const today = new Date().toISOString().split('T')[0];
+        await storePriceData(symbol, today, price);
+        
+        console.log(`✅ Stored price for ${symbol}: $${price}`);
+        return NextResponse.json({ success: true });
+
+    } catch (error) {
+        console.error(`❌ Error storing price for ${symbol}:`, error);
+        return NextResponse.json(
+            { error: 'Failed to store price data' }, 
+            { status: 500 }
+        );
     }
-    
-    // Update only today's price for this symbol
-    historicalData[symbol][today] = price;
-    
-    await writeHistoricalPrices(historicalData);
-    
-    return NextResponse.json({ success: true });
 }

@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getFxRate, storeFxRate } from '@/database/operations/fxRateOperations';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const FX_RATES_FILE_PATH = path.join(process.cwd(), 'src/data/fxRates.json');
-
-interface FxRateData {
-    [fxPair: string]: {
-        [date: string]: number;
-    };
-}
+const FX_RATES_FILE_PATH = path.join(process.cwd(), 'data/fxRates.json');
 
 export async function GET(request: NextRequest) {
     try {
@@ -20,53 +15,36 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
         }
         
-        // Read FX rates data
-        let fxRates: FxRateData = {};
-        try {
-            const data = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
-            fxRates = JSON.parse(data);
-        } catch {
-            // File doesn't exist, return null
-            return NextResponse.json({ rate: null });
-        }
+        // Try to get FX rate from database first
+        let result = await getFxRate(fxPair, requestedDate || undefined);
         
-        if (!fxRates[fxPair]) {
-            return NextResponse.json({ rate: null });
-        }
-        
-        // If specific date requested, try to find closest match
-        if (requestedDate) {
-            const targetDate = new Date(requestedDate.replace(/\//g, '-'));
-            const availableDates = Object.keys(fxRates[fxPair])
-                .map(dateStr => ({ dateStr, date: new Date(dateStr) }))
-                .sort((a, b) => Math.abs(a.date.getTime() - targetDate.getTime()) - Math.abs(b.date.getTime() - targetDate.getTime()));
-            
-            if (availableDates.length > 0) {
-                const closestDate = availableDates[0].dateStr;
-                const rate = fxRates[fxPair][closestDate];
-                return NextResponse.json({ 
-                    rate,
-                    date: closestDate,
-                    requestedDate,
-                    pair: fxPair
-                });
+        if (!result || result.rate === null) {
+            // No data in database, try to get from JSON file and cache it
+            console.log(`📄 No FX rate for ${fxPair} in database, checking JSON file...`);
+            try {
+                const data = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
+                const fxRatesData = JSON.parse(data);
+                
+                if (fxRatesData[fxPair]) {
+                    // Cache all rates for this pair to database
+                    console.log(`💾 Caching ${fxPair} rates to database...`);
+                    const { migrateFxRatesFromJson } = await import('@/database/operations/fxRateOperations');
+                    const pairData = { [fxPair]: fxRatesData[fxPair] };
+                    await migrateFxRatesFromJson(pairData);
+                    
+                    // Try to get the rate again from database
+                    result = await getFxRate(fxPair, requestedDate || undefined);
+                }
+            } catch (error) {
+                console.log(`ℹ️ No JSON file or error reading it: ${error}`);
             }
         }
         
-        // Get the most recent rate (first key since dates are sorted newest first)
-        const dates = Object.keys(fxRates[fxPair]);
-        if (dates.length === 0) {
-            return NextResponse.json({ rate: null });
+        if (!result || result.rate === null) {
+            return NextResponse.json({ rate: null, pair: fxPair });
         }
         
-        const latestDate = dates[0];
-        const rate = fxRates[fxPair][latestDate];
-        
-        return NextResponse.json({ 
-            rate,
-            date: latestDate,
-            pair: fxPair
-        });
+        return NextResponse.json(result);
         
     } catch (error) {
         console.error('Error fetching FX rate:', error);
@@ -85,34 +63,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid FX pair or rate' }, { status: 400 });
         }
         
-        // Read existing data
-        let fxRates: FxRateData = {};
-        try {
-            const data = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
-            fxRates = JSON.parse(data);
-        } catch {
-            // File doesn't exist or is invalid, start fresh
-        }
-        
-        // Initialize pair if it doesn't exist
-        if (!fxRates[fxPair]) {
-            fxRates[fxPair] = {};
-        }
-        
-        // Add today's rate
+        // Store the FX rate in database
         const today = new Date().toISOString().split('T')[0];
-        fxRates[fxPair][today] = rate;
-        
-        // Sort dates for this pair (newest first)
-        const sortedDates = Object.keys(fxRates[fxPair]).sort((a, b) => b.localeCompare(a));
-        const sortedRates: {[date: string]: number} = {};
-        sortedDates.forEach(date => {
-            sortedRates[date] = fxRates[fxPair][date];
-        });
-        fxRates[fxPair] = sortedRates;
-        
-        // Write back to file
-        await fs.writeFile(FX_RATES_FILE_PATH, JSON.stringify(fxRates, null, 2), 'utf-8');
+        await storeFxRate(fxPair, rate, today);
         
         return NextResponse.json({ 
             success: true,

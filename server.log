@@ -1,0 +1,218 @@
+
+> portfolio-tracker@0.1.0 dev
+> next dev --turbopack --port 3000
+
+   ▲ Next.js 15.3.3 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.50.35:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 764ms
+ ✓ Compiled /api/positions in 424ms
+📋 GET /api/positions - Fetching positions data
+🔍 Checking database initialization...
+Connected to local SQLite database: ./data/portfolio.db
+🏗️ Database tables not found, initializing...
+Initializing database schema...
+Creating table: brokers
+Creating table: currencies
+Creating table: accounts
+Creating table: securities
+Creating table: positions
+Creating table: historical_prices
+Creating table: fx_rates
+Database schema created successfully
+Inserting default reference data...
+Default reference data inserted successfully
+Database setup completed successfully
+Starting demo database initialization...
+Migrating demo positions from template to database...
+Migrated demo position: AAPL
+Migrated demo position: GOOG
+Migrated demo position: 7940.T
+Migrated demo position: 8953.T
+Migrated demo position: 8986.T
+Migrated demo position: 4246.T
+Migrated demo position: 4246.T
+Migrated demo position: NVDA
+Successfully migrated 8 demo positions to database
+Demo database initialization completed successfully!
+✅ Database initialized successfully
+✅ Successfully fetched 8 positions
+ GET /api/positions 200 in 594ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1142ms
+ GET / 200 in 1308ms
+ GET / 200 in 83ms
+📋 GET /api/positions - Fetching positions data
+✅ Successfully fetched 8 positions
+ GET /api/positions 200 in 32ms
+ ✓ Compiled /api/prices in 190ms
+🌐 Fetching fresh price for 4246.T from Yahoo Finance
+🔄 fetchStockPrice called for 4246.T, forceRefresh: true
+🌐 [2025-09-05T02:28:43.954Z] YAHOO FINANCE API CALL #1:
+   Symbol: 4246.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/4246.T?interval=1d&range=1d
+✅ [2025-09-05T02:28:44.180Z] Response received for 4246.T (Call #1)
+✅ 4246.T: 773 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for 4246.T, skipping cache update via API
+✅ Fetched and cached price for 4246.T: $773
+ GET /api/prices?symbol=4246.T 200 in 446ms
+🌐 Fetching fresh price for 7940.T from Yahoo Finance
+🔄 fetchStockPrice called for 7940.T, forceRefresh: true
+🌐 [2025-09-05T02:28:44.212Z] YAHOO FINANCE API CALL #2:
+   Symbol: 7940.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/7940.T?interval=1d&range=1d
+✅ [2025-09-05T02:28:44.335Z] Response received for 7940.T (Call #2)
+✅ 7940.T: 723 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for 7940.T, skipping cache update via API
+✅ Fetched and cached price for 7940.T: $723
+ GET /api/prices?symbol=7940.T 200 in 145ms
+🌐 Fetching fresh price for 8953.T from Yahoo Finance
+🔄 fetchStockPrice called for 8953.T, forceRefresh: true
+🌐 [2025-09-05T02:28:44.361Z] YAHOO FINANCE API CALL #3:
+   Symbol: 8953.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8953.T?interval=1d&range=1d
+✅ [2025-09-05T02:28:44.502Z] Response received for 8953.T (Call #3)
+✅ 8953.T: 111400 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for 8953.T, skipping cache update via API
+✅ Fetched and cached price for 8953.T: $111400
+ GET /api/prices?symbol=8953.T 200 in 162ms
+🌐 Fetching fresh price for 8986.T from Yahoo Finance
+🔄 fetchStockPrice called for 8986.T, forceRefresh: true
+🌐 [2025-09-05T02:28:44.519Z] YAHOO FINANCE API CALL #4:
+   Symbol: 8986.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8986.T?interval=1d&range=1d
+✅ [2025-09-05T02:28:44.677Z] Response received for 8986.T (Call #4)
+✅ 8986.T: 105800 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for 8986.T, skipping cache update via API
+✅ Fetched and cached price for 8986.T: $105800
+ GET /api/prices?symbol=8986.T 200 in 179ms
+🌐 Fetching fresh price for AAPL from Yahoo Finance
+🔄 fetchStockPrice called for AAPL, forceRefresh: true
+🌐 [2025-09-05T02:28:44.716Z] YAHOO FINANCE API CALL #5:
+   Symbol: AAPL
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d
+✅ [2025-09-05T02:28:44.869Z] Response received for AAPL (Call #5)
+✅ AAPL: 239.78 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for AAPL, skipping cache update via API
+✅ Fetched and cached price for AAPL: $239.78
+ GET /api/prices?symbol=AAPL 200 in 178ms
+🌐 Fetching fresh price for GOOG from Yahoo Finance
+🔄 fetchStockPrice called for GOOG, forceRefresh: true
+⏳ Rate limiting: waiting 15ms for GOOG
+🌐 [2025-09-05T02:28:44.910Z] YAHOO FINANCE API CALL #6:
+   Symbol: GOOG
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/GOOG?interval=1d&range=1d
+✅ [2025-09-05T02:28:45.033Z] Response received for GOOG (Call #6)
+✅ GOOG: 232.66 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for GOOG, skipping cache update via API
+✅ Fetched and cached price for GOOG: $232.66
+ GET /api/prices?symbol=GOOG 200 in 163ms
+🌐 Fetching fresh price for NVDA from Yahoo Finance
+🔄 fetchStockPrice called for NVDA, forceRefresh: true
+🌐 [2025-09-05T02:28:45.058Z] YAHOO FINANCE API CALL #7:
+   Symbol: NVDA
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1d&range=1d
+✅ [2025-09-05T02:28:45.192Z] Response received for NVDA (Call #7)
+✅ NVDA: 171.66 (refreshed from Yahoo Finance)
+⚠️ updatePriceCache called in server context for NVDA, skipping cache update via API
+✅ Fetched and cached price for NVDA: $171.66
+ GET /api/prices?symbol=NVDA 200 in 156ms
+(node:46662) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ Compiled /api/fx-rates in 185ms
+ GET /api/fx-rates?pair=USDJPY 200 in 210ms
+ GET /api/fx-rates?pair=USDJPY 200 in 106ms
+ GET /api/fx-rates?pair=USDJPY 200 in 56ms
+ GET /api/fx-rates?pair=USDJPY 200 in 17ms
+ GET /api/fx-rates?pair=USDJPY 200 in 17ms
+ GET /api/fx-rates?pair=USDJPY 200 in 17ms
+ GET /?id=76e5745d-c391-4332-8219-54f3df0f129d&vscodeBrowserReqId=1757039404169 200 in 62ms
+📋 GET /api/positions - Fetching positions data
+✅ Successfully fetched 8 positions
+ GET /api/positions 200 in 24ms
+📋 Using cached price for 4246.T: $773
+ GET /api/prices?symbol=4246.T 200 in 13ms
+📋 Using cached price for 7940.T: $723
+ GET /api/prices?symbol=7940.T 200 in 9ms
+📋 Using cached price for 8953.T: $111400
+ GET /api/prices?symbol=8953.T 200 in 9ms
+📋 Using cached price for 8986.T: $105800
+ GET /api/prices?symbol=8986.T 200 in 10ms
+📋 Using cached price for AAPL: $239.78
+ GET /api/prices?symbol=AAPL 200 in 13ms
+📋 Using cached price for GOOG: $232.66
+ GET /api/prices?symbol=GOOG 200 in 10ms
+📋 Using cached price for NVDA: $171.66
+ GET /api/prices?symbol=NVDA 200 in 12ms
+ GET /api/fx-rates?pair=USDJPY 200 in 47ms
+ GET /api/fx-rates?pair=USDJPY 200 in 12ms
+ GET /api/fx-rates?pair=USDJPY 200 in 19ms
+ GET /api/fx-rates?pair=USDJPY 200 in 11ms
+ GET /api/fx-rates?pair=USDJPY 200 in 15ms
+ GET /api/fx-rates?pair=USDJPY 200 in 10ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 562ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.rukt6zbgn87'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.rukt6zbgn87'
+}
+[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.dlyerkj9nl'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.dlyerkj9nl'
+}
+[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.473j0a9xw1m'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.473j0a9xw1m'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.9cein9b8akt'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.9cein9b8akt'
+}
+[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.gl2xm43m46'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.gl2xm43m46'
+}
+[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.xuote1jgocg'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.xuote1jgocg'
+}
+[?25h

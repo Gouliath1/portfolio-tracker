@@ -107,7 +107,15 @@ function installDependencies() {
         process.exit(1);
     }
     
-    return execCommand('npm install', 'Dependencies installed');
+    const success = execCommand('npm install', 'Dependencies installed');
+    
+    if (success) {
+        // Install Turso database client
+        log('   Installing Turso database client...', 'blue');
+        return execCommand('npm install @libsql/client', 'Turso database client installed');
+    }
+    
+    return false;
 }
 
 function setupEnvironment() {

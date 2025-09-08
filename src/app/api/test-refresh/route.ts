@@ -7,7 +7,7 @@ import { RawPosition } from '../../../types/portfolio';
 
 async function loadPositionsFromFile(): Promise<RawPosition[]> {
     try {
-        const filePath = path.join(process.cwd(), 'src/data/positions.json');
+        const filePath = path.join(process.cwd(), 'data/positions.json');
         const data = await fs.readFile(filePath, 'utf-8');
         const parsed = JSON.parse(data);
         return parsed.positions || [];
@@ -19,7 +19,7 @@ async function loadPositionsFromFile(): Promise<RawPosition[]> {
 
 async function savePricesToCache(prices: {[symbol: string]: number | null}): Promise<void> {
     try {
-        const cacheFilePath = path.join(process.cwd(), 'src/data/positionsPrices.json');
+        const cacheFilePath = path.join(process.cwd(), 'data/positionsPrices.json');
         
         // Read current data
         let historicalData: {[symbol: string]: {[date: string]: number}} = {};
@@ -53,7 +53,7 @@ async function savePricesToCache(prices: {[symbol: string]: number | null}): Pro
 
 async function saveFxRatesToCache(fxRates: {[fxPair: string]: number | null}): Promise<void> {
     try {
-        const cacheFilePath = path.join(process.cwd(), 'src/data/fxRates.json');
+        const cacheFilePath = path.join(process.cwd(), 'data/fxRates.json');
         
         // Read current data
         let historicalFxData: {[fxPair: string]: {[date: string]: number}} = {};

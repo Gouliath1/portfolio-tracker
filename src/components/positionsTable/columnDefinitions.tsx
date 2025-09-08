@@ -35,16 +35,19 @@ export function createTableColumns() {
         columnHelper.accessor('ticker', {
             header: 'Ticker',
             size: 100,
-            cell: props => (
-                <a 
-                    href={`https://finance.yahoo.com/quote/${props.getValue()}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
-                >
-                    {props.getValue()}
-                </a>
-            ),
+            cell: (props) => {
+                const ticker = props.getValue();
+                return (
+                    <a 
+                        href={`https://finance.yahoo.com/quote/${ticker}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800"
+                    >
+                        {ticker}
+                    </a>
+                );
+            },
         }),
 
         /**

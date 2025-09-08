@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+    output: 'standalone', // Creates self-contained production build
     async rewrites() {
         return [
             {

@@ -52,9 +52,9 @@ If you prefer to set up manually:
 
 3. **Set up your portfolio data:**
    ```bash
-   cp src/data/positions.template.json src/data/positions.json
+   cp data/positions.template.json data/positions.json
    ```
-   Edit `src/data/positions.json` with your actual portfolio data.
+   Edit `data/positions.json` with your actual portfolio data.
 
 4. **Create environment file (optional):**
    ```bash
@@ -96,17 +96,22 @@ portfolio-tracker/
 │   │   ├── PerformanceChart.tsx
 │   │   ├── PortfolioSummary.tsx
 │   │   └── PositionsTable.tsx
-│   ├── data/              # Data files
-│   │   ├── positions.template.json  # Template for portfolio data
-│   │   ├── positions.json          # Your portfolio data (gitignored)
-│   │   └── positionsPrices.json        # Price cache
+│   ├── database/          # Database infrastructure
+│   │   ├── schema.ts      # Database schema & setup
+│   │   ├── startup.ts     # Server startup initialization
+│   │   └── operations/    # Database operations
 │   ├── types/             # TypeScript type definitions
 │   └── utils/             # Utility functions
-├── utils/       # Development utilities and setup scripts
+├── data/                  # Data files & database
+│   ├── portfolio.db       # SQLite database
+│   ├── positions.template.json  # Template for portfolio data
+│   ├── positions.json     # Your portfolio data (gitignored)
+│   └── positionsPrices.json     # Price cache
+├── scripts/               # Development utilities and setup scripts
 │   ├── setup.js          # Cross-platform setup script
 │   ├── setup.sh          # Unix/macOS setup script
-│   ├── setup.bat         # Windows setup script
 │   └── gitPush.sh        # Git push utility
+├── instrumentation.ts    # Server startup hook
 └── ...                   # Other config files
 ```
 
@@ -114,11 +119,11 @@ portfolio-tracker/
 
 1. **Copy the template:**
    ```bash
-   cp src/data/positions.template.json src/data/positions.json
+   cp data/positions.template.json data/positions.json
    ```
 
 2. **Edit your positions:**
-   Open `src/data/positions.json` and replace the template data with your actual portfolio positions.
+   Open `data/positions.json` and replace the template data with your actual portfolio positions.
 
 3. **Data format example:**
    ```json
@@ -161,6 +166,132 @@ Create a `.env.local` file for any environment-specific configuration:
 - Individual position tracking
 - Performance metrics and analytics
 
+### Database Architecture
+- SQLite database with automatic initialization
+- Cache-first API approach for optimal performance
+- Automatic server startup initialization
+
+### Price Caching
+- Smart caching system to minimize API calls
+- Automatic daily price updates
+- Manual refresh capability
+
+### Data Privacy
+- All portfolio data stored locally
+- No sensitive data transmitted to external services
+- Your financial information stays private
+
+## 🚀 Production Deployment
+
+### Building for Production
+
+The application uses Next.js standalone build for production-ready deployments:
+
+```bash
+# Build the application
+npm run build
+
+# The standalone build will be created in .next/standalone/
+```
+
+### Production Structure
+
+The standalone build creates a self-contained production package:
+
+```
+.next/standalone/
+├── .next/            # Compiled Next.js application
+├── data/             # Data files & database (copied from source)
+├── node_modules/     # Runtime dependencies only
+├── package.json      # Production dependencies
+└── server.js         # Production server entry point
+```
+
+### Deployment Options
+
+#### Option 1: Direct Deployment
+
+```bash
+# Deploy the standalone folder to your server
+rsync -av .next/standalone/ user@server:/path/to/app/
+
+# Ensure data directory exists and copy your data
+rsync -av data/ user@server:/path/to/app/data/
+
+# Start the production server
+ssh user@server 'cd /path/to/app && node server.js'
+```
+
+#### Option 2: Docker Deployment
+
+Create a `Dockerfile`:
+
+```dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy the standalone build
+COPY .next/standalone ./
+COPY data ./data
+
+# Expose port
+EXPOSE 3000
+
+# Start the server
+CMD ["node", "server.js"]
+```
+
+Build and run:
+
+```bash
+npm run build
+docker build -t portfolio-tracker .
+docker run -p 3000:3000 -v $(pwd)/data:/app/data portfolio-tracker
+```
+
+#### Option 3: PM2 Process Manager
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Deploy and start with PM2
+pm2 start .next/standalone/server.js --name portfolio-tracker
+pm2 startup
+pm2 save
+```
+
+### Environment Configuration
+
+For production, create environment variables:
+
+```bash
+# Production environment
+NODE_ENV=production
+PORT=3000
+# Add any other production-specific variables
+```
+
+### Database Considerations
+
+- The SQLite database (`data/portfolio.db`) is automatically created on first startup
+- Your portfolio data (`data/positions.json`) should be deployed alongside the app
+- Database initialization happens automatically via `instrumentation.ts`
+
+### Security Notes
+
+- No database management endpoints are exposed in production
+- All database operations happen at server startup or through internal APIs
+- Your portfolio data remains local to your server
+
+## 🎯 Features Overview
+
+### Portfolio Dashboard
+- Real-time portfolio value and P&L
+- Individual position tracking
+- Performance metrics and analytics
+
 ### Price Caching
 - Smart caching system to minimize API calls
 - Automatic daily price updates
@@ -185,7 +316,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Troubleshooting
 
-### Common Issues
+### Common Development Issues
 
 **Setup script fails:**
 - Ensure Node.js 18+ is installed
@@ -198,9 +329,30 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Try manual refresh using the refresh button
 
 **Data not showing:**
-- Ensure `positions.json` exists and contains valid data
+- Ensure `positions.json` exists in the `data/` directory and contains valid data
 - Check browser console for any errors
 - Verify the data format matches the template
+
+### Production Deployment Issues
+
+**Database not initializing:**
+- Check server logs for database connection errors
+- Ensure the `data/` directory exists and is writable
+- Verify that `instrumentation.ts` is being executed
+
+**Missing data files:**
+- Ensure `data/positions.json` and templates are deployed
+- Check file permissions on the production server
+- Verify data directory structure matches development
+
+**Port conflicts:**
+- Default port is 3000, set `PORT` environment variable to change
+- Check if port is already in use: `lsof -i :3000`
+
+**Build fails:**
+- Run `npm run build` locally first to test
+- Check for TypeScript errors or missing dependencies
+- Ensure all required environment variables are set
 
 For more help, please open an issue on GitHub.
 

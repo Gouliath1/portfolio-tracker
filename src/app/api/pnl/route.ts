@@ -4,8 +4,8 @@ import path from 'path';
 import { RawPosition } from '@/types/portfolio';
 import { calculatePortfolioSummary } from '@/utils/calculations';
 
-const POSITIONS_FILE_PATH = path.join(process.cwd(), 'src/data/positions.json');
-const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'src/data/positions.template.json');
+const POSITIONS_FILE_PATH = path.join(process.cwd(), 'data/positions.json');
+const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'data/positions.template.json');
 
 async function readPositionsData() {
     try {

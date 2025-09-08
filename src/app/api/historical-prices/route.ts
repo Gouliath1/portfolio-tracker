@@ -3,10 +3,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { refreshAllHistoricalData, refreshFxRatesForDates } from '@/utils/yahooFinanceApi';
 
-const POSITIONS_FILE_PATH = path.join(process.cwd(), 'src/data/positions.json');
-const PRICES_FILE_PATH = path.join(process.cwd(), 'src/data/positionsPrices.json');
-const FX_RATES_FILE_PATH = path.join(process.cwd(), 'src/data/fxRates.json');
-const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'src/data/positions.template.json');
+const POSITIONS_FILE_PATH = path.join(process.cwd(), 'data/positions.json');
+const PRICES_FILE_PATH = path.join(process.cwd(), 'data/positionsPrices.json');
+const FX_RATES_FILE_PATH = path.join(process.cwd(), 'data/fxRates.json');
+const POSITIONS_TEMPLATE_PATH = path.join(process.cwd(), 'data/positions.template.json');
 
 export async function POST() {
     try {

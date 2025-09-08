@@ -95,6 +95,15 @@ main() {
         exit 1
     fi
 
+    # Install Turso database client
+    log_info "Installing Turso database client..."
+    if npm install @libsql/client; then
+        log_success "Turso database client installed"
+    else
+        log_error "Failed to install Turso database client"
+        exit 1
+    fi
+
     # Step 3: Setup environment
     log_step "3. Setting up environment"
     

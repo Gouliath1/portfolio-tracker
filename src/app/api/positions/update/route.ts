@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { RawPosition } from '../../../../types/portfolio';
 
-const POSITIONS_FILE = path.join(process.cwd(), 'src/data/positions.json');
+const POSITIONS_FILE = path.join(process.cwd(), 'data/positions.json');
 
 export async function POST(request: NextRequest) {
     try {

@@ -64,6 +64,15 @@ if %errorlevel% neq 0 (
 )
 echo ✅ Dependencies installed
 
+echo    Installing Turso database client...
+call npm install @libsql/client
+if %errorlevel% neq 0 (
+    echo ❌ Failed to install Turso database client
+    pause
+    exit /b 1
+)
+echo ✅ Turso database client installed
+
 REM Step 3: Setup environment
 echo.
 echo 3. Setting up environment

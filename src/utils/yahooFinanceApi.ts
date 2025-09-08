@@ -658,7 +658,7 @@ async function getHistoricalFxRate(fxPair: string, transactionDate: string): Pro
             console.log(`📂 Running in server-side context, reading fxRates.json`);
             const fs = await import('fs/promises');
             const path = await import('path');
-            const fxRatesPath = path.join(process.cwd(), 'src/data/fxRates.json');
+            const fxRatesPath = path.join(process.cwd(), 'data/fxRates.json');
             const data = await fs.readFile(fxRatesPath, 'utf-8');
             const fxRates = JSON.parse(data);
             

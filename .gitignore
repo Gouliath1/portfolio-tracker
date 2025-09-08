@@ -40,11 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# portfolio data
-src/data/positions.json
-src/data/positions.json.*
-!src/data/positions.template.json
-src/data/positionsPrices.json
-src/data/fxRates.json
+# Data files (generated/personal data - templates are kept)
+data/positions.json
+data/positions.json.*
+!data/positions.template.json
+data/positionsPrices.json
+data/fxRates.json
 !src/data/positionsPrices.template.json
 !src/data/fxRates.template.json
