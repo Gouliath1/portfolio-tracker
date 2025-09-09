@@ -8,6 +8,7 @@ import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
 import { PortfolioSummary } from '../components/PortfolioSummary';
 import { PerformanceChart } from '../components/PerformanceChart';
 import { PositionsTable } from '../components/PositionsTable';
+import DemoBanner from '../components/DemoBanner';
 
 export default function Home() {
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummaryType | null>(null);
@@ -142,6 +143,8 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      <DemoBanner />
 
       <div className="space-y-8">
         <PortfolioSummary summary={portfolioSummary} showValues={showValues} />

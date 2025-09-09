@@ -6,31 +6,50 @@ async function getPositionsFromDatabase(): Promise<RawPosition[]> {
         const { getDbClient } = await import('@/database');
         const client = getDbClient();
         
-        // Check if we have positions in database
-        const countResult = await client.execute('SELECT COUNT(*) as count FROM positions');
+        // Get the active position set
+        const activeSetResult = await client.execute(`
+            SELECT id FROM position_sets WHERE is_active = TRUE LIMIT 1
+        `);
+        
+        if (activeSetResult.rows.length === 0) {
+            console.log('No active position set found');
+            return []; // Return empty array if no active position set
+        }
+        
+        const activePositionSetId = Number(activeSetResult.rows[0].id);
+        
+        // Check if we have positions in the active position set
+        const countResult = await client.execute({
+            sql: 'SELECT COUNT(*) as count FROM positions WHERE position_set_id = ?',
+            args: [activePositionSetId]
+        });
         const count = Number(countResult.rows[0].count);
         
         if (count === 0) {
             return []; // Return empty array if no positions
         }
         
-        // Query positions with joined data
-        const result = await client.execute(`
-            SELECT 
-                p.quantity,
-                p.average_cost as costPerUnit,
-                p.position_currency as transactionCcy,
-                s.ticker,
-                s.name as fullName,
-                s.currency as stockCcy,
-                a.name as account,
-                b.display_name as broker
-            FROM positions p
-            JOIN securities s ON p.security_id = s.id
-            JOIN accounts a ON p.account_id = a.id
-            JOIN brokers b ON a.broker_id = b.id
-            ORDER BY s.ticker
-        `);
+        // Query positions with joined data from active position set
+        const result = await client.execute({
+            sql: `
+                SELECT 
+                    p.quantity,
+                    p.average_cost as costPerUnit,
+                    p.position_currency as transactionCcy,
+                    s.ticker,
+                    s.name as fullName,
+                    s.currency as stockCcy,
+                    a.name as account,
+                    b.display_name as broker
+                FROM positions p
+                JOIN securities s ON p.security_id = s.id
+                JOIN accounts a ON p.account_id = a.id
+                JOIN brokers b ON a.broker_id = b.id
+                WHERE p.position_set_id = ?
+                ORDER BY s.ticker
+            `,
+            args: [activePositionSetId]
+        });
         
         return result.rows.map(row => ({
             transactionDate: '2023/01/01', // Default date - not critical for calculations

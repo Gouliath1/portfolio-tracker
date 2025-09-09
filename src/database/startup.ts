@@ -1,5 +1,4 @@
 import { setupDatabase } from './schema';
-import { runMigrations } from './migrations';
 import { initializeDemoPositions } from './operations/demoDataManagement';
 import { getDbClient } from './config';
 
@@ -13,10 +12,7 @@ export async function initializeDatabaseOnStartup(): Promise<void> {
     try {
         console.log('🚀 Initializing database on server startup...');
         
-        // Run migrations first (before schema setup)
-        await runMigrations();
-        
-        // Then setup/update schema  
+        // Setup database schema
         await setupDatabase();
         
         // Only load demo positions if this is a fresh database (no positions exist)

@@ -66,10 +66,24 @@ const SCHEMA_SQL = {
       FOREIGN KEY (currency) REFERENCES currencies (code)
     )`,
 
+  // Position sets table - allows for multiple data sets (demo, user data, scenarios)
+  position_sets: `
+    CREATE TABLE IF NOT EXISTS position_sets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      description TEXT,
+      info_type TEXT NOT NULL DEFAULT 'info',
+      is_active BOOLEAN DEFAULT FALSE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
   // Positions table
   positions: `
     CREATE TABLE IF NOT EXISTS positions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      position_set_id INTEGER NOT NULL,
       account_id INTEGER NOT NULL,
       security_id INTEGER NOT NULL,
       quantity DECIMAL(15,6) NOT NULL,
@@ -78,10 +92,11 @@ const SCHEMA_SQL = {
       position_currency TEXT NOT NULL,
       last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (position_set_id) REFERENCES position_sets (id),
       FOREIGN KEY (account_id) REFERENCES accounts (id),
       FOREIGN KEY (security_id) REFERENCES securities (id),
       FOREIGN KEY (position_currency) REFERENCES currencies (code),
-      UNIQUE (account_id, security_id)
+      UNIQUE (position_set_id, account_id, security_id)
     )`,
 
   // Securities prices table (historical prices data)

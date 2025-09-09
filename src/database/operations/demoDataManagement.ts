@@ -3,6 +3,7 @@
  */
 
 import { getDbClient } from '../config';
+import { createPositionSet } from './positionSetOperations';
 
 /**
  * Initialize demo positions in database using pure SQL inserts
@@ -14,6 +15,17 @@ export const initializeDemoPositions = async (): Promise<void> => {
   const db = getDbClient();
   
   try {
+    // First create the demo position set
+    console.log('Creating demo position set...');
+    const demoPositionSetId = await createPositionSet({
+      name: 'demo',
+      display_name: 'Demo Portfolio',
+      description: 'You are currently viewing some sample portfolio data for demonstration purposes',
+      info_type: 'warning',
+      is_active: true
+    });
+    
+    console.log(`Created demo position set with ID: ${demoPositionSetId}`);
     // First ensure we have the required accounts
     // Get CreditAgricole broker ID
     const brokerResult = await db.execute({
@@ -82,10 +94,10 @@ export const initializeDemoPositions = async (): Promise<void> => {
       // Calculate cost basis (quantity * average_cost)
       const costBasis = pos.quantity * pos.cost;
 
-      // Insert position
+      // Insert position with position set reference
       await db.execute({
-        sql: 'INSERT INTO positions (security_id, account_id, quantity, average_cost, cost_basis, position_currency) VALUES (?, ?, ?, ?, ?, ?)',
-        args: [securityId, accountId, pos.quantity, pos.cost, costBasis, pos.posCurrency]
+        sql: 'INSERT INTO positions (position_set_id, security_id, account_id, quantity, average_cost, cost_basis, position_currency) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        args: [demoPositionSetId, securityId, accountId, pos.quantity, pos.cost, costBasis, pos.posCurrency]
       });
 
       console.log(`Migrated demo position: ${pos.ticker}`);
