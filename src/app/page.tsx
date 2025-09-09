@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '../utils/calculations';
+import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
 import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
 import { PortfolioSummary } from '../components/PortfolioSummary';
 import { PerformanceChart } from '../components/PerformanceChart';
@@ -29,6 +30,15 @@ export default function Home() {
     try {
       // Load positions dynamically
       const currentPositions = await loadPositions();
+      
+      // Check and auto-refresh historical data if needed (only on initial load, not forced refresh)
+      if (!forceRefresh && !showRefreshing) {
+        console.log('🔍 Checking if historical data needs refresh...');
+        const wasRefreshed = await autoRefreshHistoricalDataIfNeeded();
+        if (wasRefreshed) {
+          console.log('✅ Historical data was auto-refreshed');
+        }
+      }
       
       // Calculate portfolio summary with the loaded positions
       const summary = await calculatePortfolioSummary(currentPositions, forceRefresh);
@@ -67,7 +77,7 @@ export default function Home() {
       
       // Then refresh historical data
       console.log(`📈 Starting historical data refresh...`);
-      const response = await fetch('/api/historical-prices', {
+      const response = await fetch('/api/historical-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

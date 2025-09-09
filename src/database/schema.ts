@@ -84,9 +84,9 @@ const SCHEMA_SQL = {
       UNIQUE (account_id, security_id)
     )`,
 
-  // Historical prices table
-  historical_prices: `
-    CREATE TABLE IF NOT EXISTS historical_prices (
+  // Securities prices table (historical prices data)
+  securities_prices: `
+    CREATE TABLE IF NOT EXISTS securities_prices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       security_id INTEGER NOT NULL,
       price_date DATE NOT NULL,

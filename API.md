@@ -100,7 +100,7 @@ Returns current cached price data for all symbols.
 }
 ```
 
-### GET /api/historical-prices
+### GET /api/historical-data
 
 Returns historical price data for all symbols.
 
@@ -121,13 +121,13 @@ Returns historical price data for all symbols.
 }
 ```
 
-### POST /api/historical-prices
+### POST /api/historical-data
 
 Refreshes historical price data for all positions from Yahoo Finance.
 
 **Usage:**
 ```bash
-curl -X POST http://localhost:3000/api/historical-prices
+curl -X POST http://localhost:3000/api/historical-data
 ```
 
 ## Data Structure

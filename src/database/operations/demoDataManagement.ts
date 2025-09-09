@@ -113,7 +113,7 @@ export const clearCachedData = async (): Promise<void> => {
     await client.execute('BEGIN TRANSACTION');
     
     // Clear historical prices (will be refetched from Yahoo)
-    await client.execute('DELETE FROM historical_prices');
+    await client.execute('DELETE FROM securities_prices');
     console.log('Cleared historical prices cache');
     
     // Clear FX rates (will be refetched from Yahoo)

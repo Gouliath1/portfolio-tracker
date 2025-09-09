@@ -35,7 +35,7 @@ async function getPositionsFromDatabase() {
 
 export async function POST() {
     try {
-        console.log('🔄 Historical price refresh initiated...');
+        console.log('🔄 Historical data refresh initiated...');
         
         // Load positions from database
         const positions = await getPositionsFromDatabase();
@@ -68,20 +68,39 @@ export async function POST() {
 
 export async function GET() {
     try {
-        console.log('📊 GET /api/historical-prices - Fetching historical data summary');
+        console.log('📊 GET /api/historical-data - Fetching historical data summary');
         
         const { getDbClient } = await import('@/database');
         const client = getDbClient();
         
         // Get summary of historical data
-        const pricesCount = await client.execute('SELECT COUNT(*) as count FROM historical_prices');
+        const pricesCount = await client.execute('SELECT COUNT(*) as count FROM securities_prices');
         const fxCount = await client.execute('SELECT COUNT(*) as count FROM fx_rates');
-        const securitiesCount = await client.execute('SELECT COUNT(DISTINCT security_id) as count FROM historical_prices');
+        const securitiesCount = await client.execute('SELECT COUNT(DISTINCT security_id) as count FROM securities_prices');
+        
+        // Get the most recent data date
+        const recentPriceResult = await client.execute(`
+            SELECT MAX(price_date) as latest_date 
+            FROM securities_prices
+        `);
+        const lastDataDate = recentPriceResult.rows[0]?.latest_date as string | null;
+        
+        // Calculate days since last data
+        let daysSinceLastData = 0;
+        if (lastDataDate) {
+            const lastDate = new Date(lastDataDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            lastDate.setHours(0, 0, 0, 0);
+            daysSinceLastData = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
         
         return NextResponse.json({
             historicalPrices: Number(pricesCount.rows[0].count),
             fxRates: Number(fxCount.rows[0].count),
-            securitiesWithData: Number(securitiesCount.rows[0].count)
+            securitiesWithData: Number(securitiesCount.rows[0].count),
+            lastDataDate,
+            daysSinceLastData
         });
         
     } catch (error) {

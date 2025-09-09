@@ -47,7 +47,7 @@ export const getHistoricalPricesForSymbol = async (symbol: string): Promise<{ [d
     // Get historical prices
     const pricesResult = await client.execute({
       sql: `SELECT price_date, close_price 
-            FROM historical_prices 
+            FROM securities_prices 
             WHERE security_id = ? 
             ORDER BY price_date DESC`,
       args: [securityId]
@@ -107,7 +107,7 @@ export const storePriceData = async (symbol: string, date: string, price: number
 
     // Insert or update price
     await client.execute({
-      sql: `INSERT OR REPLACE INTO historical_prices 
+      sql: `INSERT OR REPLACE INTO securities_prices 
             (security_id, price_date, close_price) 
             VALUES (?, ?, ?)`,
       args: [securityId, date, price]
@@ -150,7 +150,7 @@ export const storeHistoricalPrices = async (symbol: string, prices: { [date: str
     // Insert all prices
     for (const [date, price] of Object.entries(prices)) {
       await client.execute({
-        sql: `INSERT OR REPLACE INTO historical_prices 
+        sql: `INSERT OR REPLACE INTO securities_prices 
               (security_id, price_date, close_price) 
               VALUES (?, ?, ?)`,
         args: [securityId, date, price]
@@ -177,7 +177,7 @@ export const getAllHistoricalPrices = async (): Promise<HistoricalPricesData> =>
   try {
     const result = await client.execute(`
       SELECT s.ticker, hp.price_date, hp.close_price
-      FROM historical_prices hp
+      FROM securities_prices hp
       JOIN securities s ON hp.security_id = s.id
       ORDER BY s.ticker, hp.price_date DESC
     `);

@@ -12,7 +12,7 @@ class HistoricalPriceCache {
     private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
     private async fetchAllHistoricalData(): Promise<HistoricalData> {
-        const response = await fetch('/api/historical-prices');
+        const response = await fetch('/api/historical-data');
         if (!response.ok) {
             throw new Error('Failed to fetch historical data');
         }
