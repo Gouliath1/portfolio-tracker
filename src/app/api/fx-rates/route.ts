@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
         const fxPair = url.searchParams.get('pair');
         const requestedDate = url.searchParams.get('date');
         
+        console.log(`🔍 FX RATE API CALL: pair=${fxPair}, date=${requestedDate || 'CURRENT'}`);
+        console.log(`📊 Full URL: ${request.url}`);
+        
         if (!fxPair) {
             return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
         }
@@ -41,12 +44,12 @@ export async function GET(request: NextRequest) {
         }
         
         if (!result || result.rate === null) {
+            console.log(`❌ No FX rate found in database for ${fxPair} on ${requestedDate || 'current'}`);
             return NextResponse.json({ rate: null, pair: fxPair });
         }
-        
-        return NextResponse.json(result);
-        
-    } catch (error) {
+
+        console.log(`✅ FX rate found: ${fxPair} = ${result.rate} (date: ${result.date})`);
+        return NextResponse.json(result);    } catch (error) {
         console.error('Error fetching FX rate:', error);
         return NextResponse.json({ 
             error: 'Failed to fetch FX rate',
