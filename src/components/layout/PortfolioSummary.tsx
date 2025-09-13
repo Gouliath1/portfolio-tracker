@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { PortfolioSummary as PortfolioSummaryType } from '../types/portfolio';
-import { calculatePortfolioAnnualizedReturn } from '../utils/returnCalculations';
+import { PortfolioSummary as PortfolioSummaryType } from '../../types/portfolio';
+import { calculatePortfolioAnnualizedReturn } from '../../utils/returnCalculations';
 
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;

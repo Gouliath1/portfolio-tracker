@@ -36,6 +36,7 @@ async function getPositionsFromDatabase(): Promise<RawPosition[]> {
                     p.quantity,
                     p.average_cost as costPerUnit,
                     p.position_currency as transactionCcy,
+                    p.transaction_date as transactionDate,
                     s.ticker,
                     s.name as fullName,
                     s.currency as stockCcy,
@@ -52,7 +53,7 @@ async function getPositionsFromDatabase(): Promise<RawPosition[]> {
         });
         
         return result.rows.map(row => ({
-            transactionDate: '2023/01/01', // Default date - not critical for calculations
+            transactionDate: String(row.transactionDate), // Use actual transaction date from database
             ticker: String(row.ticker),
             fullName: String(row.fullName),
             broker: String(row.broker),

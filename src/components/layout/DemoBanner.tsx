@@ -13,13 +13,20 @@ interface DemoStatus {
     } | null;
 }
 
-export default function DemoBanner() {
+interface DemoBannerProps {
+    refreshTrigger?: number; // Used to trigger re-checking demo status
+}
+
+export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
     const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
         const checkDemoStatus = async () => {
+            setIsLoading(true);
+            // Reset visibility when refreshing
+            setIsVisible(true);
             try {
                 const response = await fetch('/api/demo-status');
                 if (response.ok) {
@@ -36,14 +43,14 @@ export default function DemoBanner() {
         };
 
         checkDemoStatus();
-    }, []);
+    }, [refreshTrigger]); // Re-run when refreshTrigger changes
 
-    // Auto-hide info banners after 10 seconds
+    // Auto-hide info banners after 5 seconds
     useEffect(() => {
         if (demoStatus?.positionSet?.info_type === 'info') {
             const timer = setTimeout(() => {
                 setIsVisible(false);
-            }, 10000);
+            }, 5000);
             return () => clearTimeout(timer);
         }
     }, [demoStatus]);

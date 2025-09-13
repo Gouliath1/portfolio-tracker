@@ -13,8 +13,8 @@ import { defaultColumnVisibility, defaultColumnSizing, STORAGE_KEYS, ELEMENT_IDS
  * @returns Object containing all state variables and setters
  */
 export function useTableState() {
-    // Table data state
-    const [sorting, setSorting] = useState<SortingState>([]);
+    // Table data state with default sorting by transaction date (oldest first)
+    const [sorting, setSorting] = useState<SortingState>([{ id: 'transactionDate', desc: false }]);
     const [filterText, setFilterText] = useState('');
     const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
 

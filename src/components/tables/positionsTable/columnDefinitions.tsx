@@ -5,11 +5,12 @@
 
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Position } from '../../types/portfolio';
-import { calculateAnnualizedReturn } from '../../utils/returnCalculations';
-import { formatBrokerDisplay } from '../../utils/brokerInformationMapping';
-import { BASE_CURRENCY_CONSTANT } from '../../utils/yahooFinanceApi';
+import { Position } from '../../../types/portfolio';
+import { calculateAnnualizedReturn } from '../../../utils/returnCalculations';
+import { formatBrokerDisplay } from '../../../utils/brokerInformationMapping';
+import { BASE_CURRENCY_CONSTANT } from '../../../utils/yahooFinanceApi';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
+import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
 
 const columnHelper = createColumnHelper<Position>();
 
@@ -125,22 +126,51 @@ export function createTableColumns() {
 
         /**
          * Original FX rate at time of transaction
-         * Only shown if transaction currency differs from stock currency
+         * Shows the FX rate from transaction currency to JPY for non-JPY positions
          */
         columnHelper.accessor('transactionFxRate', {
             header: 'Orig FX Rate',
-            size: 120,
+            size: 140,
             cell: props => {
                 const value = props.getValue();
                 const row = props.row.original;
                 
-                if (row.transactionCcy === row.stockCcy) {
+                // Show N/A for JPY positions (no FX conversion needed)
+                if (row.transactionCcy === 'JPY') {
                     return <span className="text-gray-400">N/A</span>;
                 }
                 
-                return props.table.options.meta?.showValues
-                    ? <span>{value.toFixed(2)}</span>
-                    : getHiddenValue(value);
+                // Create Yahoo Finance historical FX rate URL
+                const getYahooFxUrl = (fromCcy: string, toCcy: string, date: string) => {
+                    // Convert date from YYYY-MM-DD to timestamp for Yahoo Finance
+                    const transactionDate = new Date(date);
+                    const unixTimestamp = Math.floor(transactionDate.getTime() / 1000);
+                    const nextDay = Math.floor((transactionDate.getTime() + 24 * 60 * 60 * 1000) / 1000);
+                    
+                    return `https://finance.yahoo.com/quote/${fromCcy}${toCcy}=X/history?period1=${unixTimestamp}&period2=${nextDay}&interval=1d`;
+                };
+                
+                const fxPair = `${row.transactionCcy}JPY`;
+                const yahooUrl = getYahooFxUrl(row.transactionCcy, 'JPY', row.transactionDate);
+                
+                if (!props.table.options.meta?.showValues) {
+                    return getHiddenValue(value);
+                }
+                
+                return (
+                    <div className="flex items-center gap-2">
+                        <span>{value.toFixed(2)}</span>
+                        <a 
+                            href={yahooUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:opacity-80 transition-opacity flex-shrink-0"
+                            title={`View ${fxPair} historical rate on ${row.transactionDate}`}
+                        >
+                            <FxRateIcon currencyPair={fxPair} className="w-6 h-6" />
+                        </a>
+                    </div>
+                );
             },
         }),
 
@@ -176,7 +206,7 @@ export function createTableColumns() {
          */
         columnHelper.accessor('currentFxRate', {
             header: 'Curr FX Rate (Stock-JPY)',
-            size: 120,
+            size: 140,
             cell: props => {
                 const value = props.getValue();
                 const row = props.row.original;
@@ -188,8 +218,29 @@ export function createTableColumns() {
                 if (!props.table.options.meta?.showValues) {
                     return getHiddenValue(value);
                 }
-                    
-                return <span>{value.toFixed(2)}</span>;
+                
+                // Create Yahoo Finance current FX rate URL
+                const getCurrentYahooFxUrl = (fromCcy: string, toCcy: string) => {
+                    return `https://finance.yahoo.com/quote/${fromCcy}${toCcy}=X`;
+                };
+                
+                const fxPair = `${row.stockCcy}JPY`;
+                const yahooUrl = getCurrentYahooFxUrl(row.stockCcy, 'JPY');
+                
+                return (
+                    <div className="flex items-center gap-2">
+                        <span>{value.toFixed(2)}</span>
+                        <a 
+                            href={yahooUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:opacity-80 transition-opacity flex-shrink-0"
+                            title={`View current ${fxPair} rate on Yahoo Finance`}
+                        >
+                            <FxRateIcon currencyPair={fxPair} className="w-6 h-6" />
+                        </a>
+                    </div>
+                );
             },
         }),
 

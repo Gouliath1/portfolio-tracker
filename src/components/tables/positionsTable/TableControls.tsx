@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { Table } from '@tanstack/react-table';
-import { Position } from '../../types/portfolio';
+import { Position } from '../../../types/portfolio';
 import { ELEMENT_IDS } from './tableConfig';
 
 interface TableControlsProps {

@@ -1,5 +1,5 @@
-import { Position } from '../../types/portfolio';
-import { HistoricalSnapshot } from '../../utils/historicalPortfolioCalculations';
+import { Position } from '../../../types/portfolio';
+import { HistoricalSnapshot } from '../../../utils/historicalPortfolioCalculations';
 import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
 
 export interface ChartData {

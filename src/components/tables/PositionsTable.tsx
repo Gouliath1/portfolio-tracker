@@ -7,7 +7,7 @@ import {
     getSortedRowModel,
     type ColumnResizeMode,
 } from '@tanstack/react-table';
-import { Position } from '../types/portfolio';
+import { Position } from '../../types/portfolio';
 import { createTableColumns } from './positionsTable/columnDefinitions';
 import { useTableState } from './positionsTable/tableState';
 import { useFilteredPositions } from './positionsTable/dataUtils';

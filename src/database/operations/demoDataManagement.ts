@@ -1,112 +1,147 @@
 /**
- * Demo database operations - Simple SQL inserts for template data
+ * Demo database operations - Simple import from positions.json
  */
 
+import fs from 'fs/promises';
+import path from 'path';
 import { getDbClient } from '../config';
 import { createPositionSet } from './positionSetOperations';
+import { RawPosition } from '@/types/portfolio';
 
 /**
- * Initialize demo positions in database using pure SQL inserts
- * This creates sample positions without relying on external JSON files
+ * Initialize demo positions by importing from positions.json file
+ * Uses the same logic as the import API but directly
  */
 export const initializeDemoPositions = async (): Promise<void> => {
-  console.log('Migrating demo positions to database...');
-  
-  const db = getDbClient();
+  console.log('📋 Loading demo positions from positions.json...');
   
   try {
-    // First create the demo position set
-    console.log('Creating demo position set...');
-    const demoPositionSetId = await createPositionSet({
+    // Read the positions.json file
+    const positionsPath = path.join(process.cwd(), 'data', 'positions.json');
+    const fileContent = await fs.readFile(positionsPath, 'utf8');
+    const positionsData = JSON.parse(fileContent);
+
+    if (!positionsData.positions || !Array.isArray(positionsData.positions)) {
+      throw new Error('Invalid positions.json format - expected positions array');
+    }
+
+    const positions: RawPosition[] = positionsData.positions;
+    console.log(`📥 Importing demo position set with ${positions.length} positions...`);
+    
+    // Create the demo position set
+    const positionSetId = await createPositionSet({
       name: 'demo',
       display_name: 'Demo Portfolio',
-      description: 'You are currently viewing some sample portfolio data for demonstration purposes',
+      description: 'Sample portfolio data for demonstration purposes',
       info_type: 'warning',
       is_active: true
     });
     
-    console.log(`Created demo position set with ID: ${demoPositionSetId}`);
-    // First ensure we have the required accounts
-    // Get CreditAgricole broker ID
-    const brokerResult = await db.execute({
-      sql: 'SELECT id FROM brokers WHERE name = ?',
-      args: ['credit_agricole']
-    });
-
-    if (brokerResult.rows.length === 0) {
-      throw new Error('CreditAgricole broker not found in database');
-    }
-
-    const brokerId = brokerResult.rows[0].id as number;
-
-    // Create required accounts if they don't exist
-    const requiredAccounts = ['General', 'JP NISA', 'JP General'];
-    for (const accountName of requiredAccounts) {
-      await db.execute({
-        sql: 'INSERT OR IGNORE INTO accounts (broker_id, name, account_type) VALUES (?, ?, ?)',
-        args: [brokerId, accountName, 'INDIVIDUAL']
-      });
-    }
-
-    // Insert demo positions with simple SQL
-    const demoPositions = [
-      { ticker: 'AAPL', name: 'Apple Inc', currency: 'USD', account: 'General', quantity: 392, cost: 2.63, posCurrency: 'USD' },
-      { ticker: 'MSFT', name: 'Microsoft Corp', currency: 'USD', account: 'General', quantity: 50, cost: 85.50, posCurrency: 'USD' },
-      { ticker: 'GOOG', name: 'Alphabet Inc', currency: 'USD', account: 'General', quantity: 25, cost: 120.75, posCurrency: 'USD' },
-      { ticker: '7940.T', name: 'Wavelock HLDGS', currency: 'JPY', account: 'JP NISA', quantity: 100, cost: 572.0, posCurrency: 'JPY' },
-      { ticker: '8953.T', name: 'Japan City Fund', currency: 'JPY', account: 'JP General', quantity: 1, cost: 118000.0, posCurrency: 'JPY' },
-      { ticker: '8986.T', name: 'Daiwa Securities Living Investment', currency: 'JPY', account: 'JP General', quantity: 1, cost: 106342.0, posCurrency: 'JPY' },
-      { ticker: '4246.T', name: 'Daikyo Nishikawa', currency: 'JPY', account: 'JP General', quantity: 100, cost: 605.35, posCurrency: 'JPY' },
-      { ticker: 'NVDA', name: 'Nvidia Corp', currency: 'USD', account: 'JP General', quantity: 2, cost: 110.71, posCurrency: 'USD' }
-    ];
-
-    for (const pos of demoPositions) {
-      // Get or create security
-      const securityResult = await db.execute({
-        sql: 'SELECT id FROM securities WHERE ticker = ?',
-        args: [pos.ticker]
-      });
-
-      let securityId: number;
-      if (securityResult.rows.length === 0) {
-        // Create security
-        const insertSecurity = await db.execute({
-          sql: 'INSERT INTO securities (ticker, name, currency) VALUES (?, ?, ?) RETURNING id',
-          args: [pos.ticker, pos.name, pos.currency]
+    // Import positions to the database (same logic as import API)
+    const client = getDbClient();
+    
+    for (const position of positions) {
+      try {
+        // Ensure the security exists
+        const securityResult = await client.execute({
+          sql: 'SELECT id FROM securities WHERE ticker = ?',
+          args: [position.ticker]
         });
-        securityId = insertSecurity.rows[0].id as number;
-      } else {
-        securityId = securityResult.rows[0].id as number;
+        
+        let securityId: number;
+        if (securityResult.rows.length === 0) {
+          console.log(`📄 Creating security for ${position.ticker}`);
+          const insertSecurityResult = await client.execute({
+            sql: `INSERT INTO securities (ticker, name, exchange, currency) 
+                  VALUES (?, ?, ?, ?)`,
+            args: [
+              position.ticker,
+              position.fullName || position.ticker,
+              'UNKNOWN',
+              position.transactionCcy || 'USD'
+            ]
+          });
+          securityId = Number(insertSecurityResult.lastInsertRowid);
+        } else {
+          securityId = Number(securityResult.rows[0].id);
+        }
+        
+        // Ensure the account exists
+        const accountResult = await client.execute({
+          sql: `SELECT a.id FROM accounts a 
+                JOIN brokers b ON a.broker_id = b.id 
+                WHERE a.name = ?`,
+          args: [position.account]
+        });
+        
+        let accountId: number;
+        if (accountResult.rows.length === 0) {
+          console.log(`📄 Creating account for ${position.account}`);
+          
+          // Get Credit Agricole broker (our default)
+          const brokerResult = await client.execute({
+            sql: 'SELECT id FROM brokers WHERE name = ?',
+            args: ['credit_agricole']
+          });
+          
+          const brokerId = Number(brokerResult.rows[0].id);
+          
+          // Create account
+          const insertAccountResult = await client.execute({
+            sql: `INSERT INTO accounts (name, broker_id, base_currency) 
+                  VALUES (?, ?, ?)`,
+            args: [
+              position.account,
+              brokerId,
+              position.transactionCcy || 'USD'
+            ]
+          });
+          accountId = Number(insertAccountResult.lastInsertRowid);
+        } else {
+          accountId = Number(accountResult.rows[0].id);
+        }
+        
+        // Calculate cost basis
+        const costBasis = position.quantity * position.costPerUnit;
+        
+        // Parse transaction date
+        let transactionDate = null;
+        if (position.transactionDate) {
+          const dateStr = position.transactionDate.replace(/\//g, '-'); // Convert YYYY/MM/DD to YYYY-MM-DD
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            transactionDate = parsedDate.toISOString().split('T')[0];
+          }
+        }
+        
+        // Insert position
+        await client.execute({
+          sql: `INSERT INTO positions 
+                (position_set_id, account_id, security_id, quantity, average_cost, cost_basis, position_currency, transaction_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            positionSetId,
+            accountId,
+            securityId,
+            position.quantity,
+            position.costPerUnit,
+            costBasis,
+            position.transactionCcy || 'USD',
+            transactionDate
+          ]
+        });
+        
+        console.log(`Loaded demo position: ${position.ticker} (${transactionDate || 'no date'})`);
+        
+      } catch (positionError) {
+        console.error(`❌ Error processing position ${position.ticker}:`, positionError);
       }
-
-      // Get account ID
-      const accountResult = await db.execute({
-        sql: 'SELECT id FROM accounts WHERE broker_id = ? AND name = ?',
-        args: [brokerId, pos.account]
-      });
-
-      if (accountResult.rows.length === 0) {
-        throw new Error(`Account ${pos.account} not found`);
-      }
-
-      const accountId = accountResult.rows[0].id as number;
-
-      // Calculate cost basis (quantity * average_cost)
-      const costBasis = pos.quantity * pos.cost;
-
-      // Insert position with position set reference
-      await db.execute({
-        sql: 'INSERT INTO positions (position_set_id, security_id, account_id, quantity, average_cost, cost_basis, position_currency) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        args: [demoPositionSetId, securityId, accountId, pos.quantity, pos.cost, costBasis, pos.posCurrency]
-      });
-
-      console.log(`Migrated demo position: ${pos.ticker}`);
     }
-
-    console.log(`Successfully migrated ${demoPositions.length} demo positions to database`);
+    
+    console.log(`✅ Successfully loaded ${positions.length} demo positions`);
     
   } catch (error) {
-    console.error('Error migrating demo positions:', error);
+    console.error('❌ Error loading demo positions:', error);
     throw error;
   }
 };
@@ -114,7 +149,6 @@ export const initializeDemoPositions = async (): Promise<void> => {
 /**
  * Clear all dynamic cached data (prices, fx rates)
  * Keep only core position data
- * @returns {Promise<void>}
  */
 export const clearCachedData = async (): Promise<void> => {
   console.log('Clearing cached price and FX rate data...');
@@ -144,12 +178,11 @@ export const clearCachedData = async (): Promise<void> => {
 
 /**
  * Initialize database with demo data only
- * @returns {Promise<void>}
  */
 export const initializeDemoDatabase = async (): Promise<void> => {
-    console.log('🎬 Initializing demo database...');
-    
-    await initializeDemoPositions();
-    
-    console.log('✅ Demo database initialized successfully');
+  console.log('🎬 Initializing demo database...');
+  
+  await initializeDemoPositions();
+  
+  console.log('✅ Demo database initialized successfully');
 };

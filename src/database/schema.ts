@@ -90,6 +90,7 @@ const SCHEMA_SQL = {
       average_cost DECIMAL(15,4) NOT NULL,
       cost_basis DECIMAL(15,2) NOT NULL,
       position_currency TEXT NOT NULL,
+      transaction_date DATE,
       last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (position_set_id) REFERENCES position_sets (id),

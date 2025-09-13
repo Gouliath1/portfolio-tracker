@@ -4,215 +4,205 @@
 
    ▲ Next.js 15.3.3 (Turbopack)
    - Local:        http://localhost:3000
-   - Network:      http://192.168.50.35:3000
+   - Network:      http://192.0.0.2:3000
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 764ms
- ✓ Compiled /api/positions in 424ms
-📋 GET /api/positions - Fetching positions data
-🔍 Checking database initialization...
-Connected to local SQLite database: ./data/portfolio.db
-🏗️ Database tables not found, initializing...
+ ✓ Compiled instrumentation Node.js in 30ms
+ ✓ Compiled instrumentation Edge in 14ms
+🚀 Initializing database on server startup...
 Initializing database schema...
+Connected to local SQLite database: ./data/portfolio.db
 Creating table: brokers
 Creating table: currencies
 Creating table: accounts
 Creating table: securities
+Creating table: position_sets
 Creating table: positions
-Creating table: historical_prices
+Creating table: securities_prices
 Creating table: fx_rates
 Database schema created successfully
 Inserting default reference data...
 Default reference data inserted successfully
 Database setup completed successfully
-Starting demo database initialization...
-Migrating demo positions from template to database...
-Migrated demo position: AAPL
-Migrated demo position: GOOG
-Migrated demo position: 7940.T
-Migrated demo position: 8953.T
-Migrated demo position: 8986.T
-Migrated demo position: 4246.T
-Migrated demo position: 4246.T
-Migrated demo position: NVDA
-Successfully migrated 8 demo positions to database
-Demo database initialization completed successfully!
+📋 Database has 24 existing positions, skipping demo data
 ✅ Database initialized successfully
-✅ Successfully fetched 8 positions
- GET /api/positions 200 in 594ms
- ○ Compiling / ...
- ✓ Compiled / in 1142ms
- GET / 200 in 1308ms
- GET / 200 in 83ms
-📋 GET /api/positions - Fetching positions data
-✅ Successfully fetched 8 positions
- GET /api/positions 200 in 32ms
- ✓ Compiled /api/prices in 190ms
-🌐 Fetching fresh price for 4246.T from Yahoo Finance
-🔄 fetchStockPrice called for 4246.T, forceRefresh: true
-🌐 [2025-09-05T02:28:43.954Z] YAHOO FINANCE API CALL #1:
+ ✓ Ready in 909ms
+ ✓ Compiled /api/historical-data in 442ms
+🔄 Historical data refresh initiated...
+Connected to local SQLite database: ./data/portfolio.db
+📋 Found 24 positions in database
+📈 HISTORICAL DATA REFRESH STARTED: 13 symbols
+📈 Starting API call count: 0
+📈 Symbols to refresh: 3465.T, 4246.T, 7940.T, 8604.T, 8897.T, 8953.T, 8966.T, 8986.T, AAPL, AI.PA, GOOG, NVDA, TSLA
+📈 Processing 1/13: 3465.T
+📈 fetchHistoricalPrices called for 3465.T
+📅 3465.T: First purchase 2025-09-12, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:07:57.697Z] YAHOO FINANCE HISTORICAL API CALL #1:
+   Symbol: 3465.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/3465.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:07:58.469Z] Historical response received for 3465.T (Call #1)
+✅ 3465.T: Retrieved 1 historical price points
+⏳ Waiting 372ms before next historical request...
+📈 Processing 2/13: 4246.T
+📈 fetchHistoricalPrices called for 4246.T
+📅 4246.T: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:07:58.846Z] YAHOO FINANCE HISTORICAL API CALL #2:
    Symbol: 4246.T
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/4246.T?interval=1d&range=1d
-✅ [2025-09-05T02:28:44.180Z] Response received for 4246.T (Call #1)
-✅ 4246.T: 773 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for 4246.T, skipping cache update via API
-✅ Fetched and cached price for 4246.T: $773
- GET /api/prices?symbol=4246.T 200 in 446ms
-🌐 Fetching fresh price for 7940.T from Yahoo Finance
-🔄 fetchStockPrice called for 7940.T, forceRefresh: true
-🌐 [2025-09-05T02:28:44.212Z] YAHOO FINANCE API CALL #2:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/4246.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:07:59.150Z] Historical response received for 4246.T (Call #2)
+✅ 4246.T: Retrieved 1 historical price points
+⏳ Waiting 288ms before next historical request...
+📈 Processing 3/13: 7940.T
+📈 fetchHistoricalPrices called for 7940.T
+📅 7940.T: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:07:59.442Z] YAHOO FINANCE HISTORICAL API CALL #3:
    Symbol: 7940.T
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/7940.T?interval=1d&range=1d
-✅ [2025-09-05T02:28:44.335Z] Response received for 7940.T (Call #2)
-✅ 7940.T: 723 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for 7940.T, skipping cache update via API
-✅ Fetched and cached price for 7940.T: $723
- GET /api/prices?symbol=7940.T 200 in 145ms
-🌐 Fetching fresh price for 8953.T from Yahoo Finance
-🔄 fetchStockPrice called for 8953.T, forceRefresh: true
-🌐 [2025-09-05T02:28:44.361Z] YAHOO FINANCE API CALL #3:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/7940.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:07:59.747Z] Historical response received for 7940.T (Call #3)
+✅ 7940.T: Retrieved 1 historical price points
+⏳ Waiting 309ms before next historical request...
+📈 Processing 4/13: 8604.T
+📈 fetchHistoricalPrices called for 8604.T
+📅 8604.T: First purchase 2025-09-12, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:00.059Z] YAHOO FINANCE HISTORICAL API CALL #4:
+   Symbol: 8604.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8604.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:00.396Z] Historical response received for 8604.T (Call #4)
+✅ 8604.T: Retrieved 1 historical price points
+⏳ Waiting 287ms before next historical request...
+📈 Processing 5/13: 8897.T
+📈 fetchHistoricalPrices called for 8897.T
+📅 8897.T: First purchase 2025-09-12, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:00.684Z] YAHOO FINANCE HISTORICAL API CALL #5:
+   Symbol: 8897.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8897.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:00.999Z] Historical response received for 8897.T (Call #5)
+✅ 8897.T: Retrieved 1 historical price points
+⏳ Waiting 341ms before next historical request...
+📈 Processing 6/13: 8953.T
+📈 fetchHistoricalPrices called for 8953.T
+📅 8953.T: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:01.343Z] YAHOO FINANCE HISTORICAL API CALL #6:
    Symbol: 8953.T
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/8953.T?interval=1d&range=1d
-✅ [2025-09-05T02:28:44.502Z] Response received for 8953.T (Call #3)
-✅ 8953.T: 111400 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for 8953.T, skipping cache update via API
-✅ Fetched and cached price for 8953.T: $111400
- GET /api/prices?symbol=8953.T 200 in 162ms
-🌐 Fetching fresh price for 8986.T from Yahoo Finance
-🔄 fetchStockPrice called for 8986.T, forceRefresh: true
-🌐 [2025-09-05T02:28:44.519Z] YAHOO FINANCE API CALL #4:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8953.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:01.685Z] Historical response received for 8953.T (Call #6)
+✅ 8953.T: Retrieved 1 historical price points
+⏳ Waiting 359ms before next historical request...
+📈 Processing 7/13: 8966.T
+📈 fetchHistoricalPrices called for 8966.T
+📅 8966.T: First purchase 2025-09-12, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:02.046Z] YAHOO FINANCE HISTORICAL API CALL #7:
+   Symbol: 8966.T
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8966.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:02.347Z] Historical response received for 8966.T (Call #7)
+✅ 8966.T: Retrieved 1 historical price points
+⏳ Waiting 314ms before next historical request...
+📈 Processing 8/13: 8986.T
+📈 fetchHistoricalPrices called for 8986.T
+📅 8986.T: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:02.664Z] YAHOO FINANCE HISTORICAL API CALL #8:
    Symbol: 8986.T
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/8986.T?interval=1d&range=1d
-✅ [2025-09-05T02:28:44.677Z] Response received for 8986.T (Call #4)
-✅ 8986.T: 105800 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for 8986.T, skipping cache update via API
-✅ Fetched and cached price for 8986.T: $105800
- GET /api/prices?symbol=8986.T 200 in 179ms
-🌐 Fetching fresh price for AAPL from Yahoo Finance
-🔄 fetchStockPrice called for AAPL, forceRefresh: true
-🌐 [2025-09-05T02:28:44.716Z] YAHOO FINANCE API CALL #5:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/8986.T?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:02.977Z] Historical response received for 8986.T (Call #8)
+✅ 8986.T: Retrieved 1 historical price points
+⏳ Waiting 360ms before next historical request...
+📈 Processing 9/13: AAPL
+📈 fetchHistoricalPrices called for AAPL
+📅 AAPL: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:03.339Z] YAHOO FINANCE HISTORICAL API CALL #9:
    Symbol: AAPL
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d
-✅ [2025-09-05T02:28:44.869Z] Response received for AAPL (Call #5)
-✅ AAPL: 239.78 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for AAPL, skipping cache update via API
-✅ Fetched and cached price for AAPL: $239.78
- GET /api/prices?symbol=AAPL 200 in 178ms
-🌐 Fetching fresh price for GOOG from Yahoo Finance
-🔄 fetchStockPrice called for GOOG, forceRefresh: true
-⏳ Rate limiting: waiting 15ms for GOOG
-🌐 [2025-09-05T02:28:44.910Z] YAHOO FINANCE API CALL #6:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:03.743Z] Historical response received for AAPL (Call #9)
+✅ AAPL: Retrieved 1 historical price points
+⏳ Waiting 324ms before next historical request...
+📈 Processing 10/13: AI.PA
+📈 fetchHistoricalPrices called for AI.PA
+📅 AI.PA: First purchase 2025-09-12, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:04.069Z] YAHOO FINANCE HISTORICAL API CALL #10:
+   Symbol: AI.PA
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/AI.PA?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:04.406Z] Historical response received for AI.PA (Call #10)
+✅ AI.PA: Retrieved 1 historical price points
+⏳ Waiting 207ms before next historical request...
+📈 Processing 11/13: GOOG
+📈 fetchHistoricalPrices called for GOOG
+📅 GOOG: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:04.617Z] YAHOO FINANCE HISTORICAL API CALL #11:
    Symbol: GOOG
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/GOOG?interval=1d&range=1d
-✅ [2025-09-05T02:28:45.033Z] Response received for GOOG (Call #6)
-✅ GOOG: 232.66 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for GOOG, skipping cache update via API
-✅ Fetched and cached price for GOOG: $232.66
- GET /api/prices?symbol=GOOG 200 in 163ms
-🌐 Fetching fresh price for NVDA from Yahoo Finance
-🔄 fetchStockPrice called for NVDA, forceRefresh: true
-🌐 [2025-09-05T02:28:45.058Z] YAHOO FINANCE API CALL #7:
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/GOOG?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:04.929Z] Historical response received for GOOG (Call #11)
+✅ GOOG: Retrieved 1 historical price points
+⏳ Waiting 257ms before next historical request...
+📈 Processing 12/13: NVDA
+📈 fetchHistoricalPrices called for NVDA
+📅 NVDA: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:05.189Z] YAHOO FINANCE HISTORICAL API CALL #12:
    Symbol: NVDA
-   URL: https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1d&range=1d
-✅ [2025-09-05T02:28:45.192Z] Response received for NVDA (Call #7)
-✅ NVDA: 171.66 (refreshed from Yahoo Finance)
-⚠️ updatePriceCache called in server context for NVDA, skipping cache update via API
-✅ Fetched and cached price for NVDA: $171.66
- GET /api/prices?symbol=NVDA 200 in 156ms
-(node:46662) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
- ✓ Compiled /api/fx-rates in 185ms
- GET /api/fx-rates?pair=USDJPY 200 in 210ms
- GET /api/fx-rates?pair=USDJPY 200 in 106ms
- GET /api/fx-rates?pair=USDJPY 200 in 56ms
- GET /api/fx-rates?pair=USDJPY 200 in 17ms
- GET /api/fx-rates?pair=USDJPY 200 in 17ms
- GET /api/fx-rates?pair=USDJPY 200 in 17ms
- GET /?id=76e5745d-c391-4332-8219-54f3df0f129d&vscodeBrowserReqId=1757039404169 200 in 62ms
-📋 GET /api/positions - Fetching positions data
-✅ Successfully fetched 8 positions
- GET /api/positions 200 in 24ms
-📋 Using cached price for 4246.T: $773
- GET /api/prices?symbol=4246.T 200 in 13ms
-📋 Using cached price for 7940.T: $723
- GET /api/prices?symbol=7940.T 200 in 9ms
-📋 Using cached price for 8953.T: $111400
- GET /api/prices?symbol=8953.T 200 in 9ms
-📋 Using cached price for 8986.T: $105800
- GET /api/prices?symbol=8986.T 200 in 10ms
-📋 Using cached price for AAPL: $239.78
- GET /api/prices?symbol=AAPL 200 in 13ms
-📋 Using cached price for GOOG: $232.66
- GET /api/prices?symbol=GOOG 200 in 10ms
-📋 Using cached price for NVDA: $171.66
- GET /api/prices?symbol=NVDA 200 in 12ms
- GET /api/fx-rates?pair=USDJPY 200 in 47ms
- GET /api/fx-rates?pair=USDJPY 200 in 12ms
- GET /api/fx-rates?pair=USDJPY 200 in 19ms
- GET /api/fx-rates?pair=USDJPY 200 in 11ms
- GET /api/fx-rates?pair=USDJPY 200 in 15ms
- GET /api/fx-rates?pair=USDJPY 200 in 10ms
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
-}
- ○ Compiling /_error ...
- ✓ Compiled /_error in 562ms
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.rukt6zbgn87'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.rukt6zbgn87'
-}
-[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
-}
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.dlyerkj9nl'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.dlyerkj9nl'
-}
-[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.473j0a9xw1m'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.473j0a9xw1m'
-}
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
-}
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.9cein9b8akt'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.9cein9b8akt'
-}
-[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/server/app/api/fx-rates/[__metadata_id__]/route/app-paths-manifest.json'
-}
- ⨯ [Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.gl2xm43m46'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.gl2xm43m46'
-}
-[Error: ENOENT: no such file or directory, open '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.xuote1jgocg'] {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/goul/Development/portfolio-tracker/.next/static/development/_buildManifest.js.tmp.xuote1jgocg'
-}
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:05.511Z] Historical response received for NVDA (Call #12)
+✅ NVDA: Retrieved 1 historical price points
+⏳ Waiting 383ms before next historical request...
+📈 Processing 13/13: TSLA
+📈 fetchHistoricalPrices called for TSLA
+📅 TSLA: First purchase 2025-09-10, 1 months ago, using range: 1y
+🌐 [2025-09-13T01:08:05.899Z] YAHOO FINANCE HISTORICAL API CALL #13:
+   Symbol: TSLA
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/TSLA?interval=1mo&range=1y
+   Range: 1y (1 months of data)
+✅ [2025-09-13T01:08:06.693Z] Historical response received for TSLA (Call #13)
+✅ TSLA: Retrieved 1 historical price points
+🏁 HISTORICAL DATA REFRESH COMPLETED:
+   Total symbols processed: 13
+   Total API calls made: 13
+   Total time taken: 9.0s
+   Average time per call: 0.7s
+💱 Starting FX rates refresh for historical dates...
+📅 Found 2 unique transaction dates: 2025-09-10 14:15:57, 2025-09-12 13:44:51
+💱 FX RATES REFRESH STARTED for 3 dates (1 price dates + 2 transaction dates)
+💱 Starting API call count: 13
+💱 Date range: 2025-09-10 14:15:57 to 2025-09-12 13:44:51
+📊 Required FX pairs for JPY base: USDJPY, EURJPY
+💱 Processing 1/2: USDJPY
+💱 fetchHistoricalFxRates called for USDJPY
+📅 USDJPY: Date range 2025-09-10 to 2025-09-12, using range: 1y
+🌐 [2025-09-13T01:08:06.695Z] YAHOO FINANCE FX HISTORICAL API CALL #14:
+   FX Pair: USDJPY (Yahoo: JPY=X)
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/JPY=X?interval=1d&range=1y
+   Range: 1y (0 months of data)
+✅ [2025-09-13T01:08:07.004Z] FX Historical response received for USDJPY (Call #14)
+📈 Forward filled USDJPY for 2025-09-10 14:15:57 with rate from 2025-09-10: 147.332
+📈 Forward filled USDJPY for 2025-09-12 13:44:51 with rate from 2025-09-12: 147.645
+✅ USDJPY: Retrieved 3 historical FX rate points
+⏳ Waiting 351ms before next FX pair...
+💱 Processing 2/2: EURJPY
+💱 fetchHistoricalFxRates called for EURJPY
+📅 EURJPY: Date range 2025-09-10 to 2025-09-12, using range: 1y
+🌐 [2025-09-13T01:08:07.381Z] YAHOO FINANCE FX HISTORICAL API CALL #15:
+   FX Pair: EURJPY (Yahoo: EURJPY=X)
+   URL: https://query1.finance.yahoo.com/v8/finance/chart/EURJPY=X?interval=1d&range=1y
+   Range: 1y (0 months of data)
+✅ [2025-09-13T01:08:07.708Z] FX Historical response received for EURJPY (Call #15)
+📈 Forward filled EURJPY for 2025-09-10 14:15:57 with rate from 2025-09-10: 172.438
+📈 Forward filled EURJPY for 2025-09-12 13:44:51 with rate from 2025-09-12: 173.261
+✅ EURJPY: Retrieved 3 historical FX rate points
+🏁 FX RATES REFRESH COMPLETED:
+   Total FX pairs processed: 2
+   Total API calls made: 2
+   Total time taken: 1.0s
+   Average time per call: 0.5s
+💱 FX rates refresh completed
+ POST /api/historical-data 200 in 10577ms
 [?25h

@@ -13,10 +13,10 @@ async function getPositionsFromDatabase() {
                 p.quantity,
                 p.average_cost as costPerUnit,
                 p.position_currency as transactionCcy,
-                MIN(p.created_at) as transactionDate
+                p.transaction_date as transactionDate
             FROM positions p
             JOIN securities s ON p.security_id = s.id
-            GROUP BY s.ticker, p.quantity, p.average_cost, p.position_currency
+            ORDER BY p.transaction_date
         `);
         
         return result.rows.map(row => ({
@@ -24,7 +24,7 @@ async function getPositionsFromDatabase() {
             quantity: Number(row.quantity),
             costPerUnit: Number(row.costPerUnit),
             transactionCcy: String(row.transactionCcy),
-            transactionDate: String(row.transactionDate).split('T')[0] // Extract date only
+            transactionDate: String(row.transactionDate) // Already in correct format from database
         }));
         
     } catch (error) {
@@ -51,9 +51,25 @@ export async function POST() {
         // Refresh historical data for all positions
         const historicalResults = await refreshAllHistoricalData(positions);
         
+        // Also refresh FX rates for the same dates
+        const { refreshFxRatesForDates } = await import('@/utils/yahooFinanceApi');
+        console.log('💱 Starting FX rates refresh for historical dates...');
+        
+        // Filter out null values for FX rate refresh
+        const validHistoricalResults: {[symbol: string]: {[date: string]: number}} = {};
+        for (const [symbol, data] of Object.entries(historicalResults)) {
+            if (data !== null) {
+                validHistoricalResults[symbol] = data;
+            }
+        }
+        
+        const fxResults = await refreshFxRatesForDates(validHistoricalResults, positions);
+        console.log('💱 FX rates refresh completed');
+        
         return NextResponse.json({ 
             message: 'Historical data refresh completed',
             historicalResults,
+            fxResults,
             positionsProcessed: positions.length
         });
         

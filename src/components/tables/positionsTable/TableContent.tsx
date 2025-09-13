@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { flexRender, Table } from '@tanstack/react-table';
-import { Position } from '../../types/portfolio';
+import { Position } from '../../../types/portfolio';
 
 interface TableContentProps {
     table: Table<Position>;
