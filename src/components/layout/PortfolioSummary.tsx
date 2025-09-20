@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { PortfolioSummary as PortfolioSummaryType } from '../../types/portfolio';
-import { calculatePortfolioAnnualizedReturn } from '../../utils/returnCalculations';
+import { calculatePortfolioCagrSinceInception } from '../../utils/returnCalculations';
 
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
@@ -20,7 +20,7 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
     }, [summary]);
 
     const hasNullPrices = summary.positions.some(p => p.currentPrice === null);
-    const portfolioAnnualizedReturn = calculatePortfolioAnnualizedReturn(summary);
+    const portfolioAnnualizedReturn = calculatePortfolioCagrSinceInception(summary);
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);
