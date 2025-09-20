@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
-    "dev:clean": "./utils/startDev.sh",
+    "dev:clean": "./scripts/startDev.sh",
     "build": "npm run test && next build",
     "start": "next start",
     "lint": "next lint",
@@ -12,10 +12,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "push": "./utils/gitPush.sh",
-    "setup": "node utils/setup.js",
-    "setup:unix": "./utils/setup.sh",
-    "setup:windows": "utils/setup.bat"
+    "push": "./scripts/gitPush.sh",
+    "setup": "node scripts/setup.js",
+    "setup:unix": "./scripts/setup.sh",
+    "setup:windows": "scripts/setup.bat"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.26.0",
