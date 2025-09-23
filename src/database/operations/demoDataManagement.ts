@@ -1,32 +1,230 @@
 /**
- * Demo database operations - Simple import from positions.json
+ * Demo database operations - provides built-in sample data for the demo mode
  */
 
-import fs from 'fs/promises';
-import path from 'path';
 import { getDbClient } from '../config';
 import { createPositionSet } from './positionSetOperations';
 import { RawPosition } from '@/types/portfolio';
 
+type BrokerInfo = {
+  key: string;
+  display: string;
+  currency: string;
+};
+
+const BROKER_DEFAULT: BrokerInfo = {
+  key: 'credit_agricole',
+  display: 'Credit Agricole',
+  currency: 'EUR'
+};
+
+const BROKER_NAME_MAP: Record<string, BrokerInfo> = {
+  'credit agricole': BROKER_DEFAULT,
+  credit_agricole: BROKER_DEFAULT,
+  'credit agricole sa': BROKER_DEFAULT,
+  rakuten: {
+    key: 'rakuten',
+    display: 'Rakuten Securities',
+    currency: 'JPY'
+  },
+  'rakuten securities': {
+    key: 'rakuten',
+    display: 'Rakuten Securities',
+    currency: 'JPY'
+  },
+  'interactive brokers': {
+    key: 'interactive_brokers',
+    display: 'Interactive Brokers',
+    currency: 'USD'
+  },
+  interactive_brokers: {
+    key: 'interactive_brokers',
+    display: 'Interactive Brokers',
+    currency: 'USD'
+  },
+  fidelity: {
+    key: 'fidelity',
+    display: 'Fidelity',
+    currency: 'USD'
+  },
+  'vanguard': {
+    key: 'vanguard',
+    display: 'Vanguard',
+    currency: 'USD'
+  }
+};
+
+const resolveBrokerInfo = (brokerName?: string): BrokerInfo => {
+  if (!brokerName) {
+    return BROKER_DEFAULT;
+  }
+
+  const normalized = brokerName.trim().toLowerCase();
+  return BROKER_NAME_MAP[normalized] || BROKER_DEFAULT;
+};
+
+const ensureBroker = async (
+  client: ReturnType<typeof getDbClient>,
+  brokerName?: string
+): Promise<{ id: number; info: BrokerInfo }> => {
+  const baseInfo = resolveBrokerInfo(brokerName);
+
+  const existing = await client.execute({
+    sql: `SELECT id, display_name FROM brokers WHERE name = ? LIMIT 1`,
+    args: [baseInfo.key]
+  });
+
+  if (existing.rows.length > 0) {
+    return {
+      id: Number(existing.rows[0].id),
+      info: {
+        ...baseInfo,
+        display: String(existing.rows[0].display_name || baseInfo.display)
+      }
+    };
+  }
+
+  const displayName = brokerName?.trim() || baseInfo.display;
+  const currency = baseInfo.currency;
+
+  const insert = await client.execute({
+    sql: `INSERT INTO brokers (name, display_name, default_currency) VALUES (?, ?, ?)`,
+    args: [baseInfo.key, displayName, currency]
+  });
+
+  return {
+    id: Number(insert.lastInsertRowid),
+    info: {
+      ...baseInfo,
+      display: displayName,
+      currency
+    }
+  };
+};
+
+const DEFAULT_DEMO_POSITIONS: RawPosition[] = [
+  {
+    transactionDate: '2022/03/12',
+    ticker: 'AAPL',
+    fullName: 'Apple Inc.',
+    broker: 'Interactive Brokers',
+    account: 'US Margin',
+    quantity: 20,
+    costPerUnit: 145.25,
+    transactionCcy: 'USD',
+    stockCcy: 'USD'
+  },
+  {
+    transactionDate: '2022/06/18',
+    ticker: 'MSFT',
+    fullName: 'Microsoft Corporation',
+    broker: 'Interactive Brokers',
+    account: 'US Margin',
+    quantity: 15,
+    costPerUnit: 280.1,
+    transactionCcy: 'USD',
+    stockCcy: 'USD'
+  },
+  {
+    transactionDate: '2023/01/10',
+    ticker: 'VOO',
+    fullName: 'Vanguard S&P 500 ETF',
+    broker: 'Fidelity',
+    account: 'Retirement IRA',
+    quantity: 35,
+    costPerUnit: 365.4,
+    transactionCcy: 'USD',
+    stockCcy: 'USD'
+  },
+  {
+    transactionDate: '2023/05/05',
+    ticker: 'NVDA',
+    fullName: 'Nvidia Corporation',
+    broker: 'Interactive Brokers',
+    account: 'US Margin',
+    quantity: 12,
+    costPerUnit: 195.7,
+    transactionCcy: 'USD',
+    stockCcy: 'USD'
+  },
+  {
+    transactionDate: '2023/07/15',
+    ticker: 'TSLA',
+    fullName: 'Tesla Inc.',
+    broker: 'Interactive Brokers',
+    account: 'US Margin',
+    quantity: 6,
+    costPerUnit: 250,
+    transactionCcy: 'USD',
+    stockCcy: 'USD'
+  },
+  {
+    transactionDate: '2023/09/01',
+    ticker: '7203.T',
+    fullName: 'Toyota Motor Corp.',
+    broker: 'Rakuten',
+    account: 'Japan Cash',
+    quantity: 150,
+    costPerUnit: 1980,
+    transactionCcy: 'JPY',
+    stockCcy: 'JPY'
+  },
+  {
+    transactionDate: '2023/09/10',
+    ticker: '9433.T',
+    fullName: 'Nippon Telegraph & Telephone',
+    broker: 'Rakuten',
+    account: 'NISA - Growth',
+    quantity: 200,
+    costPerUnit: 167.2,
+    transactionCcy: 'JPY',
+    stockCcy: 'JPY'
+  },
+  {
+    transactionDate: '2023/11/20',
+    ticker: 'AI.PA',
+    fullName: 'Air Liquide SA',
+    broker: 'Credit Agricole',
+    account: 'PEA',
+    quantity: 25,
+    costPerUnit: 135.05,
+    transactionCcy: 'EUR',
+    stockCcy: 'EUR'
+  },
+  {
+    transactionDate: '2024/02/01',
+    ticker: 'MC.PA',
+    fullName: 'LVMH Moet Hennessy Louis Vuitton',
+    broker: 'Credit Agricole',
+    account: 'PEA',
+    quantity: 8,
+    costPerUnit: 820,
+    transactionCcy: 'EUR',
+    stockCcy: 'EUR'
+  },
+  {
+    transactionDate: '2024/03/28',
+    ticker: 'VWCE.DE',
+    fullName: 'Vanguard FTSE All-World UCITS ETF',
+    broker: 'Vanguard',
+    account: 'Global ETF Plan',
+    quantity: 18,
+    costPerUnit: 105.6,
+    transactionCcy: 'EUR',
+    stockCcy: 'EUR'
+  }
+];
+
 /**
- * Initialize demo positions by importing from positions.json file
- * Uses the same logic as the import API but directly
+ * Initialize demo positions using the built-in sample dataset.
+ * Uses the same logic as the import API but directly.
  */
 export const initializeDemoPositions = async (): Promise<void> => {
-  console.log('📋 Loading demo positions from positions.json...');
+  console.log('📋 Loading built-in demo positions...');
   
   try {
-    // Read the positions.json file
-    const positionsPath = path.join(process.cwd(), 'data', 'positions.json');
-    const fileContent = await fs.readFile(positionsPath, 'utf8');
-    const positionsData = JSON.parse(fileContent);
-
-    if (!positionsData.positions || !Array.isArray(positionsData.positions)) {
-      throw new Error('Invalid positions.json format - expected positions array');
-    }
-
-    const positions: RawPosition[] = positionsData.positions;
-    console.log(`📥 Importing demo position set with ${positions.length} positions...`);
+    const positions: RawPosition[] = DEFAULT_DEMO_POSITIONS;
+    console.log(`📥 Importing demo position set with ${positions.length} positions from built-in demo dataset...`);
     
     // Create the demo position set
     const positionSetId = await createPositionSet({
@@ -42,6 +240,9 @@ export const initializeDemoPositions = async (): Promise<void> => {
     
     for (const position of positions) {
       try {
+        const broker = await ensureBroker(client, position.broker);
+        const brokerId = broker.id;
+
         // Ensure the security exists
         const securityResult = await client.execute({
           sql: 'SELECT id FROM securities WHERE ticker = ?',
@@ -67,33 +268,25 @@ export const initializeDemoPositions = async (): Promise<void> => {
         }
         
         // Ensure the account exists
+        const accountName = position.account?.trim() || 'General';
+
         const accountResult = await client.execute({
-          sql: `SELECT a.id FROM accounts a 
-                JOIN brokers b ON a.broker_id = b.id 
-                WHERE a.name = ?`,
-          args: [position.account]
+          sql: `SELECT id FROM accounts WHERE name = ? AND broker_id = ?`,
+          args: [accountName, brokerId]
         });
         
         let accountId: number;
         if (accountResult.rows.length === 0) {
-          console.log(`📄 Creating account for ${position.account}`);
-          
-          // Get Credit Agricole broker (our default)
-          const brokerResult = await client.execute({
-            sql: 'SELECT id FROM brokers WHERE name = ?',
-            args: ['credit_agricole']
-          });
-          
-          const brokerId = Number(brokerResult.rows[0].id);
-          
-          // Create account
+          console.log(`📄 Creating account for ${accountName} (${broker.info.display})`);
+          const accountCurrency = position.transactionCcy || broker.info.currency || 'USD';
+
           const insertAccountResult = await client.execute({
             sql: `INSERT INTO accounts (name, broker_id, base_currency) 
                   VALUES (?, ?, ?)`,
             args: [
-              position.account,
+              accountName,
               brokerId,
-              position.transactionCcy || 'USD'
+              accountCurrency
             ]
           });
           accountId = Number(insertAccountResult.lastInsertRowid);
