@@ -5,3 +5,4 @@ export * from './historicalPortfolioCalculations';
 export * from './yahooFinanceApi';
 export * from './priceCache';
 export * from './fxRateCache';
+export * from './brokerInformationMapping';
