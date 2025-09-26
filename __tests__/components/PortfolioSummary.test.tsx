@@ -3,7 +3,7 @@
  */
 
 import { render, screen } from '../__mocks__/testUtils'
-import { PortfolioSummary } from '@/types/portfolio'
+  import { PortfolioSummary } from '@portfolio/types'
 
 // Mock the PortfolioSummary component
 const MockPortfolioSummaryComponent = ({ summary }: { summary: PortfolioSummary | null }) => {

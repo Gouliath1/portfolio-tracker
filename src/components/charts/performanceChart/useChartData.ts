@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Position } from '../../../types/portfolio';
+import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '../../../utils/historicalPortfolioCalculations';
 import { TimelineFilter, generateDateIntervals } from './chartUtils';
 

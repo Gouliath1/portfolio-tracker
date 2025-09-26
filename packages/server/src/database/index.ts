@@ -25,6 +25,26 @@ export {
   initializeDemoDatabase
 } from './operations/demoDataManagement';
 
+export {
+  getAllPositionSets,
+  getActivePositionSet,
+  createPositionSet,
+  setActivePositionSet,
+  isUsingDemoData,
+  getPositionSetPositionCount,
+  deletePositionSet
+} from './operations/positionSetOperations';
+
+export {
+  getFxRate,
+  storeFxRate,
+  migrateFxRatesFromJson
+} from './operations/fxRateOperations';
+
+export {
+  initializeDatabaseOnStartup
+} from './startup';
+
 // Price operations
 export {
   getHistoricalPricesForSymbol,

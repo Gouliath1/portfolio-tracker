@@ -1,4 +1,4 @@
-import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
+import { Position, RawPosition, PortfolioSummary } from '@portfolio/types';
 import { fetchStockPrice, updateAllPositions, BASE_CURRENCY_CONSTANT, fetchCurrentFxRate, fetchHistoricalFxRates } from './yahooFinanceApi';
 
 // Helper function to convert amount using FX rate (amount * rate)

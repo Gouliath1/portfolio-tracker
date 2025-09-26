@@ -1,4 +1,4 @@
-import { PortfolioSummary } from '../types/portfolio';
+import { PortfolioSummary } from '@portfolio/types';
 
 /**
  * Calculate annualized return for a position

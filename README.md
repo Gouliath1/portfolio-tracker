@@ -87,21 +87,17 @@ If you prefer to set up manually:
 
 ```
 portfolio-tracker/
+├── packages/
+│   ├── server/            # Shared database + service layer (Next & mobile)
+│   │   └── src/database/  # Schema, startup, and operations
+│   ├── types/             # Shared TypeScript models
+│   └── core/              # (Reserved) shared business logic utilities
 ├── src/
-│   ├── app/                 # Next.js app directory
-│   │   ├── api/            # API routes
-│   │   │   └── prices/     # Stock price API endpoints
-│   │   └── page.tsx        # Main dashboard page
-│   ├── components/         # React components
-│   │   ├── PerformanceChart.tsx
-│   │   ├── PortfolioSummary.tsx
-│   │   └── PositionsTable.tsx
-│   ├── database/          # Database infrastructure
-│   │   ├── schema.ts      # Database schema & setup
-│   │   ├── startup.ts     # Server startup initialization
-│   │   └── operations/    # Database operations
-│   ├── types/             # TypeScript type definitions
-│   └── utils/             # Utility functions
+│   ├── app/               # Next.js app directory
+│   │   ├── api/           # API routes (thin wrappers around shared services)
+│   │   └── page.tsx       # Main dashboard page
+│   ├── components/        # React components
+│   └── utils/             # Web-specific utilities and hooks
 ├── data/                  # Data files & database
 │   ├── portfolio.db       # SQLite database
 │   ├── positions.template.json  # Template for portfolio data
@@ -168,6 +164,7 @@ Create a `.env.local` file for any environment-specific configuration:
 
 ### Database Architecture
 - SQLite database with automatic initialization
+- Shared service layer in `packages/server` for API and mobile reuse
 - Cache-first API approach for optimal performance
 - Automatic server startup initialization
 

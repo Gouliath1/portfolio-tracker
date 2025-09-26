@@ -1,4 +1,4 @@
-import { Position } from '../../../types/portfolio';
+import { Position } from '@portfolio/types';
 
 export type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | 'All';
 

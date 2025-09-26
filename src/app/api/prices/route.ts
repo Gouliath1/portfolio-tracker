@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { 
   storePriceData,
   getTodaysPrice as getDbTodaysPrice
-} from '@/database';
+} from '@portfolio/server';
 import { fetchStockPrice } from '@/utils/yahooFinanceApi';
 
 async function getTodaysPrice(symbol: string): Promise<number | null> {

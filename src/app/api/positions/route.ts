@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { RawPosition } from '@/types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 async function getPositionsFromDatabase(): Promise<RawPosition[]> {
     try {
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const client = getDbClient();
         
         // Get the active position set
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         console.log(`📋 POST /api/positions - Importing ${positions.length} positions to database`);
         
         // Clear existing positions and import new ones
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const db = getDbClient();
         
         // Clear existing positions

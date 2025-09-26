@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { RawPosition } from '../../../../types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 const POSITIONS_FILE = path.join(process.cwd(), 'data/positions.json');
 

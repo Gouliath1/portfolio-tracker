@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { PortfolioSummary as PortfolioSummaryType } from '../../types/portfolio';
+import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { calculatePortfolioCagrSinceInception } from '../../utils/returnCalculations';
 
 interface PortfolioSummaryProps {

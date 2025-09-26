@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { Position } from '../../../types/portfolio';
+import { Position } from '@portfolio/types';
 
 /**
  * Custom hook for filtering positions data based on search text

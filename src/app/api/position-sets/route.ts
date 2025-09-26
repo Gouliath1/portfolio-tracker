@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllPositionSets, getActivePositionSet } from '@/database/operations/positionSetOperations';
+import { getAllPositionSets, getActivePositionSet } from '@portfolio/server';
 
 export async function GET() {
     try {

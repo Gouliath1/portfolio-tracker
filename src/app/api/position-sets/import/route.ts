@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createPositionSet } from '@/database/operations/positionSetOperations';
-import { RawPosition } from '@/types/portfolio';
-import { getDbClient } from '@/database/config';
+import { createPositionSet } from '@portfolio/server';
+import { RawPosition } from '@portfolio/types';
+import { getDbClient } from '@portfolio/server';
 
 interface ImportPositionSetRequest {
     name: string;

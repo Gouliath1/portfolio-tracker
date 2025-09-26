@@ -1,4 +1,4 @@
-import { RawPosition, HistoricalPortfolioSnapshot } from '../types/portfolio';
+import { RawPosition, HistoricalPortfolioSnapshot } from '@portfolio/types';
 // import { BASE_CURRENCY_CONSTANT } from './yahooFinanceApi'; // Commented out as currently unused
 
 interface MonthlyPortfolio {

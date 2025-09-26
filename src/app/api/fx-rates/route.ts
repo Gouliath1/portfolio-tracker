@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFxRate, storeFxRate } from '@/database/operations/fxRateOperations';
+import { getFxRate, storeFxRate } from '@portfolio/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
                 if (fxRatesData[fxPair]) {
                     // Cache all rates for this pair to database
                     console.log(`💾 Caching ${fxPair} rates to database...`);
-                    const { migrateFxRatesFromJson } = await import('@/database/operations/fxRateOperations');
+                    const { migrateFxRatesFromJson } = await import('@portfolio/server');
                     const pairData = { [fxPair]: fxRatesData[fxPair] };
                     await migrateFxRatesFromJson(pairData);
                     

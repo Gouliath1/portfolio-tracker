@@ -4,7 +4,7 @@
 
 import { getDbClient } from '../config';
 import { createPositionSet } from './positionSetOperations';
-import { RawPosition } from '@/types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 type BrokerInfo = {
   key: string;

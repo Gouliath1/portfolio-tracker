@@ -1,4 +1,4 @@
-import { Position } from '../types/portfolio';
+import { Position } from '@portfolio/types';
 import { fetchHistoricalPrices } from './yahooFinanceApi';
 
 export interface HistoricalSnapshot {

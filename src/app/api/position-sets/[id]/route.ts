@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deletePositionSet } from '@/database/operations/positionSetOperations';
+import { deletePositionSet } from '@portfolio/server';
 
 export async function DELETE(
     request: Request,

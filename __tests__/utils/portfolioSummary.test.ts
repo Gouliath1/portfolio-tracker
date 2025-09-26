@@ -3,7 +3,7 @@
  * Tests the core portfolio logic without external dependencies
  */
 
-import { PortfolioSummary, Position } from '@/types/portfolio'
+import { PortfolioSummary, Position } from '@portfolio/types'
 
 // Mock a simple portfolio summary calculation function
 const calculatePortfolioSummary = (positions: Position[]): PortfolioSummary => {

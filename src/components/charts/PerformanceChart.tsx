@@ -12,7 +12,7 @@ import {
     Legend,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Position } from '../../types/portfolio';
+import { Position } from '@portfolio/types';
 
 // Chart utilities and components
 import { TimelineFilter, generateDateIntervals } from './performanceChart/chartUtils';

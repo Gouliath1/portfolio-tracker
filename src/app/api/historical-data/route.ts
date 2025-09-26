@@ -3,7 +3,7 @@ import { refreshAllHistoricalData } from '@/utils/yahooFinanceApi';
 
 async function getPositionsFromDatabase() {
     try {
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const client = getDbClient();
         
         // Get all positions from database
@@ -86,7 +86,7 @@ export async function GET() {
     try {
         console.log('📊 GET /api/historical-data - Fetching historical data summary');
         
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const client = getDbClient();
         
         // Get summary of historical data

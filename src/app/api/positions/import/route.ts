@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RawPosition } from '@/types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 const POSITIONS_JSON_PATH = path.join(process.cwd(), 'data/positions.json');
 
@@ -43,7 +43,7 @@ export async function POST() {
         console.log(`📋 Found ${positions.length} positions in JSON file`);
         
         // Import to database
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const db = getDbClient();
         
         // Clear existing positions

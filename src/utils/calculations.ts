@@ -1,4 +1,4 @@
-import { Position, RawPosition, PortfolioSummary } from '../types/portfolio';
+import { Position, RawPosition, PortfolioSummary } from '@portfolio/types';
 import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates, BASE_CURRENCY_CONSTANT } from './yahooFinanceApi';
 
 // Helper function to get a single historical FX rate for a specific date

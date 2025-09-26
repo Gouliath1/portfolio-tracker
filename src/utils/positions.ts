@@ -1,4 +1,4 @@
-import { RawPosition } from '../types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 // Function to load positions dynamically from API
 export async function loadPositions(): Promise<RawPosition[]> {

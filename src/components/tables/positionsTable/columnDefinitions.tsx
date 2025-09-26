@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Position } from '../../../types/portfolio';
+import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn } from '../../../utils/returnCalculations';
 import { formatBrokerDisplay } from '../../../utils/brokerInformationMapping';
 import { BASE_CURRENCY_CONSTANT } from '../../../utils/yahooFinanceApi';

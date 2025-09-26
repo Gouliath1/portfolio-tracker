@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { calculatePortfolioSummary } from '../../../utils/calculations';
-import { RawPosition } from '../../../types/portfolio';
+import { RawPosition } from '@portfolio/types';
 
 async function loadPositionsFromDatabase(): Promise<RawPosition[]> {
     try {
-        const { getDbClient } = await import('@/database');
+        const { getDbClient } = await import('@portfolio/server');
         const client = getDbClient();
         
         // Query positions with joined data

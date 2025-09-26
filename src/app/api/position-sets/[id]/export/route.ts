@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDbClient } from '@/database/config';
+import { getDbClient } from '@portfolio/server';
 
 export async function GET(
     request: Request,

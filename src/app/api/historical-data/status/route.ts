@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDbClient } from '@/database';
+import { getDbClient } from '@portfolio/server';
 
 interface HistoricalDataStatus {
     needsRefresh: boolean;
