@@ -1,13 +1,5 @@
 import { NextResponse } from 'next/server';
-import { 
-  storePriceData,
-  getTodaysPrice as getDbTodaysPrice
-} from '@portfolio/server';
-import { fetchStockPrice } from '@portfolio/core';
-
-async function getTodaysPrice(symbol: string): Promise<number | null> {
-    return await getDbTodaysPrice(symbol);
-}
+import { getLatestPriceForSymbol, storePriceForSymbol } from '@portfolio/server';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -18,29 +10,20 @@ export async function GET(request: Request) {
     }
 
     try {
-        // First try to get today's cached price from database
-        const cachedPrice = await getTodaysPrice(symbol);
-        
-        if (cachedPrice !== null) {
-            console.log(`📋 Using cached price for ${symbol}: $${cachedPrice}`);
-            return NextResponse.json({ price: cachedPrice });
-        }
+        const result = await getLatestPriceForSymbol(symbol);
 
-        // If no cached price, fetch from Yahoo Finance
-        console.log(`🌐 Fetching fresh price for ${symbol} from Yahoo Finance`);
-        const freshPrice = await fetchStockPrice(symbol, true); // Force refresh
-        
-        if (freshPrice !== null) {
-            // Store the fresh price in database
-            const today = new Date().toISOString().split('T')[0];
-            await storePriceData(symbol, today, freshPrice);
-            
-            console.log(`✅ Fetched and cached price for ${symbol}: $${freshPrice}`);
-            return NextResponse.json({ price: freshPrice });
-        } else {
+        if (result.price === null) {
             console.warn(`❌ Unable to fetch price for ${symbol}`);
             return NextResponse.json({ price: null });
         }
+
+        if (result.source === 'database') {
+            console.log(`📋 Using cached price for ${symbol}: $${result.price}`);
+        } else {
+            console.log(`✅ Fetched and cached price for ${symbol}: $${result.price}`);
+        }
+
+        return NextResponse.json({ price: result.price, date: result.date });
 
     } catch (error) {
         console.error(`❌ Error in price API for ${symbol}:`, error);
@@ -61,9 +44,8 @@ export async function POST(request: Request) {
 
     try {
         // Store the price in database
-        const today = new Date().toISOString().split('T')[0];
-        await storePriceData(symbol, today, price);
-        
+        await storePriceForSymbol(symbol, price);
+
         console.log(`✅ Stored price for ${symbol}: $${price}`);
         return NextResponse.json({ success: true });
 

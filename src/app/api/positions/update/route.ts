@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { writePositionsFile } from '@portfolio/server';
 import { RawPosition } from '@portfolio/types';
-
-const POSITIONS_FILE = path.join(process.cwd(), 'data/positions.json');
 
 export async function POST(request: NextRequest) {
     try {
@@ -18,11 +15,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create the updated data structure
-        const data = { positions };
-
         // Write to file
-        fs.writeFileSync(POSITIONS_FILE, JSON.stringify(data, null, 2));
+        await writePositionsFile(positions);
 
         return NextResponse.json({ success: true });
     } catch (error) {

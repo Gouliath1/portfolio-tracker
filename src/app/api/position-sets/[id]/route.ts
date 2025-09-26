@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deletePositionSet } from '@portfolio/server';
+import { deletePositionSetById } from '@portfolio/server';
 
 export async function DELETE(
     request: Request,
@@ -15,7 +15,7 @@ export async function DELETE(
             }, { status: 400 });
         }
         
-        await deletePositionSet(positionSetId);
+        await deletePositionSetById(positionSetId);
         
         return NextResponse.json({
             message: 'Position set deleted successfully'

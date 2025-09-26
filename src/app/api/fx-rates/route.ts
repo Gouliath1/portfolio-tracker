@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFxRate, storeFxRate } from '@portfolio/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const FX_RATES_FILE_PATH = path.join(process.cwd(), 'data/fxRates.json');
+import { getFxRateWithFallback, updateFxRate } from '@portfolio/server';
 
 export async function GET(request: NextRequest) {
     try {
@@ -18,38 +14,16 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
         }
         
-        // Try to get FX rate from database first
-        let result = await getFxRate(fxPair, requestedDate || undefined);
-        
-        if (!result || result.rate === null) {
-            // No data in database, try to get from JSON file and cache it
-            console.log(`📄 No FX rate for ${fxPair} in database, checking JSON file...`);
-            try {
-                const data = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
-                const fxRatesData = JSON.parse(data);
-                
-                if (fxRatesData[fxPair]) {
-                    // Cache all rates for this pair to database
-                    console.log(`💾 Caching ${fxPair} rates to database...`);
-                    const { migrateFxRatesFromJson } = await import('@portfolio/server');
-                    const pairData = { [fxPair]: fxRatesData[fxPair] };
-                    await migrateFxRatesFromJson(pairData);
-                    
-                    // Try to get the rate again from database
-                    result = await getFxRate(fxPair, requestedDate || undefined);
-                }
-            } catch (error) {
-                console.log(`ℹ️ No JSON file or error reading it: ${error}`);
-            }
-        }
-        
-        if (!result || result.rate === null) {
+        const result = await getFxRateWithFallback(fxPair, { date: requestedDate || undefined });
+
+        if (result.rate === null) {
             console.log(`❌ No FX rate found in database for ${fxPair} on ${requestedDate || 'current'}`);
             return NextResponse.json({ rate: null, pair: fxPair });
         }
 
-        console.log(`✅ FX rate found: ${fxPair} = ${result.rate} (date: ${result.date})`);
-        return NextResponse.json(result);    } catch (error) {
+        console.log(`✅ FX rate found: ${fxPair} = ${result.rate} (date: ${result.date}) via ${result.source}`);
+        return NextResponse.json(result);
+    } catch (error) {
         console.error('Error fetching FX rate:', error);
         return NextResponse.json({ 
             error: 'Failed to fetch FX rate',
@@ -67,14 +41,12 @@ export async function POST(request: NextRequest) {
         }
         
         // Store the FX rate in database
-        const today = new Date().toISOString().split('T')[0];
-        await storeFxRate(fxPair, rate, today);
+        await updateFxRate(fxPair, rate);
         
         return NextResponse.json({ 
             success: true,
             message: `FX rate updated for ${fxPair}`,
-            rate,
-            date: today
+            rate
         });
         
     } catch (error) {

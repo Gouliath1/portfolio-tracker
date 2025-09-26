@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getAllPositionSets, getActivePositionSet } from '@portfolio/server';
+import { getPositionSetsOverview } from '@portfolio/server';
 
 export async function GET() {
     try {
-        const [allSets, activeSet] = await Promise.all([
-            getAllPositionSets(),
-            getActivePositionSet()
-        ]);
+        const overview = await getPositionSetsOverview();
         
         return NextResponse.json({
-            position_sets: allSets,
-            active_set: activeSet
+            position_sets: overview.positionSets,
+            active_set: overview.activeSet
         });
     } catch (error) {
         console.error('❌ Error fetching position sets:', error);

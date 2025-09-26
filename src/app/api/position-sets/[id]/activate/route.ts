@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { setActivePositionSet } from '@portfolio/server';
+import { activatePositionSetById } from '@portfolio/server';
 
 export async function POST(
     request: Request,
@@ -15,7 +15,7 @@ export async function POST(
             }, { status: 400 });
         }
         
-        await setActivePositionSet(positionSetId);
+        await activatePositionSetById(positionSetId);
         
         return NextResponse.json({
             message: 'Position set activated successfully'
