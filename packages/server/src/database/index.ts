@@ -54,5 +54,10 @@ export {
   getAllHistoricalPrices
 } from './operations/priceOperations';
 
+export {
+  getPositionsForSet,
+  getPositionsForActiveSet
+} from './operations/positionsOperations';
+
 // Re-export types for convenience
 export type { Client } from '@libsql/client';

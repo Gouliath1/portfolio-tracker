@@ -1,46 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RawPosition } from '@portfolio/types';
 import { calculatePortfolioSummary } from '@portfolio/core';
-
-async function readPositionsFromDatabase(): Promise<RawPosition[]> {
-    try {
-        const { getDbClient } = await import('@portfolio/server');
-        const client = getDbClient();
-        
-        // Query positions with joined data
-        const result = await client.execute(`
-            SELECT 
-                p.quantity,
-                p.average_cost as costPerUnit,
-                p.position_currency as transactionCcy,
-                s.ticker,
-                s.name as fullName,
-                s.currency as stockCcy,
-                a.name as account,
-                b.display_name as broker
-            FROM positions p
-            JOIN securities s ON p.security_id = s.id
-            JOIN accounts a ON p.account_id = a.id
-            JOIN brokers b ON a.broker_id = b.id
-            ORDER BY s.ticker
-        `);
-        
-        return result.rows.map(row => ({
-            transactionDate: '2023/01/01',
-            ticker: String(row.ticker),
-            fullName: String(row.fullName),
-            broker: String(row.broker),
-            account: String(row.account),
-            quantity: Number(row.quantity),
-            costPerUnit: Number(row.costPerUnit),
-            transactionCcy: String(row.transactionCcy),
-            stockCcy: String(row.stockCcy || row.transactionCcy)
-        }));
-    } catch (error) {
-        console.error('❌ Error reading positions from database:', error);
-        return [];
-    }
-}
+import { getPositionsForActiveSet } from '@portfolio/server';
 
 export async function GET(request: Request) {
     try {
@@ -55,7 +16,7 @@ export async function GET(request: Request) {
         }
         
         // Read positions data
-        const positionsData = await readPositionsFromDatabase();
+        const positionsData = await getPositionsForActiveSet();
         
         // Convert any numeric tickers to strings and ensure proper typing
         const rawPositions: RawPosition[] = positionsData.map((pos: RawPosition) => ({
