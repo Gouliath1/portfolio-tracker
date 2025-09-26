@@ -8,7 +8,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn } from '@portfolio/core';
 import { formatBrokerDisplay } from '../../../utils/brokerInformationMapping';
-import { BASE_CURRENCY_CONSTANT } from '../../../utils/yahooFinanceApi';
+import { BASE_CURRENCY_CONSTANT } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
 

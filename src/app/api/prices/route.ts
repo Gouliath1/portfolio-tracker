@@ -3,7 +3,7 @@ import {
   storePriceData,
   getTodaysPrice as getDbTodaysPrice
 } from '@portfolio/server';
-import { fetchStockPrice } from '@/utils/yahooFinanceApi';
+import { fetchStockPrice } from '@portfolio/core';
 
 async function getTodaysPrice(symbol: string): Promise<number | null> {
     return await getDbTodaysPrice(symbol);

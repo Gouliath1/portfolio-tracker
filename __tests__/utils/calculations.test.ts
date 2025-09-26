@@ -2,12 +2,12 @@
  * Unit tests for calculation utilities
  */
 
-import { calculatePosition, calculatePortfolioSummary } from '@/utils/calculations'
+import { calculatePosition, calculatePortfolioSummary } from '@portfolio/core'
 import { mockApiResponse, mockPositions } from '../__mocks__/mockData'
 import { mockFetchOnce } from '../__mocks__/testUtils'
 
 // Mock the yahooFinanceApi module
-jest.mock('@/utils/yahooFinanceApi', () => ({
+jest.mock('@portfolio/core/yahooFinanceApi', () => ({
   fetchStockPrice: jest.fn(),
   updateAllPositions: jest.fn(),
   fetchCurrentFxRate: jest.fn(),
@@ -46,7 +46,7 @@ describe('Calculations Utils', () => {
       }
 
       // Mock the yahooFinanceApi functions
-      const { fetchCurrentFxRate } = require('@/utils/yahooFinanceApi')
+      const { fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate
 
       const result = await calculatePosition(rawPosition, 160.0) // Current price $160
@@ -109,7 +109,7 @@ describe('Calculations Utils', () => {
         broker: 'Test Broker',
       }
 
-      const { fetchCurrentFxRate } = require('@/utils/yahooFinanceApi')
+      const { fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       fetchCurrentFxRate.mockResolvedValue(130.0)
 
       const result = await calculatePosition(rawPosition, null)
@@ -133,7 +133,7 @@ describe('Calculations Utils', () => {
         broker: 'Test Broker',
       }
 
-      const { fetchCurrentFxRate, fetchHistoricalFxRates } = require('@/utils/yahooFinanceApi')
+      const { fetchCurrentFxRate, fetchHistoricalFxRates } = require('@portfolio/core/yahooFinanceApi')
       fetchHistoricalFxRates.mockResolvedValue({}) // No historical data
       fetchCurrentFxRate.mockResolvedValue(130.0) // Fallback rate
 
@@ -184,7 +184,7 @@ describe('Calculations Utils', () => {
         broker: 'European Broker',
       }
 
-      const { fetchCurrentFxRate, fetchHistoricalFxRates } = require('@/utils/yahooFinanceApi')
+      const { fetchCurrentFxRate, fetchHistoricalFxRates } = require('@portfolio/core/yahooFinanceApi')
       
       // Mock historical EUR/JPY rate for transaction date
       fetchHistoricalFxRates.mockResolvedValue({
@@ -207,7 +207,7 @@ describe('Calculations Utils', () => {
 
   describe('calculatePortfolioSummary', () => {
     beforeEach(() => {
-      const { fetchStockPrice, updateAllPositions } = require('@/utils/yahooFinanceApi')
+      const { fetchStockPrice, updateAllPositions } = require('@portfolio/core/yahooFinanceApi')
       fetchStockPrice.mockClear()
       updateAllPositions.mockClear()
     })
@@ -240,7 +240,7 @@ describe('Calculations Utils', () => {
         }
       ]
 
-      const { fetchStockPrice, fetchCurrentFxRate } = require('@/utils/yahooFinanceApi')
+      const { fetchStockPrice, fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       
       // Mock stock prices
       fetchStockPrice
@@ -282,7 +282,7 @@ describe('Calculations Utils', () => {
         broker: 'Test Broker',
       }]
 
-      const { updateAllPositions } = require('@/utils/yahooFinanceApi')
+      const { updateAllPositions } = require('@portfolio/core/yahooFinanceApi')
       updateAllPositions.mockResolvedValue({
         'AAPL': 165.0
       })
@@ -347,7 +347,7 @@ describe('Calculations Utils', () => {
         }
       ]
 
-      const { fetchStockPrice, fetchCurrentFxRate } = require('@/utils/yahooFinanceApi')
+      const { fetchStockPrice, fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       
       // Mock stock prices
       fetchStockPrice
@@ -401,7 +401,7 @@ describe('Calculations Utils', () => {
         }
       ]
 
-      const { fetchStockPrice, fetchCurrentFxRate } = require('@/utils/yahooFinanceApi')
+      const { fetchStockPrice, fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       
       fetchStockPrice.mockResolvedValue(170.0) // AAPL current price
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate

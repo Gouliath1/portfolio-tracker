@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { RawPosition } from '@portfolio/types';
-import { calculatePortfolioSummary } from '@/utils/calculations';
+import { calculatePortfolioSummary } from '@portfolio/core';
 
 async function readPositionsFromDatabase(): Promise<RawPosition[]> {
     try {

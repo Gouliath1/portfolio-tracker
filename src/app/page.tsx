@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadPositions } from '../utils/positions';
-import { calculatePortfolioSummary } from '../utils/calculations';
+import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';

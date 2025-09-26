@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { refreshAllHistoricalData } from '@/utils/yahooFinanceApi';
+import { refreshAllHistoricalData } from '@portfolio/core';
 
 async function getPositionsFromDatabase() {
     try {
@@ -52,7 +52,7 @@ export async function POST() {
         const historicalResults = await refreshAllHistoricalData(positions);
         
         // Also refresh FX rates for the same dates
-        const { refreshFxRatesForDates } = await import('@/utils/yahooFinanceApi');
+        const { refreshFxRatesForDates } = await import('@portfolio/core');
         console.log('💱 Starting FX rates refresh for historical dates...');
         
         // Filter out null values for FX rate refresh
