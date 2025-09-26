@@ -9,7 +9,7 @@ import {
   getCurrencySymbol,
   formatCurrencyValue,
   getCurrencyPair
-} from '@/utils/currency'
+} from '@portfolio/core'
 
 describe('Currency Utils', () => {
   describe('SUPPORTED_CURRENCIES', () => {

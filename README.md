@@ -91,7 +91,7 @@ portfolio-tracker/
 │   ├── server/            # Shared database + service layer (Next & mobile)
 │   │   └── src/database/  # Schema, startup, and operations
 │   ├── types/             # Shared TypeScript models
-│   └── core/              # (Reserved) shared business logic utilities
+│   └── core/              # Shared business logic (currency, return calculations, …)
 ├── src/
 │   ├── app/               # Next.js app directory
 │   │   ├── api/           # API routes (thin wrappers around shared services)

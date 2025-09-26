@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
-import { calculatePortfolioCagrSinceInception } from '../../utils/returnCalculations';
+import { calculatePortfolioCagrSinceInception } from '@portfolio/core';
 
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
