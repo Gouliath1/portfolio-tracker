@@ -167,8 +167,14 @@ Create a `.env.local` file for any environment-specific configuration:
 - SQLite database with automatic initialization
 - Shared service layer in `packages/server` for API and mobile reuse
 - Portfolio service helpers (see `packages/server/src/services`) centralize portfolio calculations
+- Dedicated service modules (`priceService`, `fxRateService`, `positionsAdminService`, `positionSetsService`, `historicalDataService`) expose typed operations for both web and mobile clients
 - Cache-first API approach for optimal performance
 - Automatic server startup initialization
+
+### Shared Service Layer
+- Located in `packages/server/src/services`
+- Encapsulates database access, validation, and orchestration logic shared by Next.js routes and the upcoming Expo client
+- Covered by Jest unit tests (`packages/server/__tests__/*Service.test.ts`) to ensure regressions are caught early
 
 ### Price Caching
 - Smart caching system to minimize API calls

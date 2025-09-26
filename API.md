@@ -1,6 +1,7 @@
 # Portfolio Tracker API Endpoints
 
 This document describes the available API endpoints for the portfolio tracker application.
+All routes are thin wrappers around the shared service layer found in `packages/server/src/services`, so web and mobile clients consume the same data-access functions.
 
 ## API Endpoints
 
