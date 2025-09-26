@@ -59,5 +59,9 @@ export {
   getPositionsForActiveSet
 } from './operations/positionsOperations';
 
+export {
+  getHistoricalDataStatus
+} from './operations/historicalDataOperations';
+
 // Re-export types for convenience
 export type { Client } from '@libsql/client';
