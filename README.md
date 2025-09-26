@@ -89,7 +89,8 @@ If you prefer to set up manually:
 portfolio-tracker/
 ├── packages/
 │   ├── server/            # Shared database + service layer (Next & mobile)
-│   │   └── src/database/  # Schema, startup, and operations
+│   │   ├── src/database/  # Schema, startup, and operations
+│   │   └── src/services/  # High-level portfolio services for web & mobile
 │   ├── types/             # Shared TypeScript models
 │   └── core/              # Shared business logic (currency, return calculations, …)
 ├── src/
@@ -165,6 +166,7 @@ Create a `.env.local` file for any environment-specific configuration:
 ### Database Architecture
 - SQLite database with automatic initialization
 - Shared service layer in `packages/server` for API and mobile reuse
+- Portfolio service helpers (see `packages/server/src/services`) centralize portfolio calculations
 - Cache-first API approach for optimal performance
 - Automatic server startup initialization
 

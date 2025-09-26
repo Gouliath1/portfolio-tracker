@@ -148,7 +148,9 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
     const totalCostJPY = positions.reduce((sum, pos) => sum + pos.costInJPY, 0);
     const totalValueJPY = positions.reduce((sum, pos) => sum + pos.currentValueJPY, 0);
     const totalPnlJPY = totalValueJPY - totalCostJPY;
-    const totalPnlPercentage = (totalPnlJPY / totalCostJPY) * 100;
+    const totalPnlPercentage = totalCostJPY === 0
+        ? 0
+        : (totalPnlJPY / totalCostJPY) * 100;
 
     return {
         totalValueJPY,

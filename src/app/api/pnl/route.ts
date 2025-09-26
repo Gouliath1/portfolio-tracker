@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { RawPosition } from '@portfolio/types';
-import { calculatePortfolioSummary } from '@portfolio/core';
-import { getPositionsForActiveSet } from '@portfolio/server';
+import { getActivePortfolioSnapshot } from '@portfolio/server';
 
 export async function GET(request: Request) {
     try {
@@ -15,42 +13,21 @@ export async function GET(request: Request) {
             console.log('🔄 Force refresh requested for PnL calculation');
         }
         
-        // Read positions data
-        const positionsData = await getPositionsForActiveSet();
-        
-        // Convert any numeric tickers to strings and ensure proper typing
-        const rawPositions: RawPosition[] = positionsData.map((pos: RawPosition) => ({
-            ...pos,
-            ticker: pos.ticker.toString()
-        }));
-        
-        if (rawPositions.length === 0) {
-            console.log('⚠️ No positions found');
-            return NextResponse.json({
-                success: true,
-                summary: {
-                    totalValueJPY: 0,
-                    totalCostJPY: 0,
-                    totalPnlJPY: 0,
-                    totalPnlPercentage: 0
-                },
-                positions: [],
-                count: 0
-            });
-        }
-        
-        // Calculate portfolio summary with current prices
-        const portfolioSummary = await calculatePortfolioSummary(rawPositions, forceRefresh);
-        
-        // Extract PnL-focused data
-        const pnlData = {
+        const snapshot = await getActivePortfolioSnapshot({ forceRefresh });
+
+        const count = snapshot.summary.positions.length;
+
+        console.log(`✅ PnL calculated for ${count} positions. Total P&L: ¥${snapshot.summary.totalPnlJPY.toLocaleString()} (${snapshot.summary.totalPnlPercentage.toFixed(2)}%)`);
+
+        return NextResponse.json({
+            success: true,
             summary: {
-                totalValueJPY: portfolioSummary.totalValueJPY,
-                totalCostJPY: portfolioSummary.totalCostJPY,
-                totalPnlJPY: portfolioSummary.totalPnlJPY,
-                totalPnlPercentage: portfolioSummary.totalPnlPercentage
+                totalValueJPY: snapshot.summary.totalValueJPY,
+                totalCostJPY: snapshot.summary.totalCostJPY,
+                totalPnlJPY: snapshot.summary.totalPnlJPY,
+                totalPnlPercentage: snapshot.summary.totalPnlPercentage
             },
-            positions: portfolioSummary.positions.map(pos => ({
+            positions: snapshot.summary.positions.map(pos => ({
                 ticker: pos.ticker,
                 fullName: pos.fullName,
                 account: pos.account,
@@ -63,15 +40,8 @@ export async function GET(request: Request) {
                 pnlPercentage: pos.pnlPercentage,
                 transactionCcy: pos.transactionCcy
             })),
-            count: portfolioSummary.positions.length,
-            timestamp: new Date().toISOString()
-        };
-        
-        console.log(`✅ PnL calculated for ${pnlData.count} positions. Total P&L: ¥${pnlData.summary.totalPnlJPY.toLocaleString()} (${pnlData.summary.totalPnlPercentage.toFixed(2)}%)`);
-        
-        return NextResponse.json({
-            success: true,
-            ...pnlData
+            count,
+            timestamp: snapshot.timestamp
         });
         
     } catch (error) {

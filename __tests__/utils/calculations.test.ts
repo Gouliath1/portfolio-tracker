@@ -301,10 +301,7 @@ describe('Calculations Utils', () => {
       expect(result.totalValueJPY).toBe(0)
       expect(result.totalPnlJPY).toBe(0)
       expect(result.positions).toEqual([])
-      
-      // Note: The implementation returns NaN for percentage when cost is 0
-      // This could be considered a bug - should probably return 0 or handle gracefully
-      expect(isNaN(result.totalPnlPercentage)).toBe(true)
+      expect(result.totalPnlPercentage).toBe(0)
     })
 
     it('should handle mixed currencies in portfolio', async () => {
