@@ -1,5 +1,6 @@
 import { getCachedPrice, updatePriceCache } from './priceCache';
 import { getCachedFxRate, updateFxRateCache } from './fxRateCache';
+import { getDataPath } from '@portfolio/utils';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -657,8 +658,7 @@ async function getHistoricalFxRate(fxPair: string, transactionDate: string): Pro
         if (typeof window === 'undefined') {
             console.log(`📂 Running in server-side context, reading fxRates.json`);
             const fs = await import('fs/promises');
-            const path = await import('path');
-            const fxRatesPath = path.join(process.cwd(), 'data/fxRates.json');
+            const fxRatesPath = getDataPath('fxRates.json');
             const data = await fs.readFile(fxRatesPath, 'utf-8');
             const fxRates = JSON.parse(data);
             

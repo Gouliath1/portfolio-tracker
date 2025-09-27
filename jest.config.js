@@ -2,8 +2,8 @@ const nextJest = require('next/jest')
 
 /** @type {import('jest').Config} */
 const createJestConfig = nextJest({
-  // Provide the path to your Next.js app to load next.config.js and .env files
-  dir: './',
+  // Point to the Next.js web app inside the monorepo
+  dir: './apps/web',
 })
 
 // Add any custom config to be passed to Jest
@@ -17,34 +17,36 @@ const config = {
   // Test patterns
   testMatch: [
     '<rootDir>/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
-    '<rootDir>/src/**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
-    '<rootDir>/src/**/*.(test|spec).(js|jsx|ts|tsx)',
+    '<rootDir>/apps/web/src/**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
+    '<rootDir>/apps/web/src/**/*.(test|spec).(js|jsx|ts|tsx)',
     '<rootDir>/packages/**/*.(test|spec).(js|jsx|ts|tsx)'
   ],
   
   // Module name mapping for absolute imports
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@/components/(.*)$': '<rootDir>/src/components/$1',
-    '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
-    '^@/data/(.*)$': '<rootDir>/src/data/$1',
+    '^@/(.*)$': '<rootDir>/apps/web/src/$1',
+    '^@/components/(.*)$': '<rootDir>/apps/web/src/components/$1',
+    '^@/utils/(.*)$': '<rootDir>/apps/web/src/utils/$1',
+    '^@/data/(.*)$': '<rootDir>/apps/web/src/data/$1',
     '^@portfolio/types$': '<rootDir>/packages/types/src/index.ts',
     '^@portfolio/types/(.*)$': '<rootDir>/packages/types/src/$1',
     '^@portfolio/server$': '<rootDir>/packages/server/src/index.ts',
     '^@portfolio/server/(.*)$': '<rootDir>/packages/server/src/$1',
     '^@portfolio/core$': '<rootDir>/packages/core/src/index.ts',
     '^@portfolio/core/(.*)$': '<rootDir>/packages/core/src/$1',
+    '^@portfolio/utils$': '<rootDir>/packages/utils/src/projectPaths.ts',
+    '^@portfolio/utils/(.*)$': '<rootDir>/packages/utils/src/$1',
   },
   
   // Coverage configuration
   collectCoverageFrom: [
-    'src/**/*.{js,jsx,ts,tsx}',
+    'apps/web/src/**/*.{js,jsx,ts,tsx}',
     'packages/**/*.{js,jsx,ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/**/index.ts',
-    '!src/app/**/*.tsx', // Exclude Next.js app directory pages
-    '!src/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/**/*.config.{js,jsx,ts,tsx}',
+    '!apps/web/src/**/*.d.ts',
+    '!apps/web/src/**/index.ts',
+    '!apps/web/src/app/**/*.tsx', // Exclude Next.js app directory pages
+    '!apps/web/src/**/*.stories.{js,jsx,ts,tsx}',
+    '!apps/web/src/**/*.config.{js,jsx,ts,tsx}',
   ],
   
   // Coverage thresholds

@@ -1,0 +1,14 @@
+{
+  "name": "@portfolio/server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@libsql/client": "^0.15.14",
+    "@portfolio/core": "file:../core",
+    "@portfolio/types": "file:../types",
+    "@portfolio/utils": "file:../utils",
+    "dotenv": "^17.2.2"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react",
+    "baseUrl": ".",
+    "paths": {
+      "@portfolio/core": ["../../packages/core/src"],
+      "@portfolio/server": ["../../packages/server/src"],
+      "@portfolio/types": ["../../packages/types/src"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

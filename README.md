@@ -20,17 +20,17 @@ We provide cross-platform setup scripts to get you started quickly:
 
 **For Windows:**
 ```cmd
-utils/setup.bat
+scripts/setup.bat
 ```
 
 **For macOS/Linux:**
 ```bash
-./utils/setup.sh
+./scripts/setup.sh
 ```
 
 **Cross-platform (Node.js):**
 ```bash
-node utils/setup.js
+node scripts/setup.js
 # or
 npm run setup
 ```
@@ -45,7 +45,7 @@ If you prefer to set up manually:
    cd portfolio-tracker
    ```
 
-2. **Install dependencies:**
+2. **Install dependencies (workspace-aware):**
    ```bash
    npm install
    ```
@@ -63,11 +63,16 @@ If you prefer to set up manually:
 
 5. **Start the development server:**
    ```bash
-   npm run dev
+   npm run dev:web
    ```
 
 6. **Open your browser:**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+7. **(Optional) Start the Expo mobile preview:**
+   ```bash
+   npm run dev:mobile
+   ```
 
 ## 📋 Prerequisites
 
@@ -77,39 +82,50 @@ If you prefer to set up manually:
 
 ## 🛠️ Available Scripts
 
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build the application for production
-- `npm run start` - Start the production server
-- `npm run lint` - Run ESLint for code quality
-- `npm run setup` - Run the cross-platform setup script
+- `npm run dev` - Run all dev targets via Turborepo (web + mobile)
+- `npm run dev:web` - Launch the Next.js web app locally
+- `npm run dev:mobile` - Launch the Expo dev server for the mobile app
+- `npm run build` - Build every workspace (tests run automatically first)
+- `npm run start` - Start the production Next.js server (`apps/web`)
+- `npm run lint` - Run linting across the monorepo
+- `npm run test` - Execute the Jest test suite
+- `npm run setup` - Cross-platform setup assistant
 
 ## 📁 Project Structure
 
 ```
 portfolio-tracker/
+├── apps/
+│   ├── web/                   # Next.js application (formerly src/)
+│   │   ├── package.json       # Web-specific dependencies & scripts
+│   │   ├── next.config.ts     # Next.js configuration
+│   │   ├── instrumentation.ts # Startup hook for DB initialization
+│   │   ├── public/            # Static assets
+│   │   └── src/
+│   │       ├── app/           # App router + API routes
+│   │       ├── components/    # Web UI components
+│   │       └── utils/         # Web-only utilities
+│   └── mobile/                # Expo / React Native starter app
+│       ├── package.json       # Mobile-specific dependencies & scripts
+│       ├── App.tsx            # Example screen consuming shared logic
+│       ├── app.json           # Expo app manifest
+│       └── assets/            # Mobile static assets
 ├── packages/
-│   ├── server/            # Shared database + service layer (Next & mobile)
-│   │   ├── src/database/  # Schema, startup, and operations
-│   │   └── src/services/  # High-level portfolio services for web & mobile
-│   ├── types/             # Shared TypeScript models
-│   └── core/              # Shared business logic (currency, return calculations, …)
-├── src/
-│   ├── app/               # Next.js app directory
-│   │   ├── api/           # API routes (thin wrappers around shared services)
-│   │   └── page.tsx       # Main dashboard page
-│   ├── components/        # React components
-│   └── utils/             # Web-specific utilities and hooks
-├── data/                  # Data files & database
-│   ├── portfolio.db       # SQLite database
-│   ├── positions.template.json  # Template for portfolio data
-│   ├── positions.json     # Your portfolio data (gitignored)
-│   └── positionsPrices.json     # Price cache
-├── scripts/               # Development utilities and setup scripts
-│   ├── setup.js          # Cross-platform setup script
-│   ├── setup.sh          # Unix/macOS setup script
-│   └── gitPush.sh        # Git push utility
-├── instrumentation.ts    # Server startup hook
-└── ...                   # Other config files
+│   ├── server/                # Shared database + service layer
+│   │   ├── src/database/      # Schema, startup, and operations
+│   │   └── src/services/      # High-level portfolio services
+│   ├── core/                  # Business logic (currency, returns, Yahoo)
+│   ├── types/                 # Shared TypeScript models
+│   └── utils/                 # Cross-platform helpers (e.g., project paths)
+├── data/                      # SQLite DB and portfolio JSON files
+│   ├── portfolio.db
+│   ├── positions.template.json
+│   └── positions.json         # Your portfolio data (gitignored)
+├── scripts/                   # Tooling (setup, git push, etc.)
+├── tsconfig.base.json         # Shared TypeScript config
+├── tsconfig.json              # Solution-style references for workspaces
+├── turbo.json                 # Turborepo pipeline configuration
+└── ...                        # Additional config files
 ```
 
 ## 💼 Portfolio Data Setup
@@ -196,7 +212,7 @@ The application uses Next.js standalone build for production-ready deployments:
 # Build the application
 npm run build
 
-# The standalone build will be created in .next/standalone/
+# The standalone build for the web app is created in apps/web/.next/standalone/
 ```
 
 ### Production Structure
@@ -218,7 +234,7 @@ The standalone build creates a self-contained production package:
 
 ```bash
 # Deploy the standalone folder to your server
-rsync -av .next/standalone/ user@server:/path/to/app/
+rsync -av apps/web/.next/standalone/ user@server:/path/to/app/
 
 # Ensure data directory exists and copy your data
 rsync -av data/ user@server:/path/to/app/data/
@@ -237,7 +253,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy the standalone build
-COPY .next/standalone ./
+COPY apps/web/.next/standalone ./
 COPY data ./data
 
 # Expose port
@@ -262,7 +278,7 @@ docker run -p 3000:3000 -v $(pwd)/data:/app/data portfolio-tracker
 npm install -g pm2
 
 # Deploy and start with PM2
-pm2 start .next/standalone/server.js --name portfolio-tracker
+pm2 start apps/web/.next/standalone/server.js --name portfolio-tracker
 pm2 startup
 pm2 save
 ```

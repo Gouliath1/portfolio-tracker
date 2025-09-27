@@ -26,6 +26,16 @@ const colors = {
     cyan: '\x1b[36m'
 };
 
+function removePath(target) {
+    try {
+        if (fs.existsSync(target)) {
+            fs.rmSync(target, { recursive: true, force: true });
+        }
+    } catch (error) {
+        logWarning(`Unable to remove ${target}: ${error.message}`);
+    }
+}
+
 function log(message, color = 'reset') {
     console.log(`${colors[color]}${message}${colors.reset}`);
 }
@@ -107,15 +117,23 @@ function installDependencies() {
         process.exit(1);
     }
     
-    const success = execCommand('npm install', 'Dependencies installed');
-    
-    if (success) {
-        // Install Turso database client
-        log('   Installing Turso database client...', 'blue');
-        return execCommand('npm install @libsql/client', 'Turso database client installed');
+    log('   Cleaning previous installs...', 'blue');
+    removePath('node_modules');
+    ['apps', 'packages'].forEach(base => {
+        if (fs.existsSync(base)) {
+            fs.readdirSync(base).forEach(entry => {
+                removePath(path.join(base, entry, 'node_modules'));
+            });
+        }
+    });
+
+    const hasLockFile = fs.existsSync('package-lock.json');
+    if (hasLockFile) {
+        return execCommand('npm ci --workspaces --include-workspace-root', 'Dependencies installed');
     }
-    
-    return false;
+
+    logWarning('package-lock.json not found. Falling back to npm install --legacy-peer-deps');
+    return execCommand('npm install --legacy-peer-deps', 'Dependencies installed');
 }
 
 function setupEnvironment() {
@@ -143,7 +161,7 @@ function setupEnvironment() {
 function checkDataFiles() {
     logStep(4, 'Checking data files');
     
-    const dataDir = 'src/data';
+    const dataDir = 'data';
     
     // Check if positions.json exists, if not copy from template
     const positionsFile = path.join(dataDir, 'positions.json');
@@ -192,20 +210,22 @@ function showCompletionMessage(buildSuccess = true) {
     log('='.repeat(60), 'green');
     
     log('\nNext steps:', 'cyan');
-    log('1. Start the development server:', 'white');
-    log('   npm run dev', 'blue');
+    log('1. Start the web development server:', 'white');
+    log('   npm run dev:web', 'blue');
+    log('   (Optional) Start the Expo dev server with npm run dev:mobile', 'blue');
     
     log('\n2. Open your browser and navigate to:', 'white');
     log('   http://localhost:3000', 'blue');
     
     log('\n3. To customize your portfolio:', 'white');
-    log('   - Edit src/data/positions.json with your stock positions', 'blue');
+    log('   - Edit data/positions.json with your stock positions', 'blue');
     log('   - Update environment variables in .env.local if needed', 'blue');
     
     log('\nUseful commands:', 'cyan');
-    log('   npm run dev         - Start development server', 'blue');
-    log('   npm run build       - Build for production (includes tests)', 'blue');
-    log('   npm run start       - Start production server', 'blue');
+    log('   npm run dev:web     - Start web development server', 'blue');
+    log('   npm run dev:mobile  - Start Expo dev server', 'blue');
+    log('   npm run build       - Build all packages (includes tests)', 'blue');
+    log('   npm run start       - Start production web server', 'blue');
     log('   npm run lint        - Run linting', 'blue');
     log('   npm test            - Run unit tests', 'blue');
     log('   npm run test:watch  - Run tests in watch mode', 'blue');

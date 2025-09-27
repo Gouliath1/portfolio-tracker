@@ -8,7 +8,9 @@ import {
   PositionSet,
 } from '../database/operations/positionSetOperations';
 
-const POSITIONS_FILE_PATH = path.join(process.cwd(), 'data', 'positions.json');
+import { getDataPath } from '@portfolio/utils';
+
+const POSITIONS_FILE_PATH = getDataPath('positions.json');
 
 export interface PositionsFileStatus {
   hasFile: boolean;

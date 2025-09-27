@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+apps/*/node_modules/
+packages/*/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,6 +17,9 @@
 
 # next.js
 /.next/
+/apps/*/.next/
+/.turbo/
+apps/*/.turbo/
 /out/
 
 # production
@@ -44,6 +49,7 @@ next-env.d.ts
 data/positions.json
 data/positions.json.*
 data/portfolio.db
+apps/*/data/*.db
 
 # VSCode auto-generated empty files and directories
 src/components/transactionManager/

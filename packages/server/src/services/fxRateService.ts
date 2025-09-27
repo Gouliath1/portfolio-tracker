@@ -1,8 +1,8 @@
-import path from 'path';
 import { promises as fs } from 'fs';
 import { getFxRate, migrateFxRatesFromJson, storeFxRate } from '../database/operations/fxRateOperations';
+import { getDataPath } from '@portfolio/utils';
 
-const FX_RATES_FILE_PATH = path.join(process.cwd(), 'data', 'fxRates.json');
+const FX_RATES_FILE_PATH = getDataPath('fxRates.json');
 
 export interface FxRateQueryOptions {
   date?: string;
@@ -89,4 +89,3 @@ export const updateFxRate = async (
 
   await storeFxRate(trimmedPair, rate, date);
 };
-

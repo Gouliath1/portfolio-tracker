@@ -1,40 +1,10 @@
 {
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@portfolio/types": ["./packages/types/src/index.ts"],
-      "@portfolio/types/*": ["./packages/types/src/*"],
-      "@portfolio/server": ["./packages/server/src/index.ts"],
-      "@portfolio/server/*": ["./packages/server/src/*"],
-      "@portfolio/core": ["./packages/core/src/index.ts"],
-      "@portfolio/core/*": ["./packages/core/src/*"]
-    }
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "packages/**/*.ts",
-    "packages/**/*.tsx"
-  ],
-  "exclude": ["node_modules"]
+  "files": [],
+  "references": [
+    { "path": "apps/web" },
+    { "path": "packages/core" },
+    { "path": "packages/server" },
+    { "path": "packages/types" },
+    { "path": "packages/utils" }
+  ]
 }

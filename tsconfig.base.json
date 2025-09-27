@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "paths": {
+      "@portfolio/types": ["./packages/types/src/index.ts"],
+      "@portfolio/types/*": ["./packages/types/src/*"],
+      "@portfolio/server": ["./packages/server/src/index.ts"],
+      "@portfolio/server/*": ["./packages/server/src/*"],
+      "@portfolio/core": ["./packages/core/src/index.ts"],
+      "@portfolio/core/*": ["./packages/core/src/*"],
+      "@portfolio/utils": ["./packages/utils/src/index.ts"],
+      "@portfolio/utils/*": ["./packages/utils/src/*"]
+    }
+  }
+}

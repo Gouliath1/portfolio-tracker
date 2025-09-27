@@ -1,4 +1,4 @@
-import { checkHistoricalDataStatus, autoRefreshHistoricalDataIfNeeded } from '../../src/utils/historicalDataChecker';
+import { checkHistoricalDataStatus, autoRefreshHistoricalDataIfNeeded } from '../../apps/web/src/utils/historicalDataChecker';
 
 // Mock fetch globally
 const mockFetch = jest.fn();

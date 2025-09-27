@@ -87,21 +87,28 @@ main() {
         exit 1
     fi
     
-    log_info "Running: npm install"
-    if npm install; then
-        log_success "Dependencies installed"
-    else
-        log_error "Failed to install dependencies"
-        exit 1
-    fi
+    log_info "Cleaning previous installs..."
+    rm -rf node_modules 2>/dev/null || true
+    rm -rf apps/*/node_modules packages/*/node_modules 2>/dev/null || true
 
-    # Install Turso database client
-    log_info "Installing Turso database client..."
-    if npm install @libsql/client; then
-        log_success "Turso database client installed"
+    if [ -f "package-lock.json" ]; then
+        log_info "Running clean install from lockfile: npm ci --workspaces --include-workspace-root"
+        if npm ci --workspaces --include-workspace-root; then
+            log_success "Dependencies installed"
+        else
+            log_error "Failed to install dependencies via npm ci"
+            log_info "If the lockfile is corrupted, delete it manually and re-run npm install"
+            exit 1
+        fi
     else
-        log_error "Failed to install Turso database client"
-        exit 1
+        log_warning "package-lock.json not found. Falling back to npm install"
+        log_info "Running: npm install --legacy-peer-deps"
+        if npm install --legacy-peer-deps; then
+            log_success "Dependencies installed"
+        else
+            log_error "Failed to install dependencies"
+            exit 1
+        fi
     fi
 
     # Step 3: Setup environment
@@ -125,17 +132,17 @@ EOF
     # Step 4: Check data files
     log_step "4. Checking data files"
     
-    if [ ! -f "src/data/positions.json" ] && [ -f "src/data/positions.template.json" ]; then
+    if [ ! -f "data/positions.json" ] && [ -f "data/positions.template.json" ]; then
         log_info "Creating positions.json from template..."
-        cp src/data/positions.template.json src/data/positions.json
+        cp data/positions.template.json data/positions.json
         log_success "positions.json created from template"
-    elif [ -f "src/data/positions.json" ]; then
+    elif [ -f "data/positions.json" ]; then
         log_info "positions.json already exists"
     fi
-    
+
     # Check other data files
     for file in "positionsPrices.json"; do
-        if [ -f "src/data/$file" ]; then
+        if [ -f "data/$file" ]; then
             log_info "$file exists"
         else
             log_info "$file not found"
@@ -173,20 +180,23 @@ EOF
     echo -e "${GREEN}============================================================${NC}"
     
     echo -e "\n${CYAN}Next steps:${NC}"
-    echo -e "${NC}1. Start the development server:${NC}"
-    echo -e "${BLUE}   npm run dev${NC}"
+    echo -e "${NC}1. Start the web app development server:${NC}"
+    echo -e "${BLUE}   npm run dev:web${NC}"
+    echo -e "${NC}   (Optional) Start the Expo mobile app:${NC}"
+    echo -e "${BLUE}   npm run dev:mobile${NC}"
     
     echo -e "\n${NC}2. Open your browser and navigate to:${NC}"
     echo -e "${BLUE}   http://localhost:3000${NC}"
     
     echo -e "\n${NC}3. To customize your portfolio:${NC}"
-    echo -e "${BLUE}   - Edit src/data/positions.json with your stock positions${NC}"
+    echo -e "${BLUE}   - Edit data/positions.json with your stock positions${NC}"
     echo -e "${BLUE}   - Update environment variables in .env.local if needed${NC}"
     
     echo -e "\n${CYAN}Useful commands:${NC}"
-    echo -e "${BLUE}   npm run dev         - Start development server${NC}"
-    echo -e "${BLUE}   npm run build       - Build for production (includes tests)${NC}"
-    echo -e "${BLUE}   npm run start       - Start production server${NC}"
+    echo -e "${BLUE}   npm run dev:web     - Start web development server${NC}"
+    echo -e "${BLUE}   npm run dev:mobile  - Start Expo dev server${NC}"
+    echo -e "${BLUE}   npm run build       - Build all packages (includes tests)${NC}"
+    echo -e "${BLUE}   npm run start       - Start production web server${NC}"
     echo -e "${BLUE}   npm run lint        - Run linting${NC}"
     echo -e "${BLUE}   npm test            - Run unit tests${NC}"
     echo -e "${BLUE}   npm run test:watch  - Run tests in watch mode${NC}"

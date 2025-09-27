@@ -77,7 +77,7 @@ echo ""
 # Step 3: Quick application test (optional - can be disabled)
 echo "${BLUE}🏃 Step 3: Quick application test...${NC}"
 # Start the app in background for a quick health check
-npm run dev &
+npm run dev:web &
 APP_PID=$!
 sleep 5  # Wait for app to start
 

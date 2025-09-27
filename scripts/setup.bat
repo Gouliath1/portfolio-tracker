@@ -55,23 +55,29 @@ if not exist "package.json" (
     exit /b 1
 )
 
-echo    Running: npm install
-call npm install
+echo    Cleaning previous installs...
+IF EXIST node_modules rmdir /s /q node_modules
+for %%d in (apps packages) do (
+    if exist "%%d" (
+        for /d %%s in ("%%d\*") do (
+            if exist "%%s\node_modules" rmdir /s /q "%%s\node_modules"
+        )
+    )
+)
+
+IF EXIST package-lock.json (
+    echo    Running: npm ci --workspaces --include-workspace-root
+    call npm ci --workspaces --include-workspace-root
+) ELSE (
+    echo ⚠️  package-lock.json not found. Falling back to npm install --legacy-peer-deps
+    call npm install --legacy-peer-deps
+)
 if %errorlevel% neq 0 (
     echo ❌ Failed to install dependencies
     pause
     exit /b 1
 )
 echo ✅ Dependencies installed
-
-echo    Installing Turso database client...
-call npm install @libsql/client
-if %errorlevel% neq 0 (
-    echo ❌ Failed to install Turso database client
-    pause
-    exit /b 1
-)
-echo ✅ Turso database client installed
 
 REM Step 3: Setup environment
 echo.
@@ -96,10 +102,10 @@ REM Step 4: Check data files
 echo.
 echo 4. Checking data files
 
-if not exist "src\data\positions.json" (
-    if exist "src\data\positions.template.json" (
+if not exist "data\positions.json" (
+    if exist "data\positions.template.json" (
         echo    Creating positions.json from template...
-        copy "src\data\positions.template.json" "src\data\positions.json" >nul
+        copy "data\positions.template.json" "data\positions.json" >nul
         echo ✅ positions.json created from template
     )
 ) else (
@@ -108,7 +114,7 @@ if not exist "src\data\positions.json" (
 
 REM Check other data files
 for %%f in (positionsPrices.json) do (
-    if exist "src\data\%%f" (
+    if exist "data\%%f" (
         echo    %%f exists
     ) else (
         echo    %%f not found
@@ -148,20 +154,22 @@ if "%BUILD_SUCCESS%"=="true" (
 echo ============================================================
 echo.
 echo Next steps:
-echo 1. Start the development server:
-echo    npm run dev
+echo 1. Start the web development server:
+echo    npm run dev:web
+echo    (Optional) npm run dev:mobile
 echo.
 echo 2. Open your browser and navigate to:
 echo    http://localhost:3000
 echo.
 echo 3. To customize your portfolio:
-echo    - Edit src\data\positions.json with your stock positions
+echo    - Edit data\positions.json with your stock positions
 echo    - Update environment variables in .env.local if needed
 echo.
 echo Useful commands:
-echo    npm run dev         - Start development server
-echo    npm run build       - Build for production (includes tests)
-echo    npm run start       - Start production server
+echo    npm run dev:web     - Start web development server
+echo    npm run dev:mobile  - Start Expo dev server
+echo    npm run build       - Build all packages (includes tests)
+echo    npm run start       - Start production web server
 echo    npm run lint        - Run linting
 echo    npm test            - Run unit tests
 echo    npm run test:watch  - Run tests in watch mode
