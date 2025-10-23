@@ -29,14 +29,15 @@ export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
             setIsVisible(true);
             try {
                 const response = await fetch('/api/demo-status');
-                if (response.ok) {
-                    const data = await response.json();
-                    setDemoStatus(data);
-                } else {
-                    console.error('Failed to fetch demo status');
-                }
+                const data = await response.json();
+
+                // Set the status regardless of response code
+                // API will return appropriate status object
+                setDemoStatus(data);
             } catch (error) {
-                console.error('Error checking demo status:', error);
+                // Silently fail - banner just won't show
+                console.warn('[DemoBanner] Unable to fetch demo status:', error);
+                setDemoStatus(null);
             } finally {
                 setIsLoading(false);
             }

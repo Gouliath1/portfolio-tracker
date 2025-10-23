@@ -20,10 +20,11 @@ export async function GET() {
     return NextResponse.json({ positions });
   } catch (error) {
     console.error('❌ Error in positions GET:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch positions data' },
-      { status: 500 }
-    );
+    // Return empty array instead of error to prevent UI from failing
+    return NextResponse.json({
+      positions: [],
+      message: 'Unable to connect to database. Please check your configuration.'
+    });
   }
 }
 

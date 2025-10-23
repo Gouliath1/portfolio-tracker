@@ -1,8 +1,33 @@
-import { promises as fs } from 'fs';
+// Avoid static imports of Node.js modules to keep React Native compatible
 import { getFxRate, migrateFxRatesFromJson, storeFxRate } from '../database/operations/fxRateOperations';
 import { getDataPath } from '@portfolio/utils';
 
-const FX_RATES_FILE_PATH = getDataPath('fxRates.json');
+type FsPromises = any;
+
+let cachedFs: FsPromises | null | undefined;
+
+const loadFs = (): FsPromises | null => {
+  if (cachedFs !== undefined) {
+    return cachedFs;
+  }
+
+  if (typeof process === 'undefined' || !process.versions?.node) {
+    cachedFs = null;
+    return cachedFs;
+  }
+
+  try {
+    const req = Function('return require')() as NodeJS.Require;
+    cachedFs = req('fs/promises') as FsPromises;
+    return cachedFs;
+  } catch {
+    cachedFs = null;
+    return cachedFs;
+  }
+};
+
+// Lazy evaluation to avoid calling getDataPath at module load time (React Native compatibility)
+const getFxRatesFilePath = () => getDataPath('fxRates.json');
 
 export interface FxRateQueryOptions {
   date?: string;
@@ -19,8 +44,14 @@ export interface FxRateResult {
 }
 
 const readFxRatesFile = async (): Promise<Record<string, Record<string, number>> | null> => {
+  const fs = loadFs();
+  if (!fs) {
+    // In React Native environment, no file system access - return null to skip file fallback
+    return null;
+  }
+
   try {
-    const data = await fs.readFile(FX_RATES_FILE_PATH, 'utf-8');
+    const data = await fs.readFile(getFxRatesFilePath(), 'utf-8');
     return JSON.parse(data);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

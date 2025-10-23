@@ -2,20 +2,18 @@
   "name": "portfolio-tracker",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "npm@11.6.1",
-  "workspaces": {
-    "packages": [
-      "apps/*",
-      "packages/*"
-    ]
-  },
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node scripts/dev.js",
     "dev:web": "turbo run dev --filter=@portfolio/web",
     "dev:mobile": "turbo run dev --filter=@portfolio/mobile",
     "build": "turbo run build",
+    "build:packages": "turbo run build --filter=@portfolio/types --filter=@portfolio/utils --filter=@portfolio/core --filter=@portfolio/server",
+    "build:web": "turbo run build --filter=@portfolio/web",
+    "build:mobile": "turbo run build --filter=@portfolio/mobile",
     "start": "turbo run start --filter=@portfolio/web",
     "lint": "turbo run lint",
+    "prebuild:mobile": "cd apps/mobile && CI=1 EXPO_USE_STATIC=0 npx expo prebuild --clean || echo \"Skipping Expo prebuild (requires network and platform tooling).\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -43,9 +41,5 @@
     "tailwindcss": "^4",
     "turbo": "^2.1.3",
     "typescript": "^5"
-  },
-  "overrides": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
   }
 }

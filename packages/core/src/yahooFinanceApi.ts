@@ -655,9 +655,17 @@ async function getHistoricalFxRate(fxPair: string, transactionDate: string): Pro
     console.log(`🔍 getHistoricalFxRate called for ${fxPair} on ${transactionDate}`);
     try {
         // Try to read from file system first (server-side)
-        if (typeof window === 'undefined') {
+        const isNodeRuntime =
+            typeof process !== 'undefined' &&
+            typeof process.versions === 'object' &&
+            !!process.versions?.node &&
+            typeof navigator === 'undefined';
+
+        if (isNodeRuntime) {
             console.log(`📂 Running in server-side context, reading fxRates.json`);
-            const fs = await import('fs/promises');
+            // Use dynamic require to avoid Metro bundler issues in React Native
+            const req = Function('return require')() as NodeJS.Require;
+            const fs = req('fs/promises');
             const fxRatesPath = getDataPath('fxRates.json');
             const data = await fs.readFile(fxRatesPath, 'utf-8');
             const fxRates = JSON.parse(data);

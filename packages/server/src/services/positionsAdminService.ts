@@ -1,5 +1,5 @@
-import path from 'path';
-import { promises as fs } from 'fs';
+// Avoid static imports of Node.js modules to keep React Native compatible
+// Use dynamic require pattern instead
 import { RawPosition } from '@portfolio/types';
 import { getDbClient } from '../database/config';
 import {
@@ -10,7 +10,54 @@ import {
 
 import { getDataPath } from '@portfolio/utils';
 
-const POSITIONS_FILE_PATH = getDataPath('positions.json');
+type FsPromises = any;
+type PathModule = any;
+
+let cachedFs: FsPromises | null | undefined;
+let cachedPath: PathModule | null | undefined;
+
+const loadPath = (): PathModule | null => {
+  if (cachedPath !== undefined) {
+    return cachedPath;
+  }
+
+  if (typeof process === 'undefined' || !process.versions?.node) {
+    cachedPath = null;
+    return cachedPath;
+  }
+
+  try {
+    const req = Function('return require')() as NodeJS.Require;
+    cachedPath = req('path') as PathModule;
+    return cachedPath;
+  } catch {
+    cachedPath = null;
+    return cachedPath;
+  }
+};
+
+const loadFs = (): FsPromises | null => {
+  if (cachedFs !== undefined) {
+    return cachedFs;
+  }
+
+  if (typeof process === 'undefined' || !process.versions?.node) {
+    cachedFs = null;
+    return cachedFs;
+  }
+
+  try {
+    const req = Function('return require')() as NodeJS.Require;
+    cachedFs = req('fs/promises') as FsPromises;
+    return cachedFs;
+  } catch {
+    cachedFs = null;
+    return cachedFs;
+  }
+};
+
+// Lazy evaluation to avoid calling getDataPath at module load time (React Native compatibility)
+const getPositionsFilePath = () => getDataPath('positions.json');
 
 export interface PositionsFileStatus {
   hasFile: boolean;
@@ -192,8 +239,12 @@ const normalizePositionsInput = (data: unknown): RawPosition[] => {
 };
 
 export const readPositionsFromFile = async (
-  filePath: string = POSITIONS_FILE_PATH
+  filePath: string = getPositionsFilePath()
 ): Promise<RawPosition[]> => {
+  const fs = loadFs();
+  if (!fs) {
+    throw new Error('readPositionsFromFile requires Node.js environment');
+  }
   const contents = await fs.readFile(filePath, 'utf-8');
   const json = JSON.parse(contents);
   return normalizePositionsInput(json);
@@ -245,7 +296,7 @@ export const replaceActivePositionSetPositions = async (
 };
 
 export const importPositionsFromFile = async (
-  filePath: string = POSITIONS_FILE_PATH
+  filePath: string = getPositionsFilePath()
 ): Promise<PositionsImportResult> => {
   const positions = await readPositionsFromFile(filePath);
   const count = await replaceActivePositionSetPositions(positions);
@@ -253,7 +304,7 @@ export const importPositionsFromFile = async (
 };
 
 export const getPositionsFileStatus = async (
-  filePath: string = POSITIONS_FILE_PATH
+  filePath: string = getPositionsFilePath()
 ): Promise<PositionsFileStatus> => {
   try {
     const positions = await readPositionsFromFile(filePath);
@@ -276,8 +327,13 @@ export const getPositionsFileStatus = async (
 
 export const writePositionsFile = async (
   positions: RawPosition[],
-  filePath: string = POSITIONS_FILE_PATH
+  filePath: string = getPositionsFilePath()
 ): Promise<void> => {
+  const fs = loadFs();
+  const path = loadPath();
+  if (!fs || !path) {
+    throw new Error('writePositionsFile requires Node.js environment');
+  }
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const payload = JSON.stringify({ positions }, null, 2);
   await fs.writeFile(filePath, payload, 'utf-8');

@@ -1,0 +1,4 @@
+
+> @portfolio/types@0.1.0 build /Users/goul/Development/portfolio-tracker/packages/types
+> tsc -p tsconfig.build.json
+

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TimelineFilter, TIMELINE_BUTTONS } from './chartUtils';
+import { TimelineFilter, TIMELINE_BUTTONS } from '@portfolio/core';
 
 interface TimelineFilterProps {
     selectedTimeline: TimelineFilter;

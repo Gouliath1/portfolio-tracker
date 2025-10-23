@@ -15,9 +15,8 @@ import { Line } from 'react-chartjs-2';
 import { Position } from '@portfolio/types';
 
 // Chart utilities and components
-import { TimelineFilter, generateDateIntervals } from './performanceChart/chartUtils';
+import { TimelineFilter, generateDateIntervals, createChartData } from '@portfolio/core';
 import { pnlAreaPlugin } from './performanceChart/pnlAreaPlugin';
-import { createChartData } from './performanceChart/chartData';
 import { createChartOptions } from './performanceChart/chartOptions';
 import { createCustomTooltip } from './performanceChart/customTooltip';
 import { TimelineFilterButtons } from './performanceChart/TimelineFilterButtons';

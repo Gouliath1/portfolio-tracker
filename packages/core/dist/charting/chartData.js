@@ -1,65 +1,33 @@
-import { Position } from '@portfolio/types';
-import { HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
-
-export interface ChartData {
-    labels: string[];
-    datasets: Array<{
-        label: string;
-        data: number[];
-        borderColor: string;
-        backgroundColor: string;
-        tension: number;
-        fill: boolean;
-        hidden: boolean;
-        yAxisID?: string;
-        borderWidth?: number;
-        pointRadius: (context: { dataIndex: number }) => number;
-        pointHoverRadius: (context: { dataIndex: number }) => number;
-        pointBackgroundColor: string;
-        pointBorderColor: string;
-        pointBorderWidth: number;
-    }>;
-}
-
-export const createChartData = (
-    dateIntervals: Date[],
-    historicalData: HistoricalSnapshot[],
-    positions: Position[],
-    timeline: TimelineFilter,
-    showValues: boolean
-): ChartData => {
-    const valueData: number[] = [];
-    const costData: number[] = [];
-    const pnlData: number[] = [];
-    const transactionDates: boolean[] = [];
-
+import { getIntervalForTimeline, getTransactionsNearDate, } from './chartUtils';
+export const createChartData = (dateIntervals, historicalData, positions, timeline, showValues) => {
+    const valueData = [];
+    const costData = [];
+    const pnlData = [];
+    const transactionDates = [];
     const currentInterval = getIntervalForTimeline(timeline);
-
     dateIntervals.forEach((date, index) => {
         const snapshot = historicalData[index];
         const transactions = getTransactionsNearDate(positions, date, currentInterval);
         const hasTransactions = transactions.length > 0;
-        
         transactionDates.push(hasTransactions);
-        
         if (snapshot) {
             if (showValues) {
                 valueData.push(snapshot.totalValueJPY);
                 costData.push(snapshot.totalCostJPY);
                 pnlData.push(snapshot.pnlJPY);
-            } else {
-                valueData.push(0); // Hide the value line
-                costData.push(0); // Hide the cost line  
-                pnlData.push(snapshot.pnlPercentage); // Show P&L percentage
             }
-        } else {
+            else {
+                valueData.push(0);
+                costData.push(0);
+                pnlData.push(snapshot.pnlPercentage);
+            }
+        }
+        else {
             valueData.push(0);
             costData.push(0);
             pnlData.push(0);
         }
     });
-
     return {
         labels: dateIntervals.map(date => {
             switch (timeline) {
@@ -88,15 +56,11 @@ export const createChartData = (
                 tension: 0.1,
                 fill: true,
                 hidden: !showValues,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 0;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
+                pointRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 4 : 0),
+                pointHoverRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 6 : 3),
                 pointBackgroundColor: 'rgb(34, 197, 94)',
                 pointBorderColor: 'rgb(22, 163, 74)',
-                pointBorderWidth: 1
+                pointBorderWidth: 1,
             },
             {
                 label: 'Total Cost (JPY)',
@@ -106,15 +70,11 @@ export const createChartData = (
                 tension: 0.1,
                 fill: false,
                 hidden: !showValues,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 0;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
+                pointRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 4 : 0),
+                pointHoverRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 6 : 3),
                 pointBackgroundColor: 'rgb(148, 163, 184)',
                 pointBorderColor: 'rgb(100, 116, 139)',
-                pointBorderWidth: 1
+                pointBorderWidth: 1,
             },
             {
                 label: showValues ? 'P&L (JPY)' : 'P&L (%)',
@@ -126,16 +86,12 @@ export const createChartData = (
                 hidden: false,
                 yAxisID: showValues ? 'y1' : 'y',
                 borderWidth: 2,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 1;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
+                pointRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 4 : 1),
+                pointHoverRadius: ({ dataIndex }) => (transactionDates[dataIndex] ? 6 : 3),
                 pointBackgroundColor: 'rgb(0, 0, 0)',
                 pointBorderColor: 'rgb(0, 0, 0)',
-                pointBorderWidth: 1
-            }
-        ]
+                pointBorderWidth: 1,
+            },
+        ],
     };
 };

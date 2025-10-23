@@ -79,9 +79,25 @@ if %errorlevel% neq 0 (
 )
 echo ✅ Dependencies installed
 
-REM Step 3: Setup environment
+REM Step 3: Prepare Expo native projects
 echo.
-echo 3. Setting up environment
+echo 3. Preparing Expo native projects
+if exist "apps\mobile" (
+    call npm run prebuild:mobile
+    if %errorlevel% neq 0 (
+        echo ⚠️  Expo prebuild skipped (requires network access and platform tooling).
+        echo    You can run 'npm run prebuild:mobile' manually later.
+        ver >nul
+    ) else (
+        echo ✅ Expo native projects prepared
+    )
+) else (
+    echo    Skipping Expo prebuild (apps\mobile directory not found)
+)
+
+REM Step 4: Setup environment
+echo.
+echo 4. Setting up environment
 
 if not exist ".env.local" (
     echo    Creating .env.local file...
@@ -98,9 +114,9 @@ if not exist ".env.local" (
     echo    .env.local already exists
 )
 
-REM Step 4: Check data files
+REM Step 5: Check data files
 echo.
-echo 4. Checking data files
+echo 5. Checking data files
 
 if not exist "data\positions.json" (
     if exist "data\positions.template.json" (
@@ -121,9 +137,9 @@ for %%f in (positionsPrices.json) do (
     )
 )
 
-REM Step 5: Ask if user wants to build
+REM Step 6: Ask if user wants to build
 echo.
-echo 5. Build project with tests (optional)
+echo 6. Build project with tests (optional)
 
 set /p BUILD_CHOICE="Would you like to build the project now? This will run tests first. (y/N): "
 set BUILD_SUCCESS=true

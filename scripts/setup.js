@@ -136,8 +136,30 @@ function installDependencies() {
     return execCommand('npm install --legacy-peer-deps', 'Dependencies installed');
 }
 
+function prepareExpoProjects() {
+    const mobileDir = path.join('apps', 'mobile');
+    if (!fs.existsSync(mobileDir)) {
+        return true;
+    }
+
+    logStep(3, 'Preparing Expo native projects');
+    try {
+        log('   Running: npm run prebuild:mobile', 'blue');
+        execSync('npm run prebuild:mobile', {
+            stdio: 'inherit',
+            cwd: process.cwd()
+        });
+        logSuccess('Expo native projects prepared');
+        return true;
+    } catch (error) {
+        logWarning('Expo prebuild skipped (requires network access and platform tooling).');
+        log('   You can run "npm run prebuild:mobile" manually later.', 'blue');
+        return false;
+    }
+}
+
 function setupEnvironment() {
-    logStep(3, 'Setting up environment');
+    logStep(4, 'Setting up environment');
     
     // Check if .env.local exists
     if (!fs.existsSync('.env.local')) {
@@ -159,7 +181,7 @@ function setupEnvironment() {
 }
 
 function checkDataFiles() {
-    logStep(4, 'Checking data files');
+    logStep(5, 'Checking data files');
     
     const dataDir = 'data';
     
@@ -193,7 +215,7 @@ function checkDataFiles() {
 }
 
 function buildProject() {
-    logStep(5, 'Building the project with tests');
+    logStep(6, 'Building the project with tests');
     log('   Note: Build process includes running tests automatically', 'blue');
     
     return execCommand('npm run build', 'Project built successfully (tests passed)');
@@ -249,6 +271,8 @@ function main() {
             process.exit(1);
         }
         
+        prepareExpoProjects();
+
         setupEnvironment();
         checkDataFiles();
         

@@ -1,17 +1,18 @@
 import { RawPosition } from '@portfolio/types';
 
 // Function to load positions dynamically from API
+// Gracefully handles errors and returns empty array to prevent UI failures
 export async function loadPositions(): Promise<RawPosition[]> {
     try {
         const response = await fetch('/api/positions');
-        if (!response.ok) {
-            throw new Error('Failed to load positions data');
-        }
         const data = await response.json();
-        return data.positions;
+
+        // API returns {positions: [], message?: string} format
+        // Return positions array whether it's empty or has data
+        return Array.isArray(data.positions) ? data.positions : [];
     } catch (error) {
-        console.error('Error loading positions:', error);
-        // Return empty array as fallback
+        console.warn('[loadPositions] Unable to load positions, returning empty array:', error);
+        // Return empty array as fallback to prevent UI failure
         return [];
     }
 }

@@ -1,8 +1,4 @@
-import { Position } from '@portfolio/types';
-
-export type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | 'All';
-
-export const TIMELINE_BUTTONS: { key: TimelineFilter; label: string }[] = [
+export const TIMELINE_BUTTONS = [
     { key: '1D', label: '1D' },
     { key: '5D', label: '5D' },
     { key: '1M', label: '1M' },
@@ -13,13 +9,27 @@ export const TIMELINE_BUTTONS: { key: TimelineFilter; label: string }[] = [
     { key: '5Y', label: '5Y' },
     { key: 'All', label: 'All' }
 ];
-
-export const generateDateIntervals = (timeline: TimelineFilter, positions: Position[]): Date[] => {
+export const getIntervalForTimeline = (timeline) => {
+    switch (timeline) {
+        case '1D':
+            return 60 * 60 * 1000; // 1 hour
+        case '5D':
+        case '1M':
+            return 24 * 60 * 60 * 1000; // 1 day
+        case '6M':
+        case 'YTD':
+        case '1Y':
+        case '2Y':
+            return 7 * 24 * 60 * 60 * 1000; // 1 week
+        default:
+            return 30 * 24 * 60 * 60 * 1000; // 1 month
+    }
+};
+export const generateDateIntervals = (timeline, positions) => {
     const now = new Date();
-    const dates: Date[] = [];
-    let startDate: Date;
-    let interval: number; // in milliseconds
-
+    const dates = [];
+    let startDate;
+    let interval; // in milliseconds
     switch (timeline) {
         case '1D':
             startDate = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
@@ -55,33 +65,25 @@ export const generateDateIntervals = (timeline: TimelineFilter, positions: Posit
             break;
         case 'All':
         default:
-            // For 'All', use transaction dates as reference points but with regular intervals
-            const sortedPositions = [...positions].sort((a, b) => 
-                new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
-            );
-            if (sortedPositions.length === 0) return [];
-            
+            const sortedPositions = [...positions].sort((a, b) => new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime());
+            if (sortedPositions.length === 0) {
+                return [];
+            }
             startDate = new Date(sortedPositions[0].transactionDate);
             interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
             break;
     }
-
-    // Generate dates from startDate to now with the specified interval
     let currentDate = new Date(startDate);
     while (currentDate <= now) {
         dates.push(new Date(currentDate));
         currentDate = new Date(currentDate.getTime() + interval);
     }
-
-    // Always include the current date as the last point if it's not already included
     if (dates.length === 0 || dates[dates.length - 1].getTime() < now.getTime() - interval / 2) {
         dates.push(new Date(now));
     }
-
     return dates;
 };
-
-export const formatDateLabel = (date: Date, timeline: TimelineFilter): string => {
+export const formatDateLabel = (date, timeline) => {
     switch (timeline) {
         case '1D':
             return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -99,35 +101,12 @@ export const formatDateLabel = (date: Date, timeline: TimelineFilter): string =>
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
     }
 };
-
-export const getIntervalForTimeline = (timeline: TimelineFilter): number => {
-    switch (timeline) {
-        case '1D':
-            return 60 * 60 * 1000; // 1 hour
-        case '5D':
-        case '1M':
-            return 24 * 60 * 60 * 1000; // 1 day
-        case '6M':
-        case 'YTD':
-        case '1Y':
-        case '2Y':
-            return 7 * 24 * 60 * 60 * 1000; // 1 week
-        default:
-            return 30 * 24 * 60 * 60 * 1000; // 1 month
-    }
-};
-
-export const getTransactionsNearDate = (
-    positions: Position[], 
-    targetDate: Date, 
-    intervalMs: number
-): Position[] => {
+export const getTransactionsNearDate = (positions, targetDate, intervalMs) => {
     const halfInterval = intervalMs / 2;
     const startRange = new Date(targetDate.getTime() - halfInterval);
     const endRange = new Date(targetDate.getTime() + halfInterval);
-    
-    return positions.filter(pos => {
-        const posDate = new Date(pos.transactionDate);
-        return posDate >= startRange && posDate <= endRange;
+    return positions.filter(position => {
+        const positionDate = new Date(position.transactionDate);
+        return positionDate >= startRange && positionDate <= endRange;
     });
 };

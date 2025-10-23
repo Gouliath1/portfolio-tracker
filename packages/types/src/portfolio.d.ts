@@ -1,0 +1,35 @@
+export type Currency = 'JPY' | 'USD' | string;
+export interface RawPosition {
+    transactionDate: string;
+    ticker: string | number;
+    fullName: string;
+    broker?: string;
+    account: string;
+    quantity: number;
+    costPerUnit: number;
+    transactionCcy: Currency;
+    stockCcy: Currency;
+}
+export interface Position extends RawPosition {
+    currentPrice: number | null;
+    costInJPY: number;
+    currentValueJPY: number;
+    pnlJPY: number;
+    pnlPercentage: number;
+    transactionFxRate: number;
+    currentFxRate: number;
+}
+export interface PortfolioSummary {
+    totalValueJPY: number;
+    totalCostJPY: number;
+    totalPnlJPY: number;
+    totalPnlPercentage: number;
+    positions: Position[];
+}
+export interface HistoricalPortfolioSnapshot {
+    date: Date;
+    totalValueJPY: number;
+    totalCostJPY: number;
+    pnlJPY: number;
+    pnlPercentage: number;
+}

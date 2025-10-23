@@ -61,15 +61,16 @@ If you prefer to set up manually:
    cp .env.example .env.local
    ```
 
-5. **Start the development server:**
+5. **Start the development server (run commands from the repo root):**
    ```bash
-   npm run dev:web
+   npm run dev
    ```
+   _Tip: add `-- --mobile "iPhone 16 Plus"` to launch the Expo iOS simulator alongside the web app._
 
 6. **Open your browser:**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-7. **(Optional) Start the Expo mobile preview:**
+7. **(Optional) Start only the Expo mobile preview:**
    ```bash
    npm run dev:mobile
    ```
@@ -82,14 +83,18 @@ If you prefer to set up manually:
 
 ## 🛠️ Available Scripts
 
-- `npm run dev` - Run all dev targets via Turborepo (web + mobile)
-- `npm run dev:web` - Launch the Next.js web app locally
-- `npm run dev:mobile` - Launch the Expo dev server for the mobile app
-- `npm run build` - Build every workspace (tests run automatically first)
-- `npm run start` - Start the production Next.js server (`apps/web`)
-- `npm run lint` - Run linting across the monorepo
-- `npm run test` - Execute the Jest test suite
-- `npm run setup` - Cross-platform setup assistant
+_Run these from the repository root unless noted._
+
+- `npm run dev` – Start the web app; append `-- --mobile [device]` to also boot Expo (defaults to “iPhone 16 Plus”).
+- `npm run dev:web` – Launch only the Next.js web app.
+- `npm run dev:mobile` – Launch only the Expo dev server (requires simulator/device tooling).
+- `npm run build` – Run the Turborepo build pipeline for every workspace (boots the "iPhone 16 Plus" simulator before the Expo native build).
+- `npm run build:web` – Build only the Next.js app.
+- `npm run build:mobile` – Build only the Expo app (boots the "iPhone 16 Plus" simulator).
+- `npm run start` – Start the production Next.js server (`apps/web`).
+- `npm run lint` – Run linting across the monorepo.
+- `npm run test` – Execute the Jest test suite.
+- `npm run setup` – Cross-platform setup assistant.
 
 ## 📁 Project Structure
 
@@ -107,7 +112,7 @@ portfolio-tracker/
 │   │       └── utils/         # Web-only utilities
 │   └── mobile/                # Expo / React Native starter app
 │       ├── package.json       # Mobile-specific dependencies & scripts
-│       ├── App.tsx            # Example screen consuming shared logic
+│       ├── App.tsx            # Expo Router entry point
 │       ├── app.json           # Expo app manifest
 │       └── assets/            # Mobile static assets
 ├── packages/

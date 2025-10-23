@@ -25,10 +25,6 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.portfolio.tracker"
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static"
     }
   }
 }

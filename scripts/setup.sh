@@ -111,8 +111,19 @@ main() {
         fi
     fi
 
-    # Step 3: Setup environment
-    log_step "3. Setting up environment"
+    # Step 3: Prepare Expo native projects
+    if [ -d "apps/mobile" ]; then
+        log_step "3. Preparing Expo native projects"
+        if npm run prebuild:mobile >/dev/null 2>&1; then
+            log_success "Expo native projects prepared"
+        else
+            log_warning "Expo prebuild skipped (requires network access and platform tooling)."
+            log_info "You can re-run it later with 'npm run prebuild:mobile'."
+        fi
+    fi
+
+    # Step 4: Setup environment
+    log_step "4. Setting up environment"
     
     if [ ! -f ".env.local" ]; then
         log_info "Creating .env.local file..."
@@ -129,8 +140,8 @@ EOF
         log_info ".env.local already exists"
     fi
 
-    # Step 4: Check data files
-    log_step "4. Checking data files"
+    # Step 5: Check data files
+    log_step "5. Checking data files"
     
     if [ ! -f "data/positions.json" ] && [ -f "data/positions.template.json" ]; then
         log_info "Creating positions.json from template..."
@@ -149,8 +160,8 @@ EOF
         fi
     done
 
-    # Step 5: Build project (optional)
-    log_step "5. Build project with tests (optional)"
+    # Step 6: Build project (optional)
+    log_step "6. Build project with tests (optional)"
     
     build_success=true
     read -p "Would you like to build the project now? This will run tests first. (y/N): " -n 1 -r

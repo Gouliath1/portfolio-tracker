@@ -1,6 +1,5 @@
 import { Position } from '@portfolio/types';
-import { HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { HistoricalSnapshot, TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from '@portfolio/core';
 
 export const createCustomTooltip = (
     dateIntervals: Date[],

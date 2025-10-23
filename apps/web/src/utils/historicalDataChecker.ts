@@ -10,21 +10,23 @@ interface HistoricalDataStatus {
 /**
  * Check if historical data needs to be refreshed
  * This calls the server-side API to check database status
+ * Gracefully handles errors and returns safe defaults
  */
 export async function checkHistoricalDataStatus(): Promise<HistoricalDataStatus> {
     try {
         const response = await fetch('/api/historical-data/status');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
+        const data = await response.json();
+
+        // Return the data regardless of response status
+        // API will return appropriate status object
+        return data;
     } catch (error) {
-        console.error('Error checking historical data status:', error);
+        console.warn('[checkHistoricalDataStatus] Unable to check status, returning safe defaults:', error);
         return {
             needsRefresh: true,
             missingDays: 0,
             lastDataDate: null,
-            reason: 'Error checking data status'
+            reason: 'Unable to connect to server'
         };
     }
 }
@@ -53,17 +55,20 @@ export async function autoRefreshHistoricalDataIfNeeded(): Promise<boolean> {
                 'Content-Type': 'application/json',
             },
         });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+
         const result = await response.json();
-        console.log(`✅ Auto-refresh completed:`, result);
-        return true;
-        
+
+        // Check if the result indicates success
+        if (result && !result.error) {
+            console.log(`✅ Auto-refresh completed:`, result);
+            return true;
+        } else {
+            console.warn(`⚠️ Auto-refresh returned with issues:`, result);
+            return false;
+        }
+
     } catch (error) {
-        console.error('❌ Auto-refresh failed:', error);
+        console.warn('[autoRefreshHistoricalDataIfNeeded] Auto-refresh failed:', error);
         return false;
     }
 }

@@ -1,0 +1,4 @@
+
+> @portfolio/server@0.1.0 build /Users/goul/Development/portfolio-tracker/packages/server
+> tsc -p tsconfig.build.json
+

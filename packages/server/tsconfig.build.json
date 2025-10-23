@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "composite": false,
+    "skipLibCheck": false,
+    "baseUrl": ".",
+    "paths": {
+      "@portfolio/types": ["../types/dist/index"],
+      "@portfolio/types/*": ["../types/dist/*"],
+      "@portfolio/utils": ["../utils/dist/index"],
+      "@portfolio/utils/*": ["../utils/dist/*"],
+      "@portfolio/core": ["../core/dist/index"],
+      "@portfolio/core/*": ["../core/dist/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.test.*", "**/__tests__/**"]
+}

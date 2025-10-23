@@ -4,9 +4,10 @@
     "jsx": "react",
     "baseUrl": ".",
     "paths": {
-      "@portfolio/core": ["../../packages/core/src"],
-      "@portfolio/server": ["../../packages/server/src"],
-      "@portfolio/types": ["../../packages/types/src"]
+      "@portfolio/core": ["../../packages/core/dist"],
+      "@portfolio/server": ["../../packages/server/dist"],
+      "@portfolio/types": ["../../packages/types/dist"],
+      "@portfolio/utils": ["../../packages/utils/dist"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

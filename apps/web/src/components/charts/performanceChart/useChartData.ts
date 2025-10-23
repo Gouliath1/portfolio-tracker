@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, generateDateIntervals } from './chartUtils';
+import { TimelineFilter, generateDateIntervals } from '@portfolio/core';
 
 export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter) => {
     const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
