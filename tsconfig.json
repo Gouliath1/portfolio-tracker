@@ -20,21 +20,19 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@portfolio/types": ["./packages/types/src/index.ts"],
-      "@portfolio/types/*": ["./packages/types/src/*"],
-      "@portfolio/server": ["./packages/server/src/index.ts"],
-      "@portfolio/server/*": ["./packages/server/src/*"],
-      "@portfolio/core": ["./packages/core/src/index.ts"],
-      "@portfolio/core/*": ["./packages/core/src/*"]
+      "@portfolio/types": ["./src/types/index.ts"],
+      "@portfolio/types/*": ["./src/types/*"],
+      "@portfolio/server": ["./src/lib/server/index.ts"],
+      "@portfolio/server/*": ["./src/lib/server/*"],
+      "@portfolio/core": ["./src/lib/core/index.ts"],
+      "@portfolio/core/*": ["./src/lib/core/*"]
     }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "packages/**/*.ts",
-    "packages/**/*.tsx"
+    ".next/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

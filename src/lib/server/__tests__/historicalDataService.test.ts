@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
 
-jest.mock('../src/services/portfolioService', () => ({
+jest.mock('../services/portfolioService', () => ({
   getActivePositions: jest.fn(),
 }));
 
@@ -30,7 +30,7 @@ import {
   NoPositionsAvailableError,
   refreshHistoricalDataForActivePortfolio,
 } from '@portfolio/server';
-import { getActivePositions } from '../src/services/portfolioService';
+import { getActivePositions } from '../services/portfolioService';
 import { refreshAllHistoricalData, refreshFxRatesForDates } from '@portfolio/core';
 
 const mockedGetActivePositions = getActivePositions as jest.MockedFunction<typeof getActivePositions>;

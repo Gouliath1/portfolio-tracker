@@ -19,7 +19,7 @@ const config = {
     '<rootDir>/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
     '<rootDir>/src/**/__tests__/**/*.(test|spec).(js|jsx|ts|tsx)',
     '<rootDir>/src/**/*.(test|spec).(js|jsx|ts|tsx)',
-    '<rootDir>/packages/**/*.(test|spec).(js|jsx|ts|tsx)'
+    '<rootDir>/src/lib/**/*.(test|spec).(js|jsx|ts|tsx)'
   ],
   
   // Module name mapping for absolute imports
@@ -28,18 +28,18 @@ const config = {
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
     '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
     '^@/data/(.*)$': '<rootDir>/src/data/$1',
-    '^@portfolio/types$': '<rootDir>/packages/types/src/index.ts',
-    '^@portfolio/types/(.*)$': '<rootDir>/packages/types/src/$1',
-    '^@portfolio/server$': '<rootDir>/packages/server/src/index.ts',
-    '^@portfolio/server/(.*)$': '<rootDir>/packages/server/src/$1',
-    '^@portfolio/core$': '<rootDir>/packages/core/src/index.ts',
-    '^@portfolio/core/(.*)$': '<rootDir>/packages/core/src/$1',
+    '^@portfolio/types$': '<rootDir>/src/types/index.ts',
+    '^@portfolio/types/(.*)$': '<rootDir>/src/types/$1',
+    '^@portfolio/server$': '<rootDir>/src/lib/server/index.ts',
+    '^@portfolio/server/(.*)$': '<rootDir>/src/lib/server/$1',
+    '^@portfolio/core$': '<rootDir>/src/lib/core/index.ts',
+    '^@portfolio/core/(.*)$': '<rootDir>/src/lib/core/$1',
   },
   
   // Coverage configuration
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
-    'packages/**/*.{js,jsx,ts,tsx}',
+    'src/lib/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/index.ts',
     '!src/app/**/*.tsx', // Exclude Next.js app directory pages
