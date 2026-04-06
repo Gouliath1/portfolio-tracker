@@ -61,15 +61,6 @@ export default function Home() {
     loadData();
   }, []);
 
-  // // Auto-refresh every 30 seconds
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     loadData(false, false); // Regular update without force refresh
-  //   }, 30000);
-
-  //   return () => clearInterval(interval);
-  // }, []);
-
   const handleRefreshClick = async () => {
     console.log(`🔴 FULL REFRESH BUTTON CLICKED at ${new Date().toISOString()}`);
     console.log(`🔴 This will refresh both current prices AND historical data`);

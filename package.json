@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3000",
+    "dev": "next dev --turbopack",
     "dev:clean": "./scripts/startDev.sh",
     "build": "npm run test && next build",
     "start": "next start",
@@ -11,22 +11,14 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "push": "./scripts/gitPush.sh",
-    "setup": "node scripts/setup.js",
-    "setup:unix": "./scripts/setup.sh",
-    "setup:windows": "scripts/setup.bat"
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.26.0",
-    "@emotion/react": "^11.14.0",
     "@libsql/client": "^0.15.14",
     "@tanstack/react-table": "^8.21.3",
-    "@types/chart.js": "^2.9.41",
     "chart.js": "^4.4.9",
     "dotenv": "^17.2.2",
     "next": "15.3.3",
-    "next-themes": "^0.4.6",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.0.0",

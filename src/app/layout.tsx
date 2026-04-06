@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portolio Tracker",
+  title: "Portfolio Tracker",
   description: "Created by Gouliath & Co.",
 };
 
