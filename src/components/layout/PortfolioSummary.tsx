@@ -31,7 +31,7 @@ const StatCard = ({ label, value, sub, positive, flash }: StatCardProps) => {
         ? 'var(--pnl-green)'
         : positive === false
             ? 'var(--pnl-red)'
-            : 'var(--border)';
+            : 'var(--accent-glow)';
 
     const valueColor = positive === true
         ? 'var(--pnl-green)'
