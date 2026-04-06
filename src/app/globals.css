@@ -46,7 +46,7 @@
 
   /* Opaque surfaces for overlays that must not show content behind them */
   --surface-popover:  #0e0e24;
-  --surface-header:   rgba(8, 8, 20, 0.96);
+  --surface-header:   rgba(8, 8, 20, 0.75);
 }
 
 /* Light mode overrides */
@@ -94,7 +94,7 @@
 
   /* Opaque surfaces for overlays that must not show content behind them */
   --surface-popover:  #f4f5fb;
-  --surface-header:   rgba(235, 238, 252, 0.97);
+  --surface-header:   rgba(235, 238, 252, 0.78);
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
