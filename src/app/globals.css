@@ -43,6 +43,10 @@
 
   /* Table header */
   --table-header-bg:  rgba(10, 10, 30, 0.85);
+
+  /* Opaque surfaces for overlays that must not show content behind them */
+  --surface-popover:  #0e0e24;
+  --surface-header:   rgba(8, 8, 20, 0.96);
 }
 
 /* Light mode overrides */
@@ -87,6 +91,10 @@
 
   /* Table header */
   --table-header-bg:  rgba(220, 225, 245, 0.90);
+
+  /* Opaque surfaces for overlays that must not show content behind them */
+  --surface-popover:  #f4f5fb;
+  --surface-header:   rgba(235, 238, 252, 0.97);
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
@@ -132,4 +140,12 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
   font-family: var(--font-geist-mono), monospace;
+}
+
+/* ── Opaque overlay surface (dropdowns, popovers) ──────────── */
+.surface-popover {
+  background: var(--surface-popover);
+  border: 1px solid var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }

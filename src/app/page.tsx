@@ -108,7 +108,7 @@ export default function Home() {
     <>
       <main className="min-h-screen">
         {/* ── Header ───────────────────────────────────────── */}
-        <header className="glass sticky top-0 z-30 px-6 py-4">
+        <header className="sticky top-0 z-30 px-6 py-4" style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
           <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
             {/* Title */}
             <h1 className="text-xl font-semibold tracking-tight"

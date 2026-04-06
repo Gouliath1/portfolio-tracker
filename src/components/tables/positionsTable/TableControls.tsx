@@ -39,7 +39,7 @@ export const TableControls: React.FC<TableControlsProps> = ({
                 {isColumnMenuOpen && (
                     <div
                         id={ELEMENT_IDS.COLUMN_MENU}
-                        className="absolute mt-2 w-48 glass rounded-xl z-20 overflow-hidden"
+                        className="absolute mt-2 w-48 surface-popover rounded-xl z-20 overflow-hidden shadow-lg"
                         role="menu"
                         aria-labelledby={ELEMENT_IDS.COLUMN_BUTTON}
                     >
