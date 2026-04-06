@@ -17,7 +17,7 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                 style={{ width: table.getCenterTotalSize() }}
             >
                 {/* Header */}
-                <thead className="sticky top-0 z-10" style={{ background: 'rgba(10,10,30,0.85)', backdropFilter: 'blur(12px)' }}>
+                <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                     {table.getHeaderGroups().map(headerGroup => (
                         <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             {headerGroup.headers.map(header => (

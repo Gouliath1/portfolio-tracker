@@ -2,6 +2,11 @@ import { Position } from '@portfolio/types';
 import { HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
 
+const cssVar = (name: string): string => {
+    if (typeof window === 'undefined') return '';
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+};
+
 export interface ChartData {
     labels: string[];
     datasets: Array<{
@@ -83,57 +88,45 @@ export const createChartData = (
             {
                 label: showValues ? 'Total Value (JPY)' : 'P&L %',
                 data: valueData,
-                borderColor: 'rgb(0, 229, 255)',
-                backgroundColor: 'rgba(0, 229, 255, 0.07)',
+                borderColor: cssVar('--chart-line1'),
+                backgroundColor: cssVar('--chart-line1-fill'),
                 tension: 0.3,
                 fill: true,
                 hidden: !showValues,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 0;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
-                pointBackgroundColor: 'rgb(0, 229, 255)',
-                pointBorderColor: 'rgb(0, 180, 220)',
+                pointRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 4 : 0,
+                pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
+                pointBackgroundColor: cssVar('--chart-line1'),
+                pointBorderColor: cssVar('--chart-line1'),
                 pointBorderWidth: 1
             },
             {
                 label: 'Total Cost (JPY)',
                 data: costData,
-                borderColor: 'rgba(255,255,255,0.25)',
-                backgroundColor: 'rgba(255,255,255,0.03)',
+                borderColor: cssVar('--chart-line2'),
+                backgroundColor: cssVar('--chart-line2-fill'),
                 tension: 0.3,
                 fill: false,
                 hidden: !showValues,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 0;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
-                pointBackgroundColor: 'rgba(255,255,255,0.4)',
-                pointBorderColor: 'rgba(255,255,255,0.2)',
+                pointRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 4 : 0,
+                pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
+                pointBackgroundColor: cssVar('--chart-line2'),
+                pointBorderColor: cssVar('--chart-line2'),
                 pointBorderWidth: 1
             },
             {
                 label: showValues ? 'P&L (JPY)' : 'P&L (%)',
                 data: pnlData,
-                borderColor: 'rgb(0, 255, 136)',
-                backgroundColor: 'rgba(0, 255, 136, 0)',
+                borderColor: cssVar('--chart-line3'),
+                backgroundColor: 'transparent',
                 tension: 0.3,
                 fill: false,
                 hidden: false,
                 yAxisID: showValues ? 'y1' : 'y',
                 borderWidth: 2,
-                pointRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 4 : 1;
-                },
-                pointHoverRadius: (context: { dataIndex: number }) => {
-                    return transactionDates[context.dataIndex] ? 6 : 3;
-                },
-                pointBackgroundColor: 'rgb(0, 255, 136)',
-                pointBorderColor: 'rgb(0, 200, 100)',
+                pointRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 4 : 1,
+                pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
+                pointBackgroundColor: cssVar('--chart-line3'),
+                pointBorderColor: cssVar('--chart-line3'),
                 pointBorderWidth: 1
             }
         ]

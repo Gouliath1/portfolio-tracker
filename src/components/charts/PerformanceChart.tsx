@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -35,6 +36,7 @@ interface PerformanceChartProps {
 
 export const PerformanceChart = ({ positions, showValues }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
+    useTheme(); // triggers re-render on theme change so cssVar() picks up new tokens
 
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);

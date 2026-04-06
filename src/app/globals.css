@@ -29,6 +29,20 @@
 
   --scrollbar-thumb: rgba(255, 255, 255, 0.18);
   --scrollbar-track: rgba(255, 255, 255, 0.04);
+
+  /* Chart-specific */
+  --chart-grid:       rgba(255, 255, 255, 0.06);
+  --chart-tick:       rgba(255, 255, 255, 0.40);
+  --chart-title:      rgba(255, 255, 255, 0.75);
+  --chart-legend:     rgba(255, 255, 255, 0.55);
+  --chart-line1:      rgb(0, 229, 255);
+  --chart-line1-fill: rgba(0, 229, 255, 0.07);
+  --chart-line2:      rgba(255, 255, 255, 0.25);
+  --chart-line2-fill: rgba(255, 255, 255, 0.03);
+  --chart-line3:      rgb(0, 255, 136);
+
+  /* Table header */
+  --table-header-bg:  rgba(10, 10, 30, 0.85);
 }
 
 /* Light mode overrides */
@@ -59,6 +73,20 @@
 
   --scrollbar-thumb: rgba(100, 110, 180, 0.30);
   --scrollbar-track: rgba(100, 110, 180, 0.06);
+
+  /* Chart-specific */
+  --chart-grid:       rgba(100, 110, 180, 0.12);
+  --chart-tick:       rgba(15, 15, 35, 0.45);
+  --chart-title:      rgba(15, 15, 35, 0.75);
+  --chart-legend:     rgba(15, 15, 35, 0.60);
+  --chart-line1:      rgb(0, 100, 200);
+  --chart-line1-fill: rgba(0, 100, 200, 0.08);
+  --chart-line2:      rgba(15, 15, 35, 0.30);
+  --chart-line2-fill: rgba(15, 15, 35, 0.04);
+  --chart-line3:      rgb(0, 140, 70);
+
+  /* Table header */
+  --table-header-bg:  rgba(220, 225, 245, 0.90);
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
