@@ -34,14 +34,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const { fxPair, rate } = await request.json();
-        
+        const { fxPair, rate, date } = await request.json();
+
         if (!fxPair || typeof rate !== 'number') {
             return NextResponse.json({ error: 'Invalid FX pair or rate' }, { status: 400 });
         }
-        
-        // Store the FX rate in database
-        await updateFxRate(fxPair, rate);
+
+        // Store with explicit date (caller supplies today's date for current rates)
+        await updateFxRate(fxPair, rate, date);
         
         return NextResponse.json({ 
             success: true,
