@@ -8,7 +8,7 @@ interface TimelineFilterProps {
 
 export const TimelineFilterButtons: React.FC<TimelineFilterProps> = ({
     selectedTimeline,
-    onTimelineChange
+    onTimelineChange,
 }) => {
     return (
         <div className="flex flex-wrap gap-2 mb-4 justify-center">
@@ -16,11 +16,16 @@ export const TimelineFilterButtons: React.FC<TimelineFilterProps> = ({
                 <button
                     key={key}
                     onClick={() => onTimelineChange(key)}
-                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                        selectedTimeline === key
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                    style={selectedTimeline === key ? {
+                        background: 'var(--accent-dim)',
+                        color: 'var(--accent)',
+                        border: '1px solid var(--accent-glow)',
+                    } : {
+                        background: 'var(--glass-bg)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border)',
+                    }}
                 >
                     {label}
                 </button>

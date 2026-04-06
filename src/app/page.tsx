@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
@@ -11,7 +12,39 @@ import { PositionsTable } from '../components/tables/PositionsTable';
 import DemoBanner from '../components/layout/DemoBanner';
 import PositionSetManager from '../components/management/PositionSetManager';
 
+// ── Icons ────────────────────────────────────────────────────
+const SunIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  </svg>
+);
+
+const CloudOffIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+      d="M3 3l18 18M6.6 6.6A7 7 0 0118 13h1a3 3 0 01.7 5.9M9 17H5a4 4 0 01-.7-7.9A7 7 0 0112 5c.34 0 .68.02 1 .07" />
+  </svg>
+);
+
+const RefreshIcon = ({ spinning }: { spinning: boolean }) => (
+  <svg className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+// ── Component ────────────────────────────────────────────────
 export default function Home() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummaryType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,12 +52,12 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'portfolio' | 'manage'>('portfolio');
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
   const [showValues, setShowValues] = useState(() => {
-    // Initialize from localStorage, default to true
     const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
     return saved ? JSON.parse(saved) : true;
   });
 
-  // Save showValues preference to localStorage
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     localStorage.setItem('showValues', JSON.stringify(showValues));
   }, [showValues]);
@@ -32,19 +65,10 @@ export default function Home() {
   async function loadData(showRefreshing = false, forceRefresh = false) {
     if (showRefreshing) setRefreshing(true);
     try {
-      // Load positions dynamically
       const currentPositions = await loadPositions();
-      
-      // Check and auto-refresh historical data if needed (only on initial load, not forced refresh)
       if (!forceRefresh && !showRefreshing) {
-        console.log('🔍 Checking if historical data needs refresh...');
-        const wasRefreshed = await autoRefreshHistoricalDataIfNeeded();
-        if (wasRefreshed) {
-          console.log('✅ Historical data was auto-refreshed');
-        }
+        await autoRefreshHistoricalDataIfNeeded();
       }
-      
-      // Calculate portfolio summary with the loaded positions
       const summary = await calculatePortfolioSummary(currentPositions, forceRefresh);
       setPortfolioSummary(summary);
       setError(null);
@@ -56,146 +80,171 @@ export default function Home() {
     }
   }
 
-  // Initial load
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const handleRefreshClick = async () => {
-    console.log(`🔴 FULL REFRESH BUTTON CLICKED at ${new Date().toISOString()}`);
-    console.log(`🔴 This will refresh both current prices AND historical data`);
     setRefreshing(true);
-    
     try {
-      // First refresh current prices
-      await loadData(false, true); // Force refresh current prices
-      
-      // Then refresh historical data
-      console.log(`📈 Starting historical data refresh...`);
+      await loadData(false, true);
       const response = await fetch('/api/historical-data', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log(`✅ Historical refresh completed:`, result);
-      
-      // Reload the data to show updated historical prices
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       await loadData(false, false);
-      
     } catch (error) {
-      console.error('Error during refresh:', error);
       setError(error instanceof Error ? error.message : 'Failed to refresh data');
     } finally {
       setRefreshing(false);
     }
   };
 
-  if (loading) return <div className="min-h-screen p-8 bg-gray-100">Loading...</div>;
-  if (error) return <div className="min-h-screen p-8 bg-gray-100">Error: {error}</div>;
-  if (!portfolioSummary) return <div className="min-h-screen p-8 bg-gray-100">No data available</div>;
+  const hasStalePrice = portfolioSummary?.positions.some(p => p.currentPrice === null) ?? false;
+
+  // ── Loading / error states ───────────────────────────────
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="w-10 h-10 border-2 rounded-full border-t-transparent mx-auto animate-spin"
+          style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+        <p style={{ color: 'var(--text-secondary)' }}>Loading portfolio…</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center p-8">
+      <div className="glass rounded-2xl p-8 max-w-md text-center space-y-3">
+        <p style={{ color: 'var(--pnl-red)' }} className="font-semibold text-lg">Error</p>
+        <p style={{ color: 'var(--text-secondary)' }}>{error}</p>
+      </div>
+    </div>
+  );
+
+  if (!portfolioSummary) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p style={{ color: 'var(--text-secondary)' }}>No data available</p>
+    </div>
+  );
 
   return (
-    <main className="min-h-screen p-8 bg-gray-100">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Portfolio Tracker</h1>
-        <div className="flex items-center gap-4">
-          {activeTab === 'portfolio' && (
-            <>
+    <main className="min-h-screen">
+      {/* ── Header ───────────────────────────────────────── */}
+      <header className="glass sticky top-0 z-50 px-6 py-4">
+        <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
+          {/* Title */}
+          <h1 className="text-xl font-semibold tracking-tight tabular-nums"
+            style={{ color: 'var(--text-primary)' }}>
+            Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
+          </h1>
+
+          {/* Right controls */}
+          <div className="flex items-center gap-2">
+            {/* Stale price warning icon */}
+            {hasStalePrice && (
+              <div className="relative group">
+                <button
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--pnl-red)' }}
+                  aria-label="Some prices unavailable"
+                >
+                  <CloudOffIcon />
+                </button>
+                <div className="absolute right-0 top-full mt-2 w-64 glass rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                  style={{ color: 'var(--text-secondary)' }}>
+                  Some prices unavailable — showing last cached values
+                </div>
+              </div>
+            )}
+
+            {/* Show/hide values */}
+            {activeTab === 'portfolio' && (
               <button
                 onClick={() => setShowValues(!showValues)}
-                className={`px-4 py-2 rounded-lg ${
-                  showValues ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-                } text-white transition-colors`}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all glass glass-hover"
+                style={{ color: 'var(--text-secondary)' }}
               >
-                {showValues ? 'Hide Values' : 'Show Values'}
+                {showValues ? 'Hide' : 'Show'} values
               </button>
+            )}
+
+            {/* Refresh */}
+            {activeTab === 'portfolio' && (
               <button
                 onClick={handleRefreshClick}
                 disabled={refreshing}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors flex items-center gap-2"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                style={{
+                  background: 'var(--accent-dim)',
+                  color: 'var(--accent)',
+                  border: '1px solid var(--accent-glow)',
+                }}
               >
-                {refreshing ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Refreshing All Data...
-                  </>
-                ) : (
-                  'Refresh All Data'
-                )}
+                <RefreshIcon spinning={refreshing} />
+                {refreshing ? 'Refreshing…' : 'Refresh'}
               </button>
-            </>
-          )}
+            )}
+
+            {/* Theme toggle */}
+            {mounted && (
+              <button
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="p-2 rounded-lg glass glass-hover transition-all"
+                style={{ color: 'var(--text-secondary)' }}
+                aria-label="Toggle theme"
+              >
+                {resolvedTheme === 'dark' ? <SunIcon /> : <MoonIcon />}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      <DemoBanner refreshTrigger={demoBannerRefresh} />
+      {/* ── Content ──────────────────────────────────────── */}
+      <div className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
+        <DemoBanner refreshTrigger={demoBannerRefresh} />
 
-      {/* Tab Navigation */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+        {/* Tab navigation */}
+        <nav className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+          {(['portfolio', 'manage'] as const).map(tab => (
             <button
-              onClick={() => setActiveTab('portfolio')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'portfolio'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize"
+              style={activeTab === tab ? {
+                background: 'var(--accent-dim)',
+                color: 'var(--accent)',
+                border: '1px solid var(--accent-glow)',
+              } : {
+                color: 'var(--text-secondary)',
+              }}
             >
-              Portfolio Dashboard
+              {tab === 'portfolio' ? 'Dashboard' : 'Manage Sets'}
             </button>
-            <button
-              onClick={() => setActiveTab('manage')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'manage'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Manage Position Sets
-            </button>
-          </nav>
-        </div>
+          ))}
+        </nav>
+
+        {/* Tab content */}
+        {activeTab === 'portfolio' && (
+          <div className="space-y-6">
+            <PortfolioSummary summary={portfolioSummary} showValues={showValues} />
+            <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} />
+            <PositionsTable positions={portfolioSummary.positions} showValues={showValues} />
+          </div>
+        )}
+
+        {activeTab === 'manage' && (
+          <PositionSetManager
+            onPositionSetChanged={() => {
+              setPortfolioSummary(null);
+              setLoading(true);
+              setDemoBannerRefresh(prev => prev + 1);
+              loadData(true, true);
+              setActiveTab('portfolio');
+            }}
+          />
+        )}
       </div>
-
-      {/* Tab Content */}
-      {activeTab === 'portfolio' && (
-        <div className="space-y-8">
-          <PortfolioSummary summary={portfolioSummary} showValues={showValues} />
-          <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} />
-          <PositionsTable positions={portfolioSummary.positions} showValues={showValues} />
-        </div>
-      )}
-
-      {activeTab === 'manage' && (
-        <PositionSetManager 
-          onPositionSetChanged={() => {
-            // Clear existing data immediately to show loading state
-            setPortfolioSummary(null);
-            setLoading(true);
-            // Trigger demo banner refresh to show new status
-            setDemoBannerRefresh(prev => prev + 1);
-            // Refresh portfolio data when position set changes
-            loadData(true, true);
-            // Switch back to portfolio tab to see the updated data
-            setActiveTab('portfolio');
-          }}
-        />
-      )}
     </main>
   );
 }

@@ -83,9 +83,9 @@ export const createChartData = (
             {
                 label: showValues ? 'Total Value (JPY)' : 'P&L %',
                 data: valueData,
-                borderColor: 'rgb(34, 197, 94)',
-                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                tension: 0.1,
+                borderColor: 'rgb(0, 229, 255)',
+                backgroundColor: 'rgba(0, 229, 255, 0.07)',
+                tension: 0.3,
                 fill: true,
                 hidden: !showValues,
                 pointRadius: (context: { dataIndex: number }) => {
@@ -94,16 +94,16 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => {
                     return transactionDates[context.dataIndex] ? 6 : 3;
                 },
-                pointBackgroundColor: 'rgb(34, 197, 94)',
-                pointBorderColor: 'rgb(22, 163, 74)',
+                pointBackgroundColor: 'rgb(0, 229, 255)',
+                pointBorderColor: 'rgb(0, 180, 220)',
                 pointBorderWidth: 1
             },
             {
                 label: 'Total Cost (JPY)',
                 data: costData,
-                borderColor: 'rgb(148, 163, 184)',
-                backgroundColor: 'rgba(148, 163, 184, 0.1)',
-                tension: 0.1,
+                borderColor: 'rgba(255,255,255,0.25)',
+                backgroundColor: 'rgba(255,255,255,0.03)',
+                tension: 0.3,
                 fill: false,
                 hidden: !showValues,
                 pointRadius: (context: { dataIndex: number }) => {
@@ -112,16 +112,16 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => {
                     return transactionDates[context.dataIndex] ? 6 : 3;
                 },
-                pointBackgroundColor: 'rgb(148, 163, 184)',
-                pointBorderColor: 'rgb(100, 116, 139)',
+                pointBackgroundColor: 'rgba(255,255,255,0.4)',
+                pointBorderColor: 'rgba(255,255,255,0.2)',
                 pointBorderWidth: 1
             },
             {
                 label: showValues ? 'P&L (JPY)' : 'P&L (%)',
                 data: pnlData,
-                borderColor: 'rgb(0, 0, 0)',
-                backgroundColor: 'rgba(0, 0, 0, 0)',
-                tension: 0.1,
+                borderColor: 'rgb(0, 255, 136)',
+                backgroundColor: 'rgba(0, 255, 136, 0)',
+                tension: 0.3,
                 fill: false,
                 hidden: false,
                 yAxisID: showValues ? 'y1' : 'y',
@@ -132,8 +132,8 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => {
                     return transactionDates[context.dataIndex] ? 6 : 3;
                 },
-                pointBackgroundColor: 'rgb(0, 0, 0)',
-                pointBorderColor: 'rgb(0, 0, 0)',
+                pointBackgroundColor: 'rgb(0, 255, 136)',
+                pointBorderColor: 'rgb(0, 200, 100)',
                 pointBorderWidth: 1
             }
         ]

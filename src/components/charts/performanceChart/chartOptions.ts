@@ -14,8 +14,9 @@ export const createChartOptions = (
         legend: {
             position: 'top',
             labels: {
+                color: 'rgba(255,255,255,0.55)',
                 font: {
-                    size: 14
+                    size: 13
                 },
                 usePointStyle: true,
                 pointStyle: 'line',
@@ -48,11 +49,12 @@ export const createChartOptions = (
         },
         title: {
             display: true,
-            text: showValues 
-                ? `Portfolio P&L Over Time (${selectedTimeline})` 
+            text: showValues
+                ? `Portfolio P&L Over Time (${selectedTimeline})`
                 : `Portfolio Performance Over Time (${selectedTimeline})`,
+            color: 'rgba(255,255,255,0.75)',
             font: {
-                size: 16
+                size: 14
             }
         },
         tooltip: {
@@ -66,6 +68,7 @@ export const createChartOptions = (
             position: 'left',
             beginAtZero: true,
             ticks: {
+                color: 'rgba(255,255,255,0.40)',
                 callback: function(value) {
                     if (typeof value === 'number') {
                         if (showValues) {
@@ -77,11 +80,11 @@ export const createChartOptions = (
                     return value;
                 },
                 font: {
-                    size: 12
+                    size: 11
                 }
             },
             grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
+                color: 'rgba(255,255,255,0.06)'
             }
         },
         y1: {
@@ -92,11 +95,13 @@ export const createChartOptions = (
             title: {
                 display: true,
                 text: 'P&L (JPY)',
+                color: 'rgba(255,255,255,0.40)',
                 font: {
-                    size: 12
+                    size: 11
                 }
             },
             ticks: {
+                color: 'rgba(255,255,255,0.40)',
                 callback: function(value) {
                     if (typeof value === 'number') {
                         const sign = value >= 0 ? '+' : '';
@@ -105,7 +110,7 @@ export const createChartOptions = (
                     return value;
                 },
                 font: {
-                    size: 12
+                    size: 11
                 }
             },
             grid: {
@@ -114,11 +119,12 @@ export const createChartOptions = (
         },
         x: {
             grid: {
-                color: 'rgba(0, 0, 0, 0.1)'
+                color: 'rgba(255,255,255,0.06)'
             },
             ticks: {
+                color: 'rgba(255,255,255,0.40)',
                 font: {
-                    size: 12
+                    size: 11
                 }
             }
         }

@@ -14,7 +14,6 @@ import {
 import { Line } from 'react-chartjs-2';
 import { Position } from '@portfolio/types';
 
-// Chart utilities and components
 import { TimelineFilter, generateDateIntervals } from './performanceChart/chartUtils';
 import { pnlAreaPlugin } from './performanceChart/pnlAreaPlugin';
 import { createChartData } from './performanceChart/chartData';
@@ -24,16 +23,9 @@ import { TimelineFilterButtons } from './performanceChart/TimelineFilterButtons'
 import { LoadingState, ErrorState, NoDataState } from './performanceChart/ChartStates';
 import { useChartData } from './performanceChart/useChartData';
 
-// Register Chart.js components and plugins
 ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    pnlAreaPlugin
+    CategoryScale, LinearScale, PointElement, LineElement,
+    Title, Tooltip, Legend, pnlAreaPlugin
 );
 
 interface PerformanceChartProps {
@@ -43,44 +35,31 @@ interface PerformanceChartProps {
 
 export const PerformanceChart = ({ positions, showValues }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
-    
+
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline);
-    
-    // Generate date intervals and chart data
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
     const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues);
-    
-    // Create chart options with custom tooltip
+
     const options = createChartOptions(showValues, selectedTimeline);
     options.plugins!.tooltip = {
         enabled: false,
-        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues)
+        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues),
     };
 
     const renderChart = () => {
-        if (isLoading) {
-            return <LoadingState />;
-        }
-        
-        if (error) {
-            return <ErrorState error={error} />;
-        }
-        
-        if (dateIntervals.length === 0 || historicalData.length === 0) {
-            return <NoDataState />;
-        }
-        
+        if (isLoading) return <LoadingState />;
+        if (error) return <ErrorState error={error} />;
+        if (dateIntervals.length === 0 || historicalData.length === 0) return <NoDataState />;
         return <Line data={chartData} options={options} />;
     };
 
     return (
-        <div className="w-full bg-white p-4 rounded-lg shadow">
+        <div className="glass rounded-2xl p-6">
             <TimelineFilterButtons
                 selectedTimeline={selectedTimeline}
                 onTimelineChange={setSelectedTimeline}
             />
-            
-            <div style={{ height: '450px' }}>
+            <div style={{ height: '420px' }}>
                 {renderChart()}
             </div>
         </div>

@@ -1,8 +1,3 @@
-/**
- * Table controls component for column visibility and filtering
- * Provides UI controls for managing table display options
- */
-
 import React from 'react';
 import { Table } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
@@ -17,11 +12,6 @@ interface TableControlsProps {
     handleColumnMenuKeyDown: (event: React.KeyboardEvent) => void;
 }
 
-/**
- * Renders the table control interface including column visibility menu and filter input
- * @param props - Component props containing table instance and state handlers
- * @returns JSX element with column menu and filter controls
- */
 export const TableControls: React.FC<TableControlsProps> = ({
     table,
     filterText,
@@ -31,57 +21,56 @@ export const TableControls: React.FC<TableControlsProps> = ({
     handleColumnMenuKeyDown,
 }) => {
     return (
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            {/* Column Visibility Menu */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            {/* Column visibility */}
             <div className="relative">
                 <button
                     id={ELEMENT_IDS.COLUMN_BUTTON}
                     onClick={() => setIsColumnMenuOpen(!isColumnMenuOpen)}
                     onKeyDown={handleColumnMenuKeyDown}
-                    className="px-4 py-2 text-gray-900 bg-white border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 rounded-lg text-sm glass glass-hover transition-all"
+                    style={{ color: 'var(--text-secondary)' }}
                     aria-expanded={isColumnMenuOpen}
                     aria-controls={ELEMENT_IDS.COLUMN_MENU}
                 >
                     Columns
                 </button>
-                
+
                 {isColumnMenuOpen && (
                     <div
                         id={ELEMENT_IDS.COLUMN_MENU}
-                        className="absolute mt-2 w-48 bg-white border rounded-lg shadow-lg z-10"
+                        className="absolute mt-2 w-48 glass rounded-xl z-20 overflow-hidden"
                         role="menu"
                         aria-labelledby={ELEMENT_IDS.COLUMN_BUTTON}
                     >
                         <div className="py-1">
-                            {/* Show All Button */}
                             <button
-                                className="w-full px-4 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                                className="w-full px-4 py-2 text-left text-xs glass-hover transition-colors"
+                                style={{ color: 'var(--text-secondary)' }}
                                 onClick={() => table.toggleAllColumnsVisible(true)}
                             >
-                                Show All
+                                Show all
                             </button>
-                            
-                            {/* Hide All Button */}
                             <button
-                                className="w-full px-4 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                                className="w-full px-4 py-2 text-left text-xs glass-hover transition-colors"
+                                style={{ color: 'var(--text-secondary)' }}
                                 onClick={() => table.toggleAllColumnsVisible(false)}
                             >
-                                Hide All
+                                Hide all
                             </button>
-                            
-                            <div className="h-px bg-gray-200 my-1" />
-                            
-                            {/* Individual Column Toggles */}
+                            <div className="h-px my-1" style={{ background: 'var(--border)' }} />
                             {table.getAllColumns().map(column => (
                                 <label
                                     key={column.id}
-                                    className="flex items-center px-4 py-2 text-gray-900 hover:bg-gray-100 cursor-pointer"
+                                    className="flex items-center px-4 py-2 text-xs cursor-pointer glass-hover transition-colors"
+                                    style={{ color: 'var(--text-secondary)' }}
                                 >
                                     <input
                                         type="checkbox"
                                         checked={column.getIsVisible()}
                                         onChange={column.getToggleVisibilityHandler()}
-                                        className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        className="mr-2"
+                                        style={{ accentColor: 'var(--accent)' }}
                                     />
                                     {String(column.columnDef.header)}
                                 </label>
@@ -90,14 +79,20 @@ export const TableControls: React.FC<TableControlsProps> = ({
                     </div>
                 )}
             </div>
-            
-            {/* Filter Input */}
+
+            {/* Filter */}
             <input
                 type="text"
-                placeholder="Filter by ticker, name, or account..."
-                className="w-full sm:w-auto px-4 py-2 text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Filter by ticker, name, account…"
+                className="w-full sm:w-72 px-4 py-2 rounded-lg text-sm glass outline-none transition-all"
+                style={{
+                    color: 'var(--text-primary)',
+                    caretColor: 'var(--accent)',
+                }}
                 value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
+                onChange={e => setFilterText(e.target.value)}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent-glow)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
             />
         </div>
     );

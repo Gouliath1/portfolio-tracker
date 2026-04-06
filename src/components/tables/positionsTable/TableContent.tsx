@@ -1,8 +1,3 @@
-/**
- * Table content component for rendering the actual data table
- * Handles the table structure, headers, rows, and interactions
- */
-
 import React from 'react';
 import { flexRender, Table } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
@@ -11,68 +6,71 @@ interface TableContentProps {
     table: Table<Position>;
 }
 
-/**
- * Renders the main table content with headers, rows, and resize handles
- * Includes sticky headers, hover effects, and column resizing functionality
- * @param props - Component props containing the configured table instance
- * @returns JSX element with the complete table structure
- */
 export const TableContent: React.FC<TableContentProps> = ({ table }) => {
     return (
-        <div className="overflow-auto border rounded-lg h-[calc(100vh-280px)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-gray-100">
-            <table 
-                className="min-w-full divide-y divide-gray-200 table-fixed" 
+        <div
+            className="overflow-auto rounded-xl h-[calc(100vh-320px)]"
+            style={{ border: '1px solid var(--border)' }}
+        >
+            <table
+                className="min-w-full table-fixed"
                 style={{ width: table.getCenterTotalSize() }}
             >
-                {/* Table Header */}
-                <thead className="bg-gray-50 sticky top-0 z-10">
+                {/* Header */}
+                <thead className="sticky top-0 z-10" style={{ background: 'rgba(10,10,30,0.85)', backdropFilter: 'blur(12px)' }}>
                     {table.getHeaderGroups().map(headerGroup => (
-                        <tr key={headerGroup.id}>
+                        <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             {headerGroup.headers.map(header => (
                                 <th
                                     key={header.id}
-                                    className="relative px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider cursor-pointer select-none"
+                                    className="relative px-4 py-3 text-left text-xs font-medium uppercase tracking-widest cursor-pointer select-none"
+                                    style={{ color: 'var(--text-muted)', width: header.getSize() }}
                                     onClick={header.column.getToggleSortingHandler()}
-                                    style={{ width: header.getSize() }}
                                 >
-                                    {/* Header Content with Sort Indicator */}
                                     <div className="flex items-center justify-between w-full">
                                         <span className="flex-1 min-w-0 pr-1">
                                             {flexRender(header.column.columnDef.header, header.getContext())}
                                         </span>
-                                        <span className="ml-1 inline-block min-w-[16px] flex-shrink-0">
-                                            {{
-                                                asc: '↑',
-                                                desc: '↓',
-                                            }[header.column.getIsSorted() as string] ?? ''}
+                                        <span className="ml-1 inline-block min-w-[14px] flex-shrink-0"
+                                            style={{ color: 'var(--accent)' }}>
+                                            {{ asc: '↑', desc: '↓' }[header.column.getIsSorted() as string] ?? ''}
                                         </span>
                                     </div>
-                                    
-                                    {/* Column Resize Handle */}
+                                    {/* Resize handle */}
                                     <div
                                         onMouseDown={header.getResizeHandler()}
                                         onTouchStart={header.getResizeHandler()}
-                                        className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none opacity-0 hover:opacity-100 transition-opacity group ${
-                                            header.column.getIsResizing() ? 'opacity-100 bg-blue-500' : ''
+                                        className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none opacity-0 hover:opacity-100 transition-opacity ${
+                                            header.column.getIsResizing() ? 'opacity-100' : ''
                                         }`}
                                     >
-                                        <div className="absolute right-[3px] h-full w-px bg-gray-300 group-hover:bg-blue-500 transition-colors" />
+                                        <div className="absolute right-[3px] h-full w-px"
+                                            style={{ background: header.column.getIsResizing() ? 'var(--accent)' : 'var(--border)' }} />
                                     </div>
                                 </th>
                             ))}
                         </tr>
                     ))}
                 </thead>
-                
-                {/* Table Body */}
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {table.getRowModel().rows.map(row => (
-                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+
+                {/* Body */}
+                <tbody>
+                    {table.getRowModel().rows.map((row, i) => (
+                        <tr
+                            key={row.id}
+                            className="transition-colors group"
+                            style={{
+                                borderBottom: '1px solid var(--border)',
+                                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)')}
+                        >
                             {row.getVisibleCells().map(cell => (
                                 <td
                                     key={cell.id}
-                                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate"
-                                    style={{ width: cell.column.getSize() }}
+                                    className="px-4 py-3 text-sm truncate tabular-nums"
+                                    style={{ color: 'var(--text-primary)', width: cell.column.getSize() }}
                                 >
                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                 </td>
@@ -81,11 +79,10 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                     ))}
                 </tbody>
             </table>
-            
-            {/* Empty State */}
+
             {table.getRowModel().rows.length === 0 && (
-                <div className="text-center py-4 text-gray-500">
-                    No positions match your filter criteria
+                <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    No positions match your filter
                 </div>
             )}
         </div>

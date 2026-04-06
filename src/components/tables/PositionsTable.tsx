@@ -90,7 +90,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
     });
 
     return (
-        <div className="space-y-4 h-full">
+        <div className="glass rounded-2xl p-6 space-y-4 h-full">
             {/* Table Controls */}
             <TableControls
                 table={table}
