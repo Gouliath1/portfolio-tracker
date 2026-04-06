@@ -3,8 +3,8 @@ import { getCachedFxRate, updateFxRateCache } from './fxRateCache';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Portfolio configuration
-const BASE_CURRENCY = 'JPY'; // The base currency for portfolio valuation
+// Portfolio configuration – kept as default fallback only; callers should pass baseCurrency explicitly
+const BASE_CURRENCY = 'JPY';
 
 // Queue for rate limiting
 let lastRequestTime = 0;
@@ -363,7 +363,7 @@ function getTransactionDates(positions: (Position | RawPosition)[]): string[] {
 }
 
 // Function to refresh FX rates for all available dates
-export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[date: string]: number}}, positions: (Position | RawPosition)[]): Promise<{[fxPair: string]: {[date: string]: number} | null}> {
+export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[date: string]: number}}, positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): Promise<{[fxPair: string]: {[date: string]: number} | null}> {
     const results: {[fxPair: string]: {[date: string]: number} | null} = {};
 
     const priceDates = new Set<string>();
@@ -381,7 +381,7 @@ export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[dat
         return results;
     }
 
-    const fxPairs = getRequiredFxPairs(positions);
+    const fxPairs = getRequiredFxPairs(positions, baseCurrency);
 
     if (fxPairs.length === 0) {
         return results;
@@ -400,10 +400,10 @@ export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[dat
 }
 
 // Function to refresh current FX rates for required pairs
-export async function refreshCurrentFxRates(positions: (Position | RawPosition)[]): Promise<{[fxPair: string]: number | null}> {
+export async function refreshCurrentFxRates(positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): Promise<{[fxPair: string]: number | null}> {
     const results: {[fxPair: string]: number | null} = {};
 
-    const fxPairs = getRequiredFxPairs(positions);
+    const fxPairs = getRequiredFxPairs(positions, baseCurrency);
 
     if (fxPairs.length === 0) {
         return results;
@@ -422,18 +422,18 @@ export async function refreshCurrentFxRates(positions: (Position | RawPosition)[
 }
 
 // Utility function to get required FX pairs from positions
-function getRequiredFxPairs(positions: (Position | RawPosition)[]): string[] {
+function getRequiredFxPairs(positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): string[] {
     const uniqueCurrencies = new Set<string>();
 
     for (const position of positions) {
-        if (position.transactionCcy && position.transactionCcy !== BASE_CURRENCY) {
+        if (position.transactionCcy && position.transactionCcy !== baseCurrency) {
             uniqueCurrencies.add(position.transactionCcy);
         }
     }
 
     const fxPairs: string[] = [];
     for (const currency of uniqueCurrencies) {
-        fxPairs.push(`${currency}${BASE_CURRENCY}`);
+        fxPairs.push(`${currency}${baseCurrency}`);
     }
 
     return fxPairs;
@@ -446,11 +446,11 @@ function getYahooFxSymbol(fxPair: string): string {
 }
 
 // Utility function to get FX pair for a position
-export function getFxPairForPosition(position: Position | RawPosition): string | null {
-    if (!position.transactionCcy || position.transactionCcy === BASE_CURRENCY) {
+export function getFxPairForPosition(position: Position | RawPosition, baseCurrency: string = BASE_CURRENCY): string | null {
+    if (!position.transactionCcy || position.transactionCcy === baseCurrency) {
         return null;
     }
-    return `${position.transactionCcy}${BASE_CURRENCY}`;
+    return `${position.transactionCcy}${baseCurrency}`;
 }
 
 // Helper function to get current FX rate for a pair
@@ -504,15 +504,15 @@ async function getHistoricalFxRate(fxPair: string, transactionDate: string): Pro
 }
 
 // Utility function to convert amount to base currency using direct FX rates
-export async function convertToJPY(amount: number, position: Position | RawPosition, isHistorical: boolean = false): Promise<{ convertedAmount: number, effectiveRate: number, rates: { [pair: string]: number } }> {
-    if (position.transactionCcy === BASE_CURRENCY) {
+export async function convertToBaseCurrency(amount: number, position: Position | RawPosition, isHistorical: boolean = false, baseCurrency: string = BASE_CURRENCY): Promise<{ convertedAmount: number, effectiveRate: number, rates: { [pair: string]: number } }> {
+    if (position.transactionCcy === baseCurrency) {
         return { convertedAmount: amount, effectiveRate: 1, rates: {} };
     }
 
     const rates: { [pair: string]: number } = {};
     const transactionDate = position.transactionDate?.replace(/\//g, '-');
 
-    const directPair = `${position.transactionCcy}${BASE_CURRENCY}`;
+    const directPair = `${position.transactionCcy}${baseCurrency}`;
     let directRate: number;
 
     if (isHistorical && transactionDate) {
@@ -521,7 +521,7 @@ export async function convertToJPY(amount: number, position: Position | RawPosit
         directRate = await getCurrentFxRate(directPair);
     }
 
-    const directPairName = `${position.transactionCcy}/${BASE_CURRENCY}`;
+    const directPairName = `${position.transactionCcy}/${baseCurrency}`;
     rates[directPairName] = directRate;
 
     return {
@@ -531,7 +531,10 @@ export async function convertToJPY(amount: number, position: Position | RawPosit
     };
 }
 
-// Export BASE_CURRENCY for use in other modules
+/** @deprecated use convertToBaseCurrency */
+export const convertToJPY = convertToBaseCurrency;
+
+// Export BASE_CURRENCY_CONSTANT kept for backward-compat; prefer passing baseCurrency explicitly
 export const BASE_CURRENCY_CONSTANT = BASE_CURRENCY;
 
 async function fetchWithRetry(url: string, retries = 3, baseDelay = 1000): Promise<Response> {

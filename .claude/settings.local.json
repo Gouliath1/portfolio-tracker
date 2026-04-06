@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(cp /c/Users/N200948/Development/portfolio-tracker/packages/types/src/*.ts /c/Users/N200948/Development/portfolio-tracker/src/types/)",
+      "Bash(cp /c/Users/N200948/Development/portfolio-tracker/packages/core/src/*.ts /c/Users/N200948/Development/portfolio-tracker/src/lib/core/)",
+      "Bash(cp /c/Users/N200948/Development/portfolio-tracker/packages/server/src/*.ts /c/Users/N200948/Development/portfolio-tracker/src/lib/server/)",
+      "Bash(cp /c/Users/N200948/Development/portfolio-tracker/packages/server/src/database/*.ts /c/Users/N200948/Development/portfolio-tracker/src/lib/server/database/)",
+      "Bash(cp /c/Users/N200948/Development/portfolio-tracker/packages/server/src/database/operations/*.ts /c/Users/N200948/Development/portfolio-tracker/src/lib/server/database/operations/)",
+      "Bash(grep:*)",
+      "Bash(npm test:*)",
+      "Bash(git stash:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

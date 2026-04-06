@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
@@ -10,6 +10,7 @@ import { PerformanceChart } from '../components/charts/PerformanceChart';
 import { PositionsTable } from '../components/tables/PositionsTable';
 import DemoBanner from '../components/layout/DemoBanner';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
+import { useBaseCurrency } from '../hooks/useBaseCurrency';
 import { MdCloudOff, MdRefresh, MdSettings } from 'react-icons/md';
 
 // ── Component ────────────────────────────────────────────────
@@ -26,20 +27,22 @@ export default function Home() {
     return saved ? JSON.parse(saved) : true;
   });
 
+  const { currency, setCurrency, symbol, formatValue } = useBaseCurrency();
+
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     localStorage.setItem('showValues', JSON.stringify(showValues));
   }, [showValues]);
 
-  async function loadData(showRefreshing = false, forceRefresh = false) {
+  const loadData = useCallback(async (showRefreshing = false, forceRefresh = false, baseCurrency = currency) => {
     if (showRefreshing) setRefreshing(true);
     try {
       const currentPositions = await loadPositions();
       if (!forceRefresh && !showRefreshing) {
         await autoRefreshHistoricalDataIfNeeded();
       }
-      const summary = await calculatePortfolioSummary(currentPositions, forceRefresh);
+      const summary = await calculatePortfolioSummary(currentPositions, forceRefresh, baseCurrency);
       setPortfolioSummary(summary);
       setError(null);
     } catch (err) {
@@ -48,9 +51,9 @@ export default function Home() {
       setLoading(false);
       if (showRefreshing) setRefreshing(false);
     }
-  }
+  }, [currency]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleRefreshClick = async () => {
     setRefreshing(true);
@@ -62,8 +65,8 @@ export default function Home() {
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       await loadData(false, false);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to refresh data');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh data');
     } finally {
       setRefreshing(false);
     }
@@ -74,6 +77,13 @@ export default function Home() {
     setLoading(true);
     setDemoBannerRefresh(prev => prev + 1);
     loadData(true, true);
+  };
+
+  const handleCurrencyChange = (next: Parameters<typeof setCurrency>[0]) => {
+    setCurrency(next);
+    setPortfolioSummary(null);
+    setLoading(true);
+    loadData(false, false, next);
   };
 
   const hasStalePrice = portfolioSummary?.positions.some(p => p.currentPrice === null) ?? false;
@@ -118,6 +128,12 @@ export default function Home() {
 
             {/* Right controls */}
             <div className="flex items-center gap-2">
+              {/* Active currency badge */}
+              <span className="px-2 py-1 rounded-md text-xs font-mono font-semibold"
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                {currency}
+              </span>
+
               {/* Stale price warning */}
               {hasStalePrice && (
                 <div className="relative group">
@@ -175,9 +191,9 @@ export default function Home() {
         {/* ── Content ──────────────────────────────────────── */}
         <div className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
           <DemoBanner refreshTrigger={demoBannerRefresh} />
-          <PortfolioSummary summary={portfolioSummary} showValues={showValues} />
-          <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} />
-          <PositionsTable positions={portfolioSummary.positions} showValues={showValues} />
+          <PortfolioSummary summary={portfolioSummary} showValues={showValues} symbol={symbol} formatValue={formatValue} />
+          <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} currency={currency} symbol={symbol} />
+          <PositionsTable positions={portfolioSummary.positions} showValues={showValues} baseCurrency={currency} />
         </div>
       </main>
 
@@ -186,6 +202,8 @@ export default function Home() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onPositionSetChanged={handlePositionSetChanged}
+        currency={currency}
+        onCurrencyChange={handleCurrencyChange}
       />
     </>
   );

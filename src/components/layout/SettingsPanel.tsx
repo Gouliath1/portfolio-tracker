@@ -4,25 +4,26 @@ import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { MdClose, MdLightMode, MdDarkMode } from 'react-icons/md';
 import PositionSetManager from '../management/PositionSetManager';
+import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
 
 interface SettingsPanelProps {
     open: boolean;
     onClose: () => void;
     onPositionSetChanged: () => void;
+    currency: BaseCurrency;
+    onCurrencyChange: (currency: BaseCurrency) => void;
 }
 
-export const SettingsPanel = ({ open, onClose, onPositionSetChanged }: SettingsPanelProps) => {
+export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, onCurrencyChange }: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const panelRef = useRef<HTMLDivElement>(null);
 
-    // Close on Escape key
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
     }, [onClose]);
 
-    // Lock body scroll when open
     useEffect(() => {
         document.body.style.overflow = open ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
@@ -52,10 +53,8 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged }: SettingsP
                 className="fixed top-0 right-0 h-full z-50 flex flex-col"
                 style={{
                     width: 'min(480px, 100vw)',
-                    background: 'var(--glass-bg)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    borderLeft: '1px solid var(--glass-border)',
+                    background: 'var(--surface-popover)',
+                    borderLeft: '1px solid var(--border)',
                     transform: open ? 'translateX(0)' : 'translateX(100%)',
                     transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: open ? '-8px 0 32px rgba(0,0,0,0.4)' : 'none',
@@ -86,6 +85,8 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged }: SettingsP
                             style={{ color: 'var(--text-muted)' }}>
                             Appearance
                         </h3>
+
+                        {/* Theme */}
                         <div className="glass rounded-xl p-4 flex items-center justify-between gap-4">
                             <div>
                                 <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Theme</p>
@@ -104,6 +105,37 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged }: SettingsP
                                     : <><MdDarkMode size={16} /> Dark</>
                                 }
                             </button>
+                        </div>
+
+                        {/* Base currency */}
+                        <div className="glass rounded-xl p-4 space-y-3">
+                            <div>
+                                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Base Currency</p>
+                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                    All portfolio values are converted to this currency. Changing it recalculates everything using live FX rates.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                                {SUPPORTED_BASE_CURRENCIES.map(c => (
+                                    <button
+                                        key={c.code}
+                                        onClick={() => onCurrencyChange(c.code)}
+                                        className="flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-medium transition-all"
+                                        style={currency === c.code ? {
+                                            background: 'var(--accent-dim)',
+                                            color: 'var(--accent)',
+                                            border: '1px solid var(--accent-glow)',
+                                        } : {
+                                            background: 'var(--glass-bg)',
+                                            color: 'var(--text-secondary)',
+                                            border: '1px solid var(--border)',
+                                        }}
+                                    >
+                                        <span className="text-lg font-semibold">{c.symbol}</span>
+                                        <span>{c.code}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </section>
 

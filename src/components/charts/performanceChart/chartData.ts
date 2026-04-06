@@ -32,7 +32,8 @@ export const createChartData = (
     historicalData: HistoricalSnapshot[],
     positions: Position[],
     timeline: TimelineFilter,
-    showValues: boolean
+    showValues: boolean,
+    currency: string = 'JPY'
 ): ChartData => {
     const valueData: number[] = [];
     const costData: number[] = [];
@@ -86,7 +87,7 @@ export const createChartData = (
         }),
         datasets: [
             {
-                label: showValues ? 'Total Value (JPY)' : 'P&L %',
+                label: showValues ? `Total Value (${currency})` : 'P&L %',
                 data: valueData,
                 borderColor: cssVar('--chart-line1'),
                 backgroundColor: cssVar('--chart-line1-fill'),
@@ -100,7 +101,7 @@ export const createChartData = (
                 pointBorderWidth: 1
             },
             {
-                label: 'Total Cost (JPY)',
+                label: `Total Cost (${currency})`,
                 data: costData,
                 borderColor: cssVar('--chart-line2'),
                 backgroundColor: cssVar('--chart-line2-fill'),
@@ -114,7 +115,7 @@ export const createChartData = (
                 pointBorderWidth: 1
             },
             {
-                label: showValues ? 'P&L (JPY)' : 'P&L (%)',
+                label: showValues ? `P&L (${currency})` : 'P&L (%)',
                 data: pnlData,
                 borderColor: cssVar('--chart-line3'),
                 backgroundColor: 'transparent',

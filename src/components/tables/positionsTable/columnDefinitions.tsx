@@ -6,9 +6,7 @@
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
-import { calculateAnnualizedReturn } from '@portfolio/core';
-import { formatBrokerDisplay } from '@portfolio/core';
-import { BASE_CURRENCY_CONSTANT } from '@portfolio/core';
+import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
 
@@ -100,27 +98,27 @@ export function createTableColumns() {
          * Calculates and displays the unit price at time of purchase
          */
         columnHelper.accessor('costPerUnit', {
-            header: 'Orig Unit Price (JPY)',
+            header: 'Orig Unit Price',
             size: 120,
             cell: props => {
                 const row = props.row.original;
-                const costPerUnitJPY = row.costInJPY / row.quantity;
-                return formatCurrencyValue(costPerUnitJPY, 'JPY', props.table.options.meta?.showValues ?? false);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                const costPerUnitBase = row.costInJPY / row.quantity;
+                return formatCurrencyValue(costPerUnitBase, baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
 
         /**
-         * Total original position value in JPY
-         * Shows the total amount invested in this position
+         * Total original position value in base currency
          */
         columnHelper.accessor(row => row.costPerUnit * row.quantity, {
             id: 'totalCost',
-            header: 'Orig Position (JPY)',
+            header: 'Orig Position',
             size: 120,
             cell: props => {
-                const row = props.row.original;
-                const value = row.costInJPY;
-                return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                const value = props.row.original.costInJPY;
+                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
 
@@ -135,23 +133,23 @@ export function createTableColumns() {
                 const value = props.getValue();
                 const row = props.row.original;
                 
-                // Show N/A for JPY positions (no FX conversion needed)
-                if (row.transactionCcy === 'JPY') {
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+
+                // Show N/A when transaction currency matches base currency (no FX conversion)
+                if (row.transactionCcy === baseCcy) {
                     return <span className="text-gray-400">N/A</span>;
                 }
-                
+
                 // Create Yahoo Finance historical FX rate URL
                 const getYahooFxUrl = (fromCcy: string, toCcy: string, date: string) => {
-                    // Convert date from YYYY-MM-DD to timestamp for Yahoo Finance
                     const transactionDate = new Date(date);
                     const unixTimestamp = Math.floor(transactionDate.getTime() / 1000);
                     const nextDay = Math.floor((transactionDate.getTime() + 24 * 60 * 60 * 1000) / 1000);
-                    
                     return `https://finance.yahoo.com/quote/${fromCcy}${toCcy}=X/history?period1=${unixTimestamp}&period2=${nextDay}&interval=1d`;
                 };
-                
-                const fxPair = `${row.transactionCcy}JPY`;
-                const yahooUrl = getYahooFxUrl(row.transactionCcy, 'JPY', row.transactionDate);
+
+                const fxPair = `${row.transactionCcy}${baseCcy}`;
+                const yahooUrl = getYahooFxUrl(row.transactionCcy, baseCcy, row.transactionDate);
                 
                 if (!props.table.options.meta?.showValues) {
                     return getHiddenValue(value);
@@ -205,27 +203,23 @@ export function createTableColumns() {
          * Only shown for non-JPY stocks
          */
         columnHelper.accessor('currentFxRate', {
-            header: 'Curr FX Rate (Stock-JPY)',
+            header: 'Curr FX Rate (Stock-Base)',
             size: 140,
             cell: props => {
                 const value = props.getValue();
                 const row = props.row.original;
-                
-                if (row.stockCcy === BASE_CURRENCY_CONSTANT) {
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+
+                if (row.stockCcy === baseCcy) {
                     return <span className="text-gray-400">N/A</span>;
                 }
-                
+
                 if (!props.table.options.meta?.showValues) {
                     return getHiddenValue(value);
                 }
-                
-                // Create Yahoo Finance current FX rate URL
-                const getCurrentYahooFxUrl = (fromCcy: string, toCcy: string) => {
-                    return `https://finance.yahoo.com/quote/${fromCcy}${toCcy}=X`;
-                };
-                
-                const fxPair = `${row.stockCcy}JPY`;
-                const yahooUrl = getCurrentYahooFxUrl(row.stockCcy, 'JPY');
+
+                const fxPair = `${row.stockCcy}${baseCcy}`;
+                const yahooUrl = `https://finance.yahoo.com/quote/${fxPair}=X`;
                 
                 return (
                     <div className="flex items-center gap-2">
@@ -249,30 +243,30 @@ export function createTableColumns() {
          * Shows the current market value of the position
          */
         columnHelper.accessor('currentValueJPY', {
-            header: 'Curr Value (JPY)',
+            header: 'Curr Value',
             size: 130,
             cell: props => {
                 if (props.row.original.currentPrice === null) {
                     return <span className="text-gray-400">Loading...</span>;
                 }
-                const value = props.getValue();
-                return formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                return formatCurrencyValue(props.getValue(), baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
 
         /**
-         * Profit and Loss in JPY
-         * Color-coded green for profits, red for losses
+         * Profit and Loss in base currency
          */
         columnHelper.accessor('pnlJPY', {
-            header: 'P&L (JPY)',
+            header: 'P&L',
             size: 130,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
                     return <span className="text-gray-400">Loading...</span>;
                 }
-                const displayValue = formatCurrencyValue(value, 'JPY', props.table.options.meta?.showValues ?? false);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                const displayValue = formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
                 return (
                     <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
                         {displayValue}

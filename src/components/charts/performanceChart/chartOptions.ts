@@ -8,7 +8,9 @@ const cssVar = (name: string): string => {
 
 export const createChartOptions = (
     showValues: boolean,
-    selectedTimeline: string
+    selectedTimeline: string,
+    currencySymbol: string = '¥',
+    currency: string = 'JPY'
 ): ChartOptions<'line'> => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -46,7 +48,7 @@ export const createChartOptions = (
         title: {
             display: true,
             text: showValues
-                ? `Portfolio P&L Over Time (${selectedTimeline})`
+                ? `Portfolio P&L Over Time — ${currency} (${selectedTimeline})`
                 : `Portfolio Performance Over Time (${selectedTimeline})`,
             color: cssVar('--chart-title'),
             font: { size: 14 }
@@ -65,7 +67,10 @@ export const createChartOptions = (
                 color: cssVar('--chart-tick'),
                 callback: function(value) {
                     if (typeof value === 'number') {
-                        return showValues ? `¥${value.toLocaleString()}` : `${value.toFixed(2)}%`;
+                        if (!showValues) return `${value.toFixed(2)}%`;
+                        return currency === 'JPY'
+                            ? `${currencySymbol}${Math.round(value).toLocaleString()}`
+                            : `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
                     return value;
                 },
@@ -80,7 +85,7 @@ export const createChartOptions = (
             beginAtZero: false,
             title: {
                 display: true,
-                text: 'P&L (JPY)',
+                text: `P&L (${currency})`,
                 color: cssVar('--chart-tick'),
                 font: { size: 11 }
             },
@@ -89,7 +94,9 @@ export const createChartOptions = (
                 callback: function(value) {
                     if (typeof value === 'number') {
                         const sign = value >= 0 ? '+' : '';
-                        return `${sign}¥${Math.round(value).toLocaleString()}`;
+                        return currency === 'JPY'
+                            ? `${sign}${currencySymbol}${Math.round(value).toLocaleString()}`
+                            : `${sign}${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
                     return value;
                 },

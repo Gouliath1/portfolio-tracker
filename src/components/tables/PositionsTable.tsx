@@ -19,12 +19,14 @@ declare module '@tanstack/react-table' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface TableMeta<TData> {
         showValues: boolean;
+        baseCurrency: string;
     }
 }
 
 interface PositionsTableProps {
     positions: Position[];
     showValues: boolean;
+    baseCurrency?: string;
 }
 
 /**
@@ -42,7 +44,7 @@ interface PositionsTableProps {
  * @param showValues - Boolean to control value visibility (privacy mode)
  * @returns JSX element containing the complete positions table interface
  */
-export const PositionsTable = ({ positions, showValues }: PositionsTableProps) => {
+export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY' }: PositionsTableProps) => {
     // Use custom hooks for state management
     const {
         sorting,
@@ -80,6 +82,7 @@ export const PositionsTable = ({ positions, showValues }: PositionsTableProps) =
         },
         meta: {
             showValues,
+            baseCurrency,
         },
         onSortingChange: setSorting,
         onColumnVisibilityChange: setColumnVisibility,

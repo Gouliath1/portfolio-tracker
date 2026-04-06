@@ -7,11 +7,9 @@ import { calculatePortfolioCagrSinceInception } from '@portfolio/core';
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
     showValues: boolean;
+    symbol: string;
+    formatValue: (amount: number, showValues: boolean) => string;
 }
-
-const hiddenValue = (value: number) => '•'.repeat(Math.min(8, Math.ceil(Math.log10(Math.abs(value) + 1))));
-
-const formatJPY = (value: number) => `¥${Math.round(value).toLocaleString()}`;
 
 const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -76,7 +74,7 @@ const StatCard = ({ label, value, sub, positive, flash }: StatCardProps) => {
     );
 };
 
-export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps) => {
+export const PortfolioSummary = ({ summary, showValues, formatValue }: PortfolioSummaryProps) => {
     const prevSummary = useRef<PortfolioSummaryType>(summary);
     const valueChanged = summary.totalValueJPY !== prevSummary.current.totalValueJPY;
 
@@ -85,26 +83,24 @@ export const PortfolioSummary = ({ summary, showValues }: PortfolioSummaryProps)
     const hasNullPrices = summary.positions.some(p => p.currentPrice === null);
     const annualizedReturn = calculatePortfolioCagrSinceInception(summary);
 
-    const displayValue = (v: number) => showValues ? formatJPY(v) : `¥${hiddenValue(v)}`;
-
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
                 label="Total Value"
-                value={hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span> : displayValue(summary.totalValueJPY)}
+                value={hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span> : formatValue(summary.totalValueJPY, showValues)}
                 positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY ? true : false}
                 flash={valueChanged}
             />
             <StatCard
                 label="Total P&L"
-                value={hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span> : displayValue(summary.totalPnlJPY)}
+                value={hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span> : formatValue(summary.totalPnlJPY, showValues)}
                 sub={!hasNullPrices ? `${summary.totalPnlPercentage >= 0 ? '+' : ''}${summary.totalPnlPercentage.toFixed(2)}%` : undefined}
                 positive={hasNullPrices ? null : summary.totalPnlJPY >= 0 ? true : false}
                 flash={valueChanged}
             />
             <StatCard
                 label="Total Cost"
-                value={displayValue(summary.totalCostJPY)}
+                value={formatValue(summary.totalCostJPY, showValues)}
                 positive={null}
             />
             <StatCard

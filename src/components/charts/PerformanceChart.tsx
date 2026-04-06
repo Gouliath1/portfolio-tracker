@@ -32,20 +32,22 @@ ChartJS.register(
 interface PerformanceChartProps {
     positions: Position[];
     showValues: boolean;
+    currency?: string;
+    symbol?: string;
 }
 
-export const PerformanceChart = ({ positions, showValues }: PerformanceChartProps) => {
+export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symbol = '¥' }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
     useTheme(); // triggers re-render on theme change so cssVar() picks up new tokens
 
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
-    const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues);
+    const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues, currency);
 
-    const options = createChartOptions(showValues, selectedTimeline);
+    const options = createChartOptions(showValues, selectedTimeline, symbol, currency);
     options.plugins!.tooltip = {
         enabled: false,
-        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues),
+        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues, symbol, currency),
     };
 
     const renderChart = () => {
