@@ -48,7 +48,7 @@ const StatCard = ({ label, value, sub, positive, flash }: StatCardProps) => {
     return (
         <div
             className="glass rounded-2xl p-6 relative overflow-hidden transition-all duration-300"
-            style={{ borderColor }}
+            style={{ border: `1px solid ${borderColor}` }}
         >
             {/* Flash glow overlay */}
             {flash && glowBg && (
