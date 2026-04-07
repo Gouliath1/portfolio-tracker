@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues } from '@portfolio/core';
+import { useBaseCurrency } from './useBaseCurrency';
 
 export interface DailyPnl {
     absoluteChange: number;   // in base currency (uses same field names as HistoricalSnapshot)
@@ -11,6 +12,7 @@ export interface DailyPnl {
 
 export function useDailyPnl(positions: Position[], currentValue: number): DailyPnl | null {
     const [dailyPnl, setDailyPnl] = useState<DailyPnl | null>(null);
+    const { baseCurrency } = useBaseCurrency();
 
     useEffect(() => {
         if (positions.length === 0 || currentValue === 0) return;
@@ -28,19 +30,18 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
                     yesterday.setDate(yesterday.getDate() - 1);
                 }
 
+                // Use daily resolution so yesterday's price is accurate (not a monthly candle)
                 const snapshots = await calculateHistoricalPortfolioValues(
                     positions,
-                    [yesterday, today],
-                    false // don't need position details
+                    [yesterday],
+                    false,
+                    baseCurrency,
+                    '1d'
                 );
 
                 if (cancelled) return;
 
-                // Find yesterday's value — the snapshot closest to yesterday
-                const ySnap = snapshots.find(s => {
-                    const d = new Date(s.date);
-                    return d.toDateString() === yesterday.toDateString();
-                }) ?? snapshots[0];
+                const ySnap = snapshots[0];
 
                 if (!ySnap || ySnap.totalValueJPY === 0) return;
 
@@ -55,7 +56,7 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
 
         compute();
         return () => { cancelled = true; };
-    }, [positions, currentValue]);
+    }, [positions, currentValue, baseCurrency]);
 
     return dailyPnl;
 }

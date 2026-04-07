@@ -46,8 +46,8 @@ function getYahooRange(monthsSincePurchase: number): string {
     return 'max'; // For positions older than 10 years, get all available data
 }
 
-// Fetch historical prices for a symbol with monthly granularity
-export async function fetchHistoricalPrices(symbol: string, positions: Position[]): Promise<{[date: string]: number} | null> {
+// Fetch historical prices for a symbol. interval='1mo' for chart history, '1d' for daily P&L.
+export async function fetchHistoricalPrices(symbol: string, positions: Position[], interval: '1mo' | '1d' = '1mo'): Promise<{[date: string]: number} | null> {
     try {
         // Find the earliest purchase date for this symbol
         const symbolPositions = positions.filter(pos => pos.ticker === symbol);
@@ -61,7 +61,8 @@ export async function fetchHistoricalPrices(symbol: string, positions: Position[
         }, new Date(symbolPositions[0].transactionDate));
 
         const monthsSincePurchase = getMonthsSincePurchase(earliestDate.toISOString().split('T')[0]);
-        const range = getYahooRange(monthsSincePurchase);
+        // For daily resolution we only need a short recent window (5d covers weekends)
+        const range = interval === '1d' ? '5d' : getYahooRange(monthsSincePurchase);
 
         // Rate limiting with randomization
         const now = Date.now();
@@ -76,8 +77,8 @@ export async function fetchHistoricalPrices(symbol: string, positions: Position[
 
         const isServerSide = typeof window === 'undefined';
         const url = isServerSide
-            ? `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1mo&range=${range}`
-            : `/yahoo-finance/v8/finance/chart/${symbol}?interval=1mo&range=${range}`;
+            ? `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`
+            : `/yahoo-finance/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
 
         const response = await fetchWithRetry(url);
         const data = await response.json();

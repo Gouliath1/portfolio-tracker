@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, generateDateIntervals } from './chartUtils';
+import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 
 export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter) => {
     const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { baseCurrency } = useBaseCurrency();
 
     const calculateHistoricalData = useCallback(async () => {
         if (positions.length === 0) {
@@ -19,7 +21,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
 
         try {
             const dateIntervals = generateDateIntervals(selectedTimeline, positions);
-            const snapshots = await calculateHistoricalPortfolioValues(positions, dateIntervals, true);
+            const snapshots = await calculateHistoricalPortfolioValues(positions, dateIntervals, true, baseCurrency);
             setHistoricalData(snapshots);
         } catch (err) {
             console.error('Error calculating historical data:', err);
@@ -28,7 +30,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         } finally {
             setIsLoading(false);
         }
-    }, [positions, selectedTimeline]);
+    }, [positions, selectedTimeline, baseCurrency]);
 
     useEffect(() => {
         calculateHistoricalData();

@@ -1,5 +1,5 @@
 import { Position } from '@portfolio/types';
-import { fetchHistoricalPrices } from './yahooFinanceApi';
+import { fetchHistoricalPrices, fetchHistoricalFxRates } from './yahooFinanceApi';
 
 export interface HistoricalSnapshot {
     date: Date;
@@ -122,13 +122,16 @@ function getClosestHistoricalPrice(historicalPrices: {[date: string]: number}, t
 
 // Calculate portfolio value at a specific historical date
 export async function calculatePortfolioValueAtDate(
-    positions: Position[], 
+    positions: Position[],
     targetDate: Date,
     historicalPricesCache?: Map<string, {[date: string]: number}>,
-    includeDetails: boolean = false
+    includeDetails: boolean = false,
+    baseCurrency: string = 'JPY',
+    historicalFxCache?: Map<string, {[date: string]: number}>,
+    interval: '1mo' | '1d' = '1mo'
 ): Promise<HistoricalSnapshot> {
     const positionsAtDate = getPositionsAtDate(positions, targetDate);
-    
+
     if (positionsAtDate.length === 0) {
         return {
             date: targetDate,
@@ -142,63 +145,78 @@ export async function calculatePortfolioValueAtDate(
             cumulativePnlPercentage: 0
         };
     }
-    
+
     let totalValueJPY = 0;
     let totalCostJPY = 0;
     const positionDetails: PositionDetail[] = [];
-    
+
     // Use cache if provided, otherwise create a temporary one
     const pricesCache = historicalPricesCache || new Map();
-    
+    const fxCache = historicalFxCache || new Map();
+
     // Calculate value for each position
     for (const position of positionsAtDate) {
         totalCostJPY += position.costInJPY;
-        
+
         // Get historical prices for this ticker if not cached
         if (!pricesCache.has(position.ticker)) {
             console.log(`📈 Fetching historical prices for ${position.ticker}`);
-            // Convert positions to the format expected by fetchHistoricalPrices
             const positionsForApi = positions.map(p => ({
                 transactionDate: p.transactionDate,
                 ticker: p.ticker.toString(),
                 transactionCcy: p.transactionCcy,
                 transactionFx: p.transactionFxRate
             }));
-            const historicalPrices = await fetchHistoricalPrices(position.ticker, positionsForApi);
+            const historicalPrices = await fetchHistoricalPrices(position.ticker, positionsForApi, interval);
             if (historicalPrices) {
                 pricesCache.set(position.ticker, historicalPrices);
             } else {
                 pricesCache.set(position.ticker, {});
             }
         }
-        
+
         const historicalPrices = pricesCache.get(position.ticker) || {};
         const historicalPrice = getClosestHistoricalPrice(historicalPrices, targetDate);
-        
+
+        // Resolve the stock currency for this ticker
+        const originalPosition = positions.find(p => p.ticker.toString() === position.ticker);
+        const stockCcy = originalPosition?.stockCcy ?? baseCurrency;
+
         let positionValueJPY = 0;
-        
+
         if (historicalPrice !== null) {
-            // Calculate value in JPY (assuming FX rates are already handled in the Position data)
-            const valueInBaseCurrency = position.quantity * historicalPrice;
-            positionValueJPY = valueInBaseCurrency * position.transactionFxRate;
+            const valueInStockCcy = position.quantity * historicalPrice;
+
+            if (stockCcy === baseCurrency) {
+                positionValueJPY = valueInStockCcy;
+            } else {
+                // Use the FX rate at targetDate, not the transaction-date FX rate
+                const fxPair = `${stockCcy}${baseCurrency}`;
+                if (!fxCache.has(fxPair)) {
+                    const targetDateStr = targetDate.toISOString().split('T')[0];
+                    const rates = await fetchHistoricalFxRates(fxPair, [targetDateStr]);
+                    fxCache.set(fxPair, rates ?? {});
+                }
+                const fxRates = fxCache.get(fxPair) ?? {};
+                const fxRate = getClosestHistoricalPrice(fxRates, targetDate) ?? position.transactionFxRate;
+                positionValueJPY = valueInStockCcy * fxRate;
+            }
             totalValueJPY += positionValueJPY;
         } else {
             // If no historical price available, use current value as fallback
             console.warn(`⚠️ No historical price found for ${position.ticker} at ${targetDate.toISOString().split('T')[0]}, using current value`);
-            const currentPosition = positions.find(p => p.ticker.toString() === position.ticker);
-            if (currentPosition) {
-                positionValueJPY = (position.quantity / currentPosition.quantity) * currentPosition.currentValueJPY;
+            if (originalPosition) {
+                positionValueJPY = (position.quantity / originalPosition.quantity) * originalPosition.currentValueJPY;
                 totalValueJPY += positionValueJPY;
             }
         }
-        
+
         // Collect position details if requested
         if (includeDetails) {
-            const originalPosition = positions.find(p => p.ticker.toString() === position.ticker);
             const fullName = originalPosition?.fullName || position.ticker;
             const positionPnlJPY = positionValueJPY - position.costInJPY;
             const positionPnlPercentage = position.costInJPY > 0 ? (positionPnlJPY / position.costInJPY) * 100 : 0;
-            
+
             positionDetails.push({
                 ticker: position.ticker,
                 fullName,
@@ -239,49 +257,55 @@ export async function calculatePortfolioValueAtDate(
 export async function calculateHistoricalPortfolioValues(
     positions: Position[],
     dates: Date[],
-    includeDetails: boolean = false
+    includeDetails: boolean = false,
+    baseCurrency: string = 'JPY',
+    interval: '1mo' | '1d' = '1mo'
 ): Promise<HistoricalSnapshot[]> {
     console.log(`📊 Calculating historical portfolio values for ${dates.length} dates`);
-    
+
     // Pre-fetch all historical prices to avoid repeated API calls
     const uniqueTickers = [...new Set(positions.map(p => p.ticker.toString()))];
     const historicalPricesCache = new Map<string, {[date: string]: number}>();
-    
+    const historicalFxCache = new Map<string, {[date: string]: number}>();
+
     console.log(`🔄 Pre-fetching historical prices for ${uniqueTickers.length} tickers`);
+    const positionsForApi = positions.map(p => ({
+        transactionDate: p.transactionDate,
+        ticker: p.ticker.toString(),
+        transactionCcy: p.transactionCcy,
+        transactionFx: p.transactionFxRate
+    }));
     for (const ticker of uniqueTickers) {
-        // Convert positions to the format expected by fetchHistoricalPrices
-        const positionsForApi = positions.map(p => ({
-            transactionDate: p.transactionDate,
-            ticker: p.ticker.toString(),
-            transactionCcy: p.transactionCcy,
-            transactionFx: p.transactionFxRate
-        }));
-        const historicalPrices = await fetchHistoricalPrices(ticker, positionsForApi);
+        const historicalPrices = await fetchHistoricalPrices(ticker, positionsForApi, interval);
         if (historicalPrices) {
             historicalPricesCache.set(ticker, historicalPrices);
         } else {
             historicalPricesCache.set(ticker, {});
         }
     }
-    
+
+    // Pre-fetch FX rates for all required pairs across all dates
+    const uniqueStockCcys = [...new Set(positions.map(p => p.stockCcy).filter(c => c !== baseCurrency))];
+    if (uniqueStockCcys.length > 0) {
+        const allDateStrs = dates.map(d => d.toISOString().split('T')[0]);
+        for (const stockCcy of uniqueStockCcys) {
+            const fxPair = `${stockCcy}${baseCurrency}`;
+            const rates = await fetchHistoricalFxRates(fxPair, allDateStrs);
+            historicalFxCache.set(fxPair, rates ?? {});
+        }
+    }
+
     // Sort dates to ensure chronological order
     const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
-    
+
     // Calculate values for each date
     const results: HistoricalSnapshot[] = [];
-    let previousSnapshot: HistoricalSnapshot | null = null;
-    
+
     for (const date of sortedDates) {
-        const snapshot = await calculatePortfolioValueAtDate(positions, date, historicalPricesCache, includeDetails);
-        
-        // Enhance with additional metrics
-        if (previousSnapshot) {
-            // We could add day-over-day change calculations here if needed
-            // For now, the cumulative P&L is just the same as regular P&L since it's calculated from inception
-        }
-        
+        const snapshot = await calculatePortfolioValueAtDate(
+            positions, date, historicalPricesCache, includeDetails, baseCurrency, historicalFxCache, interval
+        );
         results.push(snapshot);
-        previousSnapshot = snapshot;
     }
     
     // Sort results back to match original date order if needed
