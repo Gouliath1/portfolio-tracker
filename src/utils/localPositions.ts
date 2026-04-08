@@ -1,0 +1,146 @@
+/**
+ * Client-side localStorage store for position sets and positions.
+ * Replaces the server-side SQLite database for multi-user safety.
+ */
+
+import { RawPosition } from '@portfolio/types';
+import { DEMO_POSITIONS, DEMO_SET, DEMO_SET_ID } from '../data/demoPositions';
+
+export interface PositionSetLocal {
+    id: string;
+    name: string;
+    display_name: string;
+    description: string | null;
+    info_type: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+const SETS_KEY = 'pt_sets';
+const ACTIVE_KEY = 'pt_active_set';
+
+const positionsKey = (id: string) => `pt_positions_${id}`;
+
+// ── Reads ─────────────────────────────────────────────────────
+
+export function getPositionSets(): PositionSetLocal[] {
+    try {
+        const raw = localStorage.getItem(SETS_KEY);
+        const stored: PositionSetLocal[] = raw ? JSON.parse(raw) : [];
+        return [DEMO_SET, ...stored];
+    } catch {
+        return [DEMO_SET];
+    }
+}
+
+export function getActiveSetId(): string {
+    return localStorage.getItem(ACTIVE_KEY) ?? DEMO_SET_ID;
+}
+
+export function getActiveSet(): PositionSetLocal {
+    const id = getActiveSetId();
+    return getPositionSets().find(s => s.id === id) ?? DEMO_SET;
+}
+
+export function getPositionsForSet(id: string): RawPosition[] {
+    if (id === DEMO_SET_ID) return DEMO_POSITIONS;
+    try {
+        const raw = localStorage.getItem(positionsKey(id));
+        return raw ? JSON.parse(raw) : DEMO_POSITIONS;
+    } catch {
+        return DEMO_POSITIONS;
+    }
+}
+
+export function getActivePositions(): RawPosition[] {
+    return getPositionsForSet(getActiveSetId());
+}
+
+export function isUsingDemoData(): boolean {
+    return getActiveSetId() === DEMO_SET_ID;
+}
+
+// ── Writes ────────────────────────────────────────────────────
+
+export function importPositionSet(
+    name: string,
+    display_name: string,
+    description: string,
+    positions: RawPosition[],
+    setAsActive: boolean
+): PositionSetLocal {
+    const stored = getStoredSets();
+    const id = `set_${Date.now()}`;
+    const now = new Date().toISOString();
+
+    if (setAsActive) {
+        stored.forEach(s => { s.is_active = false; });
+        localStorage.setItem(ACTIVE_KEY, id);
+    }
+
+    const newSet: PositionSetLocal = {
+        id,
+        name,
+        display_name,
+        description,
+        info_type: 'info',
+        is_active: setAsActive,
+        created_at: now,
+        updated_at: now,
+    };
+
+    stored.push(newSet);
+    saveStoredSets(stored);
+    localStorage.setItem(positionsKey(id), JSON.stringify(positions));
+    return newSet;
+}
+
+export function activateSet(id: string): void {
+    if (id === DEMO_SET_ID) {
+        const stored = getStoredSets();
+        stored.forEach(s => { s.is_active = false; });
+        saveStoredSets(stored);
+        localStorage.setItem(ACTIVE_KEY, DEMO_SET_ID);
+        return;
+    }
+    const stored = getStoredSets();
+    stored.forEach(s => { s.is_active = s.id === id; });
+    saveStoredSets(stored);
+    localStorage.setItem(ACTIVE_KEY, id);
+}
+
+export function deleteSet(id: string): void {
+    if (id === DEMO_SET_ID) return;
+    const stored = getStoredSets().filter(s => s.id !== id);
+    localStorage.removeItem(positionsKey(id));
+    saveStoredSets(stored);
+
+    if (getActiveSetId() === id) {
+        const next = stored.length > 0 ? stored[0].id : DEMO_SET_ID;
+        localStorage.setItem(ACTIVE_KEY, next);
+        if (stored.length > 0) {
+            stored[0].is_active = true;
+            saveStoredSets(stored);
+        }
+    }
+}
+
+export function exportSetPositions(id: string): RawPosition[] {
+    return getPositionsForSet(id);
+}
+
+// ── Internal helpers ──────────────────────────────────────────
+
+function getStoredSets(): PositionSetLocal[] {
+    try {
+        const raw = localStorage.getItem(SETS_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveStoredSets(sets: PositionSetLocal[]): void {
+    localStorage.setItem(SETS_KEY, JSON.stringify(sets));
+}

@@ -1,29 +1,5 @@
 import { NextResponse } from 'next/server';
-import { activatePositionSetById } from '@portfolio/server';
 
-export async function POST(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params;
-        const positionSetId = parseInt(id);
-        
-        if (isNaN(positionSetId)) {
-            return NextResponse.json({
-                error: 'Invalid position set ID'
-            }, { status: 400 });
-        }
-        
-        await activatePositionSetById(positionSetId);
-        
-        return NextResponse.json({
-            message: 'Position set activated successfully'
-        });
-    } catch (error) {
-        console.error('❌ Error activating position set:', error);
-        return NextResponse.json({
-            error: 'Failed to activate position set'
-        }, { status: 500 });
-    }
+export async function POST() {
+    return NextResponse.json({ message: 'Position sets managed client-side' });
 }
