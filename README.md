@@ -186,6 +186,29 @@ Create a `.env.local` file for any environment-specific configuration:
 - No sensitive data transmitted to external services
 - Your financial information stays private
 
+## 🌐 Infrastructure
+
+| What | Provider | Notes |
+|------|----------|-------|
+| Hosting / deployment | [Vercel](https://vercel.com) | Free tier, auto-deploy on push to `main` |
+| Live URL | `tracker.julienguille.com` | Custom subdomain |
+| Domain registrar | [GoDaddy](https://godaddy.com) | Manages `julienguille.com` DNS |
+| Server / web hosting | [OVH](https://ovh.com) | Hosts other sites on the same domain |
+
+### DNS setup (GoDaddy)
+
+To point `tracker.julienguille.com` to Vercel, a CNAME record is set in GoDaddy:
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `tracker` | `9d28ed80412bd346.vercel-dns-017.com.` |
+
+### Spending protection
+
+Vercel project → **Settings → Billing → Spending Limit** is set to **$0** — Vercel will pause the project rather than charge anything if free-tier limits are ever exceeded.
+
+---
+
 ## 🚀 Production Deployment
 
 ### Building for Production
