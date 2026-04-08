@@ -1,59 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFxRateWithFallback, updateFxRate } from '@portfolio/server';
+import { getCachedFxRate, setCachedFxRate } from '../../../lib/server/memoryStore';
+import { fetchCurrentFxRate } from '@portfolio/core';
+
+const today = () => new Date().toISOString().split('T')[0];
 
 export async function GET(request: NextRequest) {
-    try {
-        const url = new URL(request.url);
-        const fxPair = url.searchParams.get('pair');
-        const requestedDate = url.searchParams.get('date');
-        
-        console.log(`🔍 FX RATE API CALL: pair=${fxPair}, date=${requestedDate || 'CURRENT'}`);
-        console.log(`📊 Full URL: ${request.url}`);
-        
-        if (!fxPair) {
-            return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
-        }
-        
-        const result = await getFxRateWithFallback(fxPair, { date: requestedDate || undefined });
+    const url = new URL(request.url);
+    const fxPair = url.searchParams.get('pair');
+    const requestedDate = url.searchParams.get('date') ?? today();
 
-        if (result.rate === null) {
-            console.log(`❌ No FX rate found in database for ${fxPair} on ${requestedDate || 'current'}`);
-            return NextResponse.json({ rate: null, pair: fxPair });
-        }
-
-        console.log(`✅ FX rate found: ${fxPair} = ${result.rate} (date: ${result.date}) via ${result.source}`);
-        return NextResponse.json(result);
-    } catch (error) {
-        console.error('Error fetching FX rate:', error);
-        return NextResponse.json({ 
-            error: 'Failed to fetch FX rate',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
+    if (!fxPair) {
+        return NextResponse.json({ error: 'FX pair parameter is required' }, { status: 400 });
     }
+
+    const pair = fxPair.trim().toUpperCase();
+    const cached = getCachedFxRate(pair, requestedDate);
+    if (cached !== null) {
+        return NextResponse.json({ pair, rate: cached, date: requestedDate, source: 'memory' });
+    }
+
+    // Only fetch live rates for today (historical rates are fetched client-side via Yahoo Finance proxy)
+    if (requestedDate === today()) {
+        const rate = await fetchCurrentFxRate(pair, true);
+        if (rate !== null) {
+            setCachedFxRate(pair, rate, requestedDate);
+            return NextResponse.json({ pair, rate, date: requestedDate, source: 'fresh' });
+        }
+    }
+
+    return NextResponse.json({ pair, rate: null, date: requestedDate });
 }
 
 export async function POST(request: NextRequest) {
-    try {
-        const { fxPair, rate, date } = await request.json();
+    const { fxPair, rate, date } = await request.json();
 
-        if (!fxPair || typeof rate !== 'number') {
-            return NextResponse.json({ error: 'Invalid FX pair or rate' }, { status: 400 });
-        }
-
-        // Store with explicit date (caller supplies today's date for current rates)
-        await updateFxRate(fxPair, rate, date);
-        
-        return NextResponse.json({ 
-            success: true,
-            message: `FX rate updated for ${fxPair}`,
-            rate
-        });
-        
-    } catch (error) {
-        console.error('Error updating FX rate:', error);
-        return NextResponse.json({ 
-            error: 'Failed to update FX rate',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
+    if (!fxPair || typeof rate !== 'number') {
+        return NextResponse.json({ error: 'Invalid FX pair or rate' }, { status: 400 });
     }
+
+    const storeDate = date ?? today();
+    setCachedFxRate(fxPair.trim().toUpperCase(), rate, storeDate);
+
+    return NextResponse.json({ success: true, message: `FX rate cached for ${fxPair}`, rate });
 }

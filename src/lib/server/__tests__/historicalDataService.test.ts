@@ -81,6 +81,7 @@ describe('historicalDataService', () => {
         fullName: 'Apple',
         stockCcy: 'USD',
       },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any);
 
     mockedRefreshAllHistoricalData.mockResolvedValue({

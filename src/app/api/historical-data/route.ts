@@ -1,48 +1,22 @@
 import { NextResponse } from 'next/server';
-import { NoPositionsAvailableError, getHistoricalDataSummary, refreshHistoricalDataForActivePortfolio } from '@portfolio/server';
 
+// Historical data is fetched lazily client-side via the Yahoo Finance proxy.
+// This endpoint is a no-op kept for API compatibility.
 export async function POST() {
-    try {
-        console.log('🔄 Historical data refresh initiated...');
-        
-        const result = await refreshHistoricalDataForActivePortfolio();
-
-        console.log(`📋 Historical refresh processed ${result.positionsProcessed} positions`);
-
-        return NextResponse.json({ 
-            message: 'Historical data refresh completed',
-            historicalResults: result.historicalResults,
-            fxResults: result.fxResults,
-            positionsProcessed: result.positionsProcessed
-        });
-        
-    } catch (error) {
-        if (error instanceof NoPositionsAvailableError) {
-            return NextResponse.json({
-                error: 'No positions found in database. Please import positions first.'
-            }, { status: 400 });
-        }
-        console.error('❌ Error in historical price refresh:', error);
-        return NextResponse.json(
-            { error: 'Failed to refresh historical data' },
-            { status: 500 }
-        );
-    }
+    return NextResponse.json({
+        message: 'Historical data is fetched on demand by the client',
+        positionsProcessed: 0,
+        historicalResults: {},
+        fxResults: {},
+    });
 }
 
 export async function GET() {
-    try {
-        console.log('📊 GET /api/historical-data - Fetching historical data summary');
-        
-        const summary = await getHistoricalDataSummary();
-        
-        return NextResponse.json(summary);
-        
-    } catch (error) {
-        console.error('❌ Error fetching historical data summary:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch historical data summary' },
-            { status: 500 }
-        );
-    }
+    return NextResponse.json({
+        historicalPrices: 0,
+        fxRates: 0,
+        securitiesWithData: 0,
+        lastDataDate: null,
+        daysSinceLastData: 0,
+    });
 }

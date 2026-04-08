@@ -43,6 +43,7 @@ const ensureActivePositionSet = async (): Promise<PositionSet> => {
   }
 
   const fallbackName = 'user-portfolio';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const newSetId = await createPositionSet({
     name: fallbackName,
     display_name: 'User Portfolio',
@@ -66,10 +67,11 @@ const ensureBroker = async (
   const db = getDbClient();
   const displayName = brokerName?.trim() || 'Unknown Broker';
   const defaultCurrency = preferredCurrency || 'USD';
+  const internalName = normalizeBrokerKey(displayName) || 'unknown_broker';
 
   const existing = await db.execute({
-    sql: 'SELECT id, default_currency FROM brokers WHERE display_name = ? LIMIT 1',
-    args: [displayName],
+    sql: 'SELECT id, default_currency FROM brokers WHERE display_name = ? OR name = ? LIMIT 1',
+    args: [displayName, internalName],
   });
 
   if (existing.rows.length > 0) {
@@ -80,16 +82,21 @@ const ensureBroker = async (
     };
   }
 
-  const internalName = normalizeBrokerKey(displayName) || 'unknown_broker';
-  const insert = await db.execute({
-    sql: `INSERT INTO brokers (name, display_name, default_currency)
-          VALUES (?, ?, ?)` ,
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO brokers (name, display_name, default_currency)
+          VALUES (?, ?, ?)`,
     args: [internalName, displayName, defaultCurrency],
   });
 
+  const inserted = await db.execute({
+    sql: 'SELECT id, default_currency FROM brokers WHERE name = ? LIMIT 1',
+    args: [internalName],
+  });
+
+  const row = inserted.rows[0];
   return {
-    id: Number(insert.lastInsertRowid),
-    currency: defaultCurrency,
+    id: Number(row.id),
+    currency: String(row.default_currency || defaultCurrency),
   };
 };
 

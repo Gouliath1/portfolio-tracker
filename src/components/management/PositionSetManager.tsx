@@ -1,53 +1,54 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import {
     MdAdd, MdPlayArrow, MdDownload, MdDelete, MdSettings,
     MdCheckCircle, MdWarning, MdRefresh,
 } from 'react-icons/md';
-
-interface PositionSet {
-    id: number;
-    name: string;
-    display_name: string;
-    description: string | null;
-    info_type: string;
-    is_active: boolean;
-    created_at: string;
-    updated_at: string;
-}
-
-interface PositionSetsResponse {
-    position_sets: PositionSet[];
-    active_set: PositionSet | null;
-}
+import {
+    getPositionSets,
+    getActiveSetId,
+    importPositionSet,
+    activateSet,
+    deleteSet,
+    exportSetPositions,
+    PositionSetLocal,
+} from '../../utils/localPositions';
+import { RawPosition } from '@portfolio/types';
 
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
 }
 
+const TEMPLATE_POSITIONS: RawPosition[] = [
+    {
+        transactionDate: '2023/01/10',
+        ticker: 'AAPL',
+        fullName: 'Apple Inc.',
+        broker: 'My Broker',
+        account: 'Main Account',
+        quantity: 10,
+        costPerUnit: 130.0,
+        transactionCcy: 'USD',
+        stockCcy: 'USD',
+    },
+];
+
 const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged }) => {
-    const [positionSets, setPositionSets] = useState<PositionSet[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [operationLoading, setOperationLoading] = useState<string | null>(null);
+    const [sets, setSets] = useState<PositionSetLocal[]>([]);
+    const [activeId, setActiveId] = useState<string>('demo');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [showImportForm, setShowImportForm] = useState(false);
     const [importData, setImportData] = useState({ name: '', description: '', set_as_active: false });
+    const [importing, setImporting] = useState(false);
 
-    const fetchPositionSets = async () => {
-        try {
-            const response = await fetch('/api/position-sets');
-            if (!response.ok) throw new Error('Failed to fetch position sets');
-            const data: PositionSetsResponse = await response.json();
-            setPositionSets(data.position_sets);
-        } catch (err) {
-            setError('Failed to load position sets');
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+    const refresh = () => {
+        setSets(getPositionSets());
+        setActiveId(getActiveSetId());
     };
 
-    useEffect(() => { fetchPositionSets(); }, []);
+    useEffect(() => { refresh(); }, []);
 
     useEffect(() => {
         if (success) {
@@ -56,120 +57,96 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
         }
     }, [success]);
 
-    const handleActivateSet = async (setId: number) => {
-        setOperationLoading(`activate-${setId}`);
+    const handleActivate = (id: string) => {
         try {
-            const response = await fetch(`/api/position-sets/${setId}/activate`, { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to activate position set');
+            activateSet(id);
+            refresh();
             setSuccess('Position set activated');
-            await fetchPositionSets();
             onPositionSetChanged?.();
-        } catch (err) {
+        } catch {
             setError('Failed to activate position set');
-            console.error(err);
-        } finally {
-            setOperationLoading(null);
         }
     };
 
-    const handleDeleteSet = async (setId: number, setName: string) => {
-        if (!confirm(`Delete "${setName}"? This will permanently remove all positions in this set.`)) return;
-        setOperationLoading(`delete-${setId}`);
+    const handleDelete = (id: string, name: string) => {
+        if (!confirm(`Delete "${name}"? This will permanently remove all positions in this set.`)) return;
         try {
-            const response = await fetch(`/api/position-sets/${setId}`, { method: 'DELETE' });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete');
-            }
+            deleteSet(id);
+            refresh();
             setSuccess('Position set deleted');
-            await fetchPositionSets();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete');
-            console.error(err);
-        } finally {
-            setOperationLoading(null);
+        } catch {
+            setError('Failed to delete position set');
         }
     };
 
-    const handleExportSet = async (setId: number) => {
-        setOperationLoading(`export-${setId}`);
+    const handleExport = (id: string, name: string) => {
         try {
-            const response = await fetch(`/api/position-sets/${setId}/export`);
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                throw new Error(errorData.details || errorData.error || 'Failed to export');
-            }
-            const contentDisposition = response.headers.get('Content-Disposition');
-            const filename = contentDisposition
-                ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
-                : `position-set-${setId}.json`;
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
+            const positions = exportSetPositions(id);
+            const blob = new Blob([JSON.stringify(positions, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = filename;
+            a.download = `${name}-positions.json`;
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
+            URL.revokeObjectURL(url);
             document.body.removeChild(a);
             setSuccess('Exported successfully');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to export');
-        } finally {
-            setOperationLoading(null);
+        } catch {
+            setError('Failed to export');
         }
+    };
+
+    const handleDownloadTemplate = () => {
+        const blob = new Blob([JSON.stringify(TEMPLATE_POSITIONS, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'positions-template.json';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     };
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-        setOperationLoading('import');
+        setImporting(true);
         try {
             const content = await file.text();
             const jsonData = JSON.parse(content);
-            let positions;
+            let positions: RawPosition[];
             if (Array.isArray(jsonData)) {
                 positions = jsonData;
             } else if (jsonData.positions && Array.isArray(jsonData.positions)) {
                 positions = jsonData.positions;
             } else {
-                throw new Error('Invalid JSON format. Expected positions array.');
+                throw new Error('Invalid JSON format. Expected a positions array.');
             }
-            const response = await fetch('/api/position-sets/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: importData.name || `imported-${Date.now()}`,
-                    description: importData.description || `Imported from ${file.name}`,
-                    positions,
-                    set_as_active: importData.set_as_active,
-                }),
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to import');
-            }
-            const result = await response.json();
-            setSuccess(`Imported ${result.positions_imported} positions`);
+
+            const name = importData.name || `imported-${Date.now()}`;
+            importPositionSet(
+                name,
+                importData.name || file.name.replace('.json', ''),
+                importData.description || `Imported from ${file.name}`,
+                positions,
+                importData.set_as_active,
+            );
+
+            setSuccess(`Imported ${positions.length} positions`);
             setShowImportForm(false);
-            const wasSetAsActive = importData.set_as_active;
+            const wasActive = importData.set_as_active;
             setImportData({ name: '', description: '', set_as_active: false });
-            await fetchPositionSets();
-            if (wasSetAsActive) onPositionSetChanged?.();
+            refresh();
+            if (wasActive) onPositionSetChanged?.();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to import');
         } finally {
-            setOperationLoading(null);
+            setImporting(false);
             event.target.value = '';
         }
     };
-
-    if (loading) return (
-        <div className="glass rounded-2xl p-8 flex items-center justify-center gap-3">
-            <MdRefresh className="w-5 h-5 animate-spin" style={{ color: 'var(--accent)' }} />
-            <span style={{ color: 'var(--text-secondary)' }}>Loading position sets…</span>
-        </div>
-    );
 
     return (
         <div className="space-y-5">
@@ -186,11 +163,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                 <button
                     onClick={() => setShowImportForm(!showImportForm)}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-                    style={{
-                        background: 'var(--accent-dim)',
-                        color: 'var(--accent)',
-                        border: '1px solid var(--accent-glow)',
-                    }}
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                 >
                     <MdAdd className="w-4 h-4" />
                     Import set
@@ -223,7 +196,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name *</label>
+                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
                             <input
                                 type="text"
                                 value={importData.name}
@@ -248,7 +221,6 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="checkbox"
-                            id="set-as-active"
                             checked={importData.set_as_active}
                             onChange={e => setImportData(p => ({ ...p, set_as_active: e.target.checked }))}
                             style={{ accentColor: 'var(--accent)' }}
@@ -257,21 +229,31 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                             Set as active after import
                         </span>
                     </label>
-                    <div className="space-y-1">
-                        <label className="text-xs" style={{ color: 'var(--text-muted)' }}>JSON File *</label>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>JSON File *</label>
+                            <button
+                                onClick={handleDownloadTemplate}
+                                className="text-xs flex items-center gap-1 transition-opacity opacity-70 hover:opacity-100"
+                                style={{ color: 'var(--accent)' }}
+                            >
+                                <MdDownload className="w-3 h-3" />
+                                Download template
+                            </button>
+                        </div>
                         <input
                             type="file"
                             accept=".json"
                             onChange={handleFileUpload}
-                            disabled={operationLoading === 'import'}
+                            disabled={importing}
                             className="w-full text-sm"
                             style={{ color: 'var(--text-secondary)' }}
                         />
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Same format as data/positions.json
+                            JSON array of positions — each requires: ticker, fullName, account, quantity, costPerUnit, transactionCcy, stockCcy, transactionDate
                         </p>
                     </div>
-                    {operationLoading === 'import' && (
+                    {importing && (
                         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--accent)' }}>
                             <MdRefresh className="w-4 h-4 animate-spin" />
                             Importing…
@@ -291,7 +273,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
 
             {/* Position sets list */}
             <div className="glass rounded-2xl overflow-hidden">
-                {positionSets.length === 0 ? (
+                {sets.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <MdSettings className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -300,14 +282,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </div>
                 ) : (
                     <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                        {positionSets.map(set => (
+                        {sets.map(set => (
                             <div key={set.id} className="px-6 py-4 flex items-center justify-between gap-4 glass-hover transition-colors">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                                             {set.display_name}
                                         </span>
-                                        {set.is_active && (
+                                        {set.id === activeId && (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                                 style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)', border: '1px solid var(--pnl-green)' }}>
                                                 <MdCheckCircle className="w-3 h-3" /> Active
@@ -320,9 +302,6 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                                        {set.name} · {new Date(set.created_at).toLocaleDateString()}
-                                    </p>
                                     {set.description && (
                                         <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
                                             {set.description}
@@ -331,41 +310,34 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                 </div>
 
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                    {!set.is_active && (
+                                    {set.id !== activeId && (
                                         <button
-                                            onClick={() => handleActivateSet(set.id)}
-                                            disabled={!!operationLoading}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40"
+                                            onClick={() => handleActivate(set.id)}
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                         >
-                                            {operationLoading === `activate-${set.id}`
-                                                ? <MdRefresh className="w-3 h-3 animate-spin" />
-                                                : <MdPlayArrow className="w-3 h-3" />}
+                                            <MdPlayArrow className="w-3 h-3" />
                                             Activate
                                         </button>
                                     )}
                                     <button
-                                        onClick={() => handleExportSet(set.id)}
-                                        disabled={!!operationLoading}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium glass glass-hover transition-all disabled:opacity-40"
+                                        onClick={() => handleExport(set.id, set.name)}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium glass glass-hover transition-all"
                                         style={{ color: 'var(--text-secondary)' }}
                                     >
-                                        {operationLoading === `export-${set.id}`
-                                            ? <MdRefresh className="w-3 h-3 animate-spin" />
-                                            : <MdDownload className="w-3 h-3" />}
+                                        <MdDownload className="w-3 h-3" />
                                         Export
                                     </button>
-                                    <button
-                                        onClick={() => handleDeleteSet(set.id, set.display_name)}
-                                        disabled={!!operationLoading}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40"
-                                        style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid rgba(255,68,102,0.3)' }}
-                                    >
-                                        {operationLoading === `delete-${set.id}`
-                                            ? <MdRefresh className="w-3 h-3 animate-spin" />
-                                            : <MdDelete className="w-3 h-3" />}
-                                        Delete
-                                    </button>
+                                    {set.id !== 'demo' && (
+                                        <button
+                                            onClick={() => handleDelete(set.id, set.display_name)}
+                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid rgba(255,68,102,0.3)' }}
+                                        >
+                                            <MdDelete className="w-3 h-3" />
+                                            Delete
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}

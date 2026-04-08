@@ -141,6 +141,26 @@ export const importPositionSetData = async (
     throw new Error('Import payload requires a name and at least one position');
   }
 
+  const client = getDbClient();
+
+  // Delete existing position set with the same name (and its positions) before recreating
+  const existing = await client.execute({
+    sql: 'SELECT id FROM position_sets WHERE name = ? LIMIT 1',
+    args: [name],
+  });
+
+  if (existing.rows.length > 0) {
+    const existingId = Number(existing.rows[0].id);
+    await client.execute({
+      sql: 'DELETE FROM positions WHERE position_set_id = ?',
+      args: [existingId],
+    });
+    await client.execute({
+      sql: 'DELETE FROM position_sets WHERE id = ?',
+      args: [existingId],
+    });
+  }
+
   const positionSetId = await createPositionSet({
     name,
     display_name: name,

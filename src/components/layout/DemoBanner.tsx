@@ -1,66 +1,46 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-interface DemoStatus {
-    isDemoData: boolean;
-    positionSet?: {
-        id: string;
-        name: string;
-        display_name: string;
-        description: string;
-        info_type: string;
-    } | null;
-}
+import type { PositionSetLocal } from '../../utils/localPositions';
+import { DEMO_SET } from '../../data/demoPositions';
 
 interface DemoBannerProps {
     refreshTrigger?: number;
 }
 
 export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
-    const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [activeSet, setActiveSet] = useState<PositionSetLocal | null>(null);
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
-        const checkDemoStatus = async () => {
-            setIsLoading(true);
-            setIsVisible(true);
-            try {
-                const response = await fetch('/api/demo-status');
-                if (response.ok) {
-                    setDemoStatus(await response.json());
-                }
-            } catch (error) {
-                console.error('Error checking demo status:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        checkDemoStatus();
+        setIsVisible(true);
+        try {
+            import('../../utils/localPositions').then(({ getActiveSet }) => {
+                setActiveSet(getActiveSet());
+            }).catch(() => setActiveSet(DEMO_SET));
+        } catch {
+            setActiveSet(DEMO_SET);
+        }
     }, [refreshTrigger]);
 
     useEffect(() => {
-        if (demoStatus?.positionSet?.info_type === 'info') {
+        if (activeSet?.info_type === 'info') {
             const timer = setTimeout(() => setIsVisible(false), 5000);
             return () => clearTimeout(timer);
         }
-    }, [demoStatus]);
+    }, [activeSet]);
 
-    if (isLoading || !demoStatus?.positionSet || !isVisible) return null;
+    if (!activeSet || !isVisible) return null;
 
-    const { info_type, description } = demoStatus.positionSet;
-    const isWarning = info_type === 'warning';
-
+    const isWarning = activeSet.info_type === 'warning';
     const accentColor = isWarning ? 'var(--pnl-red)' : 'var(--accent)';
-    const bgColor    = isWarning ? 'var(--pnl-red-dim)' : 'var(--accent-dim)';
+    const bgColor = isWarning ? 'var(--pnl-red-dim)' : 'var(--accent-dim)';
 
     return (
         <div
             className="rounded-xl px-4 py-3 flex items-start gap-3 relative"
             style={{ background: bgColor, border: `1px solid ${accentColor}`, opacity: 0.9 }}
         >
-            {/* Icon */}
             <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"
                 style={{ color: accentColor }}>
                 {isWarning ? (
@@ -74,7 +54,7 @@ export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
                 )}
             </svg>
 
-            <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{description}</p>
+            <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{activeSet.description}</p>
 
             {!isWarning && (
                 <button onClick={() => setIsVisible(false)}
