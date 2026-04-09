@@ -14,6 +14,7 @@ import {
     exportSetPositions,
     PositionSetLocal,
 } from '../../utils/localPositions';
+import AddPositionModal from './AddPositionModal';
 import { RawPosition } from '@portfolio/types';
 
 interface PositionSetManagerProps {
@@ -42,6 +43,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     const [showImportForm, setShowImportForm] = useState(false);
     const [importData, setImportData] = useState({ name: '', description: '', set_as_active: false });
     const [importing, setImporting] = useState(false);
+    const [showAddPosition, setShowAddPosition] = useState(false);
 
     const refresh = () => {
         setSets(getPositionSets());
@@ -160,14 +162,26 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                         Import, export and switch between portfolio datasets
                     </p>
                 </div>
-                <button
-                    onClick={() => setShowImportForm(!showImportForm)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                >
-                    <MdAdd className="w-4 h-4" />
-                    Import set
-                </button>
+                <div className="flex items-center gap-2">
+                    {activeId !== 'demo' && (
+                        <button
+                            onClick={() => setShowAddPosition(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all glass glass-hover"
+                            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                        >
+                            <MdAdd className="w-4 h-4" />
+                            Add position
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowImportForm(!showImportForm)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                    >
+                        <MdAdd className="w-4 h-4" />
+                        Import set
+                    </button>
+                </div>
             </div>
 
             {/* Messages */}
@@ -344,6 +358,26 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </div>
                 )}
             </div>
+
+            {/* Demo set hint */}
+            {activeId === 'demo' && (
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Import a position set to add or edit individual positions — the demo portfolio is read-only.
+                </p>
+            )}
+
+            {showAddPosition && (
+                <AddPositionModal
+                    setId={activeId}
+                    onSaved={() => {
+                        setShowAddPosition(false);
+                        setSuccess('Position added');
+                        refresh();
+                        onPositionSetChanged?.();
+                    }}
+                    onClose={() => setShowAddPosition(false)}
+                />
+            )}
         </div>
     );
 };

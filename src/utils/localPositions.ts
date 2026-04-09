@@ -130,6 +130,12 @@ export function exportSetPositions(id: string): RawPosition[] {
     return getPositionsForSet(id);
 }
 
+export function addPositionToSet(id: string, position: RawPosition): void {
+    if (id === DEMO_SET_ID) return;
+    const existing = getPositionsForSet(id);
+    localStorage.setItem(positionsKey(id), JSON.stringify([...existing, position]));
+}
+
 // ── Internal helpers ──────────────────────────────────────────
 
 function getStoredSets(): PositionSetLocal[] {
