@@ -9,6 +9,7 @@ import { PortfolioSummary } from '../components/layout/PortfolioSummary';
 import { PerformanceChart } from '../components/charts/PerformanceChart';
 import { PositionsTable } from '../components/tables/PositionsTable';
 import DemoBanner from '../components/layout/DemoBanner';
+import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
 import { MdCloudOff, MdRefresh, MdSettings } from 'react-icons/md';
@@ -196,6 +197,9 @@ export default function Home() {
           <PositionsTable positions={portfolioSummary.positions} showValues={showValues} baseCurrency={currency} />
         </div>
       </main>
+
+      {/* ── Welcome modal (first visit only) ────────────── */}
+      <WelcomeModal onOpenSettings={() => setSettingsOpen(true)} />
 
       {/* ── Settings panel ───────────────────────────────── */}
       <SettingsPanel
