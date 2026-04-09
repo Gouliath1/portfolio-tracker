@@ -130,10 +130,28 @@ export function exportSetPositions(id: string): RawPosition[] {
     return getPositionsForSet(id);
 }
 
-export function addPositionToSet(id: string, position: RawPosition): void {
-    if (id === DEMO_SET_ID) return;
-    const existing = getPositionsForSet(id);
-    localStorage.setItem(positionsKey(id), JSON.stringify([...existing, position]));
+/**
+ * Adds a position to a set.
+ * If the active set is the demo, promotes it: clones the demo positions into a
+ * new real set ("My Portfolio"), activates it, then appends the new position.
+ * Returns the id of the set that was written to.
+ */
+export function addPositionToSet(id: string, position: RawPosition): string {
+    if (id !== DEMO_SET_ID) {
+        const existing = getPositionsForSet(id);
+        localStorage.setItem(positionsKey(id), JSON.stringify([...existing, position]));
+        return id;
+    }
+
+    // Promote demo → real set
+    const newSet = importPositionSet(
+        'my-portfolio',
+        'My Portfolio',
+        'Started from demo data',
+        [...DEMO_POSITIONS, position],
+        true,
+    );
+    return newSet.id;
 }
 
 // ── Internal helpers ──────────────────────────────────────────

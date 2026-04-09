@@ -163,16 +163,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {activeId !== 'demo' && (
-                        <button
-                            onClick={() => setShowAddPosition(true)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all glass glass-hover"
-                            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                        >
-                            <MdAdd className="w-4 h-4" />
-                            Add position
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setShowAddPosition(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all glass glass-hover"
+                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                        <MdAdd className="w-4 h-4" />
+                        Add position
+                    </button>
                     <button
                         onClick={() => setShowImportForm(!showImportForm)}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
@@ -358,13 +356,6 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </div>
                 )}
             </div>
-
-            {/* Demo set hint */}
-            {activeId === 'demo' && (
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Import a position set to add or edit individual positions — the demo portfolio is read-only.
-                </p>
-            )}
 
             {showAddPosition && (
                 <AddPositionModal

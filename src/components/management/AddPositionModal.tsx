@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { MdClose, MdAdd } from 'react-icons/md';
+import { MdClose, MdAdd, MdInfo } from 'react-icons/md';
 import { RawPosition } from '@portfolio/types';
+import { DEMO_SET_ID } from '../../data/demoPositions';
 
 interface AddPositionModalProps {
     setId: string;
@@ -96,6 +97,15 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+                    {setId === DEMO_SET_ID && (
+                        <div className="flex gap-2 rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
+                            <MdInfo size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
+                            <p style={{ color: 'var(--text-secondary)' }}>
+                                This will create a new <strong style={{ color: 'var(--text-primary)' }}>My Portfolio</strong> set with the demo positions plus this one, and activate it.
+                            </p>
+                        </div>
+                    )}
 
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
