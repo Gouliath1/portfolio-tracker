@@ -12,7 +12,7 @@ export interface DailyPnl {
 
 export function useDailyPnl(positions: Position[], currentValue: number): DailyPnl | null {
     const [dailyPnl, setDailyPnl] = useState<DailyPnl | null>(null);
-    const { baseCurrency } = useBaseCurrency();
+    const { currency } = useBaseCurrency();
 
     useEffect(() => {
         if (positions.length === 0 || currentValue === 0) return;
@@ -35,7 +35,7 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
                     positions,
                     [yesterday],
                     false,
-                    baseCurrency,
+                    currency,
                     '1d'
                 );
 
@@ -56,7 +56,7 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
 
         compute();
         return () => { cancelled = true; };
-    }, [positions, currentValue, baseCurrency]);
+    }, [positions, currentValue, currency]);
 
     return dailyPnl;
 }
