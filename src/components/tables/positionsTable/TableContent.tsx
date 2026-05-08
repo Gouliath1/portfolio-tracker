@@ -9,7 +9,7 @@ interface TableContentProps {
 export const TableContent: React.FC<TableContentProps> = ({ table }) => {
     return (
         <div
-            className="overflow-auto rounded-xl h-[calc(100vh-320px)]"
+            className="overflow-auto rounded-xl max-h-[calc(100vh-320px)]"
             style={{ border: '1px solid var(--border)' }}
         >
             <table
