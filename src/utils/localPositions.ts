@@ -63,6 +63,14 @@ export function isUsingDemoData(): boolean {
 
 // ── Writes ────────────────────────────────────────────────────
 
+export function uniqueDisplayName(base: string): string {
+    const existing = getStoredSets().map(s => s.display_name);
+    if (!existing.includes(base)) return base;
+    let n = 2;
+    while (existing.includes(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+}
+
 export function importPositionSet(
     name: string,
     display_name: string,
@@ -142,9 +150,10 @@ export function removePositionFromSet(setId: string, index: number): { removedPo
         if (index < 0 || index >= demoPositions.length) return null;
         const removed = demoPositions[index];
         const remaining = [...demoPositions.slice(0, index), ...demoPositions.slice(index + 1)];
+        const displayName = uniqueDisplayName('My Portfolio');
         const newSet = importPositionSet(
             'my-portfolio',
-            'My Portfolio',
+            displayName,
             'Started from demo data',
             remaining,
             true,
@@ -183,7 +192,7 @@ export function addPositionToSet(id: string, position: RawPosition): string {
     // Promote demo → real set
     const newSet = importPositionSet(
         'my-portfolio',
-        'My Portfolio',
+        uniqueDisplayName('My Portfolio'),
         'Started from demo data',
         [...DEMO_POSITIONS, position],
         true,

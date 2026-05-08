@@ -67,6 +67,6 @@ export const DEMO_SET = {
     description: 'Sample data — open Settings to import your own positions',
     info_type: 'warning',
     is_active: true,
-    created_at: new Date(0).toISOString(),
-    updated_at: new Date(0).toISOString(),
+    created_at: new Date('2024-01-01').toISOString(),
+    updated_at: new Date('2024-01-01').toISOString(),
 };

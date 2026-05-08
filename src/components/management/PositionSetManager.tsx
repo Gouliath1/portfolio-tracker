@@ -122,33 +122,26 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                 ) : (
                     <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                         {sets.map(set => (
-                            <div key={set.id} className="px-6 py-4 flex items-center justify-between gap-4 glass-hover transition-colors">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                                            {set.display_name}
+                            <div key={set.id} className="px-6 py-4 space-y-2 glass-hover transition-colors">
+                                {/* Row 1: name + badges + buttons */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                        {set.display_name}
+                                    </span>
+                                    {set.id === activeId && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                            style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)', border: '1px solid var(--pnl-green)' }}>
+                                            <MdCheckCircle className="w-3 h-3" /> Active
                                         </span>
-                                        {set.id === activeId && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                                style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)', border: '1px solid var(--pnl-green)' }}>
-                                                <MdCheckCircle className="w-3 h-3" /> Active
-                                            </span>
-                                        )}
-                                        {set.info_type === 'warning' && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                                style={{ background: 'rgba(255,180,0,0.12)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.3)' }}>
-                                                <MdWarning className="w-3 h-3" /> Demo
-                                            </span>
-                                        )}
-                                    </div>
-                                    {set.description && (
-                                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                                            {set.description}
-                                        </p>
                                     )}
-                                </div>
-
-                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    {set.info_type === 'warning' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                            style={{ background: 'rgba(255,180,0,0.12)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.3)' }}>
+                                            <MdWarning className="w-3 h-3" /> Demo
+                                        </span>
+                                    )}
+                                    {/* Buttons pushed to the right */}
+                                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                                     {set.id !== activeId && (
                                         <button
                                             onClick={() => handleActivate(set.id)}
@@ -177,7 +170,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             Delete
                                         </button>
                                     )}
-                                </div>
+                                </div>{/* end buttons */}
+                                </div>{/* end row 1 */}
+
+                                {/* Row 2: description + date */}
+                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                    {set.description && <>{set.description} · </>}
+                                    Created {new Date(set.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                </p>
                             </div>
                         ))}
                     </div>
