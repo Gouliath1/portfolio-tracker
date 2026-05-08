@@ -20,6 +20,8 @@ declare module '@tanstack/react-table' {
     interface TableMeta<TData> {
         showValues: boolean;
         baseCurrency: string;
+        onDeleteRow?: (position: Position) => void;
+        isDemoSet?: boolean;
     }
 }
 
@@ -27,6 +29,8 @@ interface PositionsTableProps {
     positions: Position[];
     showValues: boolean;
     baseCurrency?: string;
+    onDeletePosition?: (position: Position) => void;
+    isDemoSet?: boolean;
 }
 
 /**
@@ -44,7 +48,7 @@ interface PositionsTableProps {
  * @param showValues - Boolean to control value visibility (privacy mode)
  * @returns JSX element containing the complete positions table interface
  */
-export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY' }: PositionsTableProps) => {
+export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, isDemoSet = false }: PositionsTableProps) => {
     // Use custom hooks for state management
     const {
         sorting,
@@ -64,7 +68,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY' }: 
     const filteredData = useFilteredPositions(positions, filterText);
 
     // Get column definitions
-    const columns = createTableColumns();
+    const columns = createTableColumns({ showDelete: !isDemoSet });
 
     /**
      * Creates and configures the react-table instance with all necessary options
@@ -83,6 +87,8 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY' }: 
         meta: {
             showValues,
             baseCurrency,
+            onDeleteRow: onDeletePosition ? (pos: Position) => onDeletePosition(pos) : undefined,
+            isDemoSet,
         },
         onSortingChange: setSorting,
         onColumnVisibilityChange: setColumnVisibility,

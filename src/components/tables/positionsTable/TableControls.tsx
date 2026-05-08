@@ -59,7 +59,7 @@ export const TableControls: React.FC<TableControlsProps> = ({
                                 Hide all
                             </button>
                             <div className="h-px my-1" style={{ background: 'var(--border)' }} />
-                            {table.getAllColumns().map(column => (
+                            {table.getAllColumns().filter(column => column.id !== 'delete').map(column => (
                                 <label
                                     key={column.id}
                                     className="flex items-center px-4 py-2 text-xs cursor-pointer glass-hover transition-colors"

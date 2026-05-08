@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
-import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
+import { PortfolioSummary as PortfolioSummaryType, Position } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
 import { PerformanceChart } from '../components/charts/PerformanceChart';
 import { PositionsTable } from '../components/tables/PositionsTable';
@@ -12,10 +12,16 @@ import DemoBanner from '../components/layout/DemoBanner';
 import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
-import { MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdDownload } from 'react-icons/md';
+import { MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdDownload, MdUndo } from 'react-icons/md';
 import ImportSetModal from '../components/management/ImportSetModal';
 import AddPositionModal from '../components/management/AddPositionModal';
-import { getActiveSetId, exportSetPositions } from '../utils/localPositions';
+import { getActiveSetId, exportSetPositions, removePositionFromSet, insertPositionIntoSet } from '../utils/localPositions';
+
+interface UndoEntry {
+  position: Position;
+  index: number;
+  setId: string;
+}
 
 // ── Component ────────────────────────────────────────────────
 export default function Home() {
@@ -28,6 +34,8 @@ export default function Home() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [addPositionOpen, setAddPositionOpen] = useState(false);
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
+  const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showValues, setShowValues] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
     return saved ? JSON.parse(saved) : true;
@@ -78,12 +86,14 @@ export default function Home() {
     }
   };
 
-  const handlePositionSetChanged = () => {
-    setPortfolioSummary(null);
-    setLoading(true);
+  const handlePositionSetChanged = useCallback((silent = false) => {
+    if (!silent) {
+      setPortfolioSummary(null);
+      setLoading(true);
+    }
     setDemoBannerRefresh(prev => prev + 1);
-    loadData(true, true);
-  };
+    loadData(!silent, !silent);
+  }, [loadData]);
 
   const handleCurrencyChange = (next: Parameters<typeof setCurrency>[0]) => {
     setCurrency(next);
@@ -105,6 +115,67 @@ export default function Home() {
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
+
+  const handleDeletePosition = useCallback((position: Position) => {
+    const setId = getActiveSetId();
+    const rawPositions = exportSetPositions(setId);
+    const index = rawPositions.findIndex(
+      p => String(p.ticker) === String(position.ticker) &&
+           p.transactionDate === position.transactionDate &&
+           p.quantity === position.quantity &&
+           p.costPerUnit === position.costPerUnit
+    );
+    if (index === -1) return;
+
+    const result = removePositionFromSet(setId, index);
+    if (!result) return;
+
+    // Optimistic UI: splice position out of current summary without reloading
+    setPortfolioSummary(prev => {
+      if (!prev) return prev;
+      const positions = prev.positions.filter(p => p !== position);
+      const totalCostJPY = positions.reduce((s, p) => s + p.costInJPY, 0);
+      const totalValueJPY = positions.reduce((s, p) => s + p.currentValueJPY, 0);
+      const totalPnlJPY = totalValueJPY - totalCostJPY;
+      const totalPnlPercentage = totalCostJPY === 0 ? 0 : (totalPnlJPY / totalCostJPY) * 100;
+      return { positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
+    });
+
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    // Use actualSetId so undo knows the real set (post demo-promotion if applicable)
+    setUndoEntry({ position, index, setId: result.actualSetId });
+
+    // After 5s, confirm deletion with a silent background reload
+    undoTimerRef.current = setTimeout(() => {
+      setUndoEntry(null);
+      handlePositionSetChanged(true);
+    }, 5000);
+  }, [handlePositionSetChanged]);
+
+  const handleUndo = useCallback(() => {
+    if (!undoEntry) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    // Restore in localStorage
+    insertPositionIntoSet(undoEntry.setId, undoEntry.position, undoEntry.index);
+    // Restore in UI optimistically
+    setPortfolioSummary(prev => {
+      if (!prev) return prev;
+      const positions = [
+        ...prev.positions.slice(0, undoEntry.index),
+        undoEntry.position,
+        ...prev.positions.slice(undoEntry.index),
+      ];
+      const totalCostJPY = positions.reduce((s, p) => s + p.costInJPY, 0);
+      const totalValueJPY = positions.reduce((s, p) => s + p.currentValueJPY, 0);
+      const totalPnlJPY = totalValueJPY - totalCostJPY;
+      const totalPnlPercentage = totalCostJPY === 0 ? 0 : (totalPnlJPY / totalCostJPY) * 100;
+      return { positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
+    });
+    setUndoEntry(null);
+  }, [undoEntry]);
+
+  // Cleanup undo timer on unmount
+  useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); }, []);
 
   const hasStalePrice = portfolioSummary?.positions.some(p => p.currentPrice === null) ?? false;
 
@@ -242,9 +313,38 @@ export default function Home() {
             </button>
           </div>
 
-          <PositionsTable positions={portfolioSummary.positions} showValues={showValues} baseCurrency={currency} />
+          <PositionsTable
+            positions={portfolioSummary.positions}
+            showValues={showValues}
+            baseCurrency={currency}
+            onDeletePosition={handleDeletePosition}
+          />
         </div>
       </main>
+
+      {/* ── Undo toast ───────────────────────────────────────── */}
+      {undoEntry && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl"
+          style={{
+            background: 'var(--surface-popover)',
+            border: '1px solid var(--border-strong)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <span style={{ color: 'var(--text-primary)' }}>{String(undoEntry.position.ticker)}</span> removed
+          </span>
+          <button
+            onClick={handleUndo}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+          >
+            <MdUndo size={15} />
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* ── Import set modal ─────────────────────────────── */}
       {importModalOpen && (

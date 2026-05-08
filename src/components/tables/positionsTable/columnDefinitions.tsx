@@ -9,6 +9,7 @@ import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
+import { MdDeleteOutline } from 'react-icons/md';
 
 const columnHelper = createColumnHelper<Position>();
 
@@ -17,8 +18,8 @@ const columnHelper = createColumnHelper<Position>();
  * Each column includes header, size, and custom cell rendering logic
  * @returns Array of column definitions for react-table
  */
-export function createTableColumns() {
-    return [
+export function createTableColumns({ showDelete = false }: { showDelete?: boolean } = {}) {
+    const cols = [
         /**
          * Transaction date column - shows when the position was acquired
          */
@@ -353,4 +354,29 @@ export function createTableColumns() {
             },
         }),
     ];
+
+    if (showDelete) {
+        const deleteCol = columnHelper.display({
+            id: 'delete',
+            size: 40,
+            header: () => <MdDeleteOutline size={14} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />,
+            cell: props => {
+                const onDelete = props.table.options.meta?.onDeleteRow;
+                return (
+                    <button
+                        onClick={e => { e.stopPropagation(); onDelete?.(props.row.original); }}
+                        className="flex items-center justify-center p-1 rounded-md transition-all opacity-30 hover:opacity-100"
+                        style={{ color: 'var(--pnl-red)' }}
+                        aria-label="Delete position"
+                    >
+                        <MdDeleteOutline size={15} />
+                    </button>
+                );
+            },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cols.unshift(deleteCol as any);
+    }
+
+    return cols;
 }

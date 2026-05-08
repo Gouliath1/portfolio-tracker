@@ -131,6 +131,43 @@ export function exportSetPositions(id: string): RawPosition[] {
 }
 
 /**
+ * Removes a position from a set by index.
+ * If the active set is the demo, promotes it to "My Portfolio" first (same
+ * pattern as addPositionToSet), then removes. Returns the actual set ID written
+ * to (may differ from the input when demo promotion occurs) and the removed position.
+ */
+export function removePositionFromSet(setId: string, index: number): { removedPosition: RawPosition; actualSetId: string } | null {
+    if (setId === DEMO_SET_ID) {
+        const demoPositions = getPositionsForSet(DEMO_SET_ID);
+        if (index < 0 || index >= demoPositions.length) return null;
+        const removed = demoPositions[index];
+        const remaining = [...demoPositions.slice(0, index), ...demoPositions.slice(index + 1)];
+        const newSet = importPositionSet(
+            'my-portfolio',
+            'My Portfolio',
+            'Started from demo data',
+            remaining,
+            true,
+        );
+        return { removedPosition: removed, actualSetId: newSet.id };
+    }
+    const positions = getPositionsForSet(setId);
+    if (index < 0 || index >= positions.length) return null;
+    const removed = positions[index];
+    const updated = [...positions.slice(0, index), ...positions.slice(index + 1)];
+    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
+    return { removedPosition: removed, actualSetId: setId };
+}
+
+export function insertPositionIntoSet(setId: string, position: RawPosition, index: number): void {
+    if (setId === DEMO_SET_ID) return;
+    const positions = getPositionsForSet(setId);
+    const clamped = Math.max(0, Math.min(index, positions.length));
+    const updated = [...positions.slice(0, clamped), position, ...positions.slice(clamped)];
+    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
+}
+
+/**
  * Adds a position to a set.
  * If the active set is the demo, promotes it: clones the demo positions into a
  * new real set ("My Portfolio"), activates it, then appends the new position.
