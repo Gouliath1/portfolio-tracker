@@ -120,7 +120,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
                             <input

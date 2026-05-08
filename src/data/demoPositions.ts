@@ -64,7 +64,7 @@ export const DEMO_SET = {
     id: DEMO_SET_ID,
     name: 'demo-portfolio',
     display_name: 'Demo Portfolio',
-    description: 'Sample data — open Settings to import your own positions',
+    description: 'Viewing demo data — use Import set or Add position to start your own portfolio',
     info_type: 'warning',
     is_active: true,
     created_at: new Date('2024-01-01').toISOString(),

@@ -209,16 +209,16 @@ export default function Home() {
     <>
       <main className="min-h-screen">
         {/* ── Header ───────────────────────────────────────── */}
-        <header className="sticky top-0 z-30 px-6 py-4" style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
-          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-30 px-4 sm:px-6 py-3 sm:py-4" style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
             {/* Title */}
-            <h1 className="text-xl font-semibold tracking-tight"
+            <h1 className="text-lg sm:text-xl font-semibold tracking-tight flex-shrink-0"
               style={{ color: 'var(--text-primary)' }}>
               Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
             </h1>
 
             {/* Right controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Active currency badge */}
               <span className="px-2 py-1 rounded-md text-xs font-mono font-semibold"
                 style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
@@ -233,9 +233,9 @@ export default function Home() {
                     style={{ color: 'var(--pnl-red)' }}
                     aria-label="Some prices unavailable"
                   >
-                    <MdCloudOff size={20} />
+                    <MdCloudOff size={18} />
                   </button>
-                  <div className="absolute right-0 top-full mt-2 w-64 glass rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                  <div className="absolute right-0 top-full mt-2 w-56 glass rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
                     style={{ color: 'var(--text-secondary)' }}>
                     Some prices unavailable — showing last cached values
                   </div>
@@ -245,17 +245,19 @@ export default function Home() {
               {/* Show/hide values */}
               <button
                 onClick={() => setShowValues(!showValues)}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all glass glass-hover"
+                className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-all glass glass-hover"
                 style={{ color: 'var(--text-secondary)' }}
+                aria-label={showValues ? 'Hide values' : 'Show values'}
               >
-                {showValues ? 'Hide' : 'Show'} values
+                <span className="hidden sm:inline">{showValues ? 'Hide' : 'Show'} values</span>
+                <span className="sm:hidden">{showValues ? '🙈' : '👁'}</span>
               </button>
 
               {/* Refresh */}
               <button
                 onClick={handleRefreshClick}
                 disabled={refreshing}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                 style={{
                   background: 'var(--accent-dim)',
                   color: 'var(--accent)',
@@ -263,7 +265,7 @@ export default function Home() {
                 }}
               >
                 <MdRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
-                {refreshing ? 'Refreshing…' : 'Refresh'}
+                <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
               </button>
 
               {/* Settings */}
@@ -280,7 +282,7 @@ export default function Home() {
         </header>
 
         {/* ── Content ──────────────────────────────────────── */}
-        <div className="max-w-screen-2xl mx-auto px-6 py-6 space-y-6">
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
           <DemoBanner refreshTrigger={demoBannerRefresh} />
           <PortfolioSummary summary={portfolioSummary} showValues={showValues} symbol={symbol} formatValue={formatValue} />
           <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} currency={currency} symbol={symbol} />

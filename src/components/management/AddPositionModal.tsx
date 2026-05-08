@@ -185,7 +185,7 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
                     )}
 
                     {/* Ticker + Company name */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <label className="text-xs" style={labelStyle}>Ticker *</label>
                             <input
@@ -215,7 +215,7 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
                     </div>
 
                     {/* Quantity + Cost per unit + Fees */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div className="space-y-1">
                             <label className="text-xs" style={labelStyle}>Quantity *</label>
                             <input
@@ -256,7 +256,7 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
                     )}
 
                     {/* Currencies */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <label className="text-xs" style={labelStyle}>Transaction currency *</label>
                             <select className={inputClass} style={inputStyle} value={form.transactionCcy} onChange={set('transactionCcy')}>
@@ -285,7 +285,7 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
                     </div>
 
                     {/* Broker + Account with datalist suggestions */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <label className="text-xs" style={labelStyle}>Broker</label>
                             <input

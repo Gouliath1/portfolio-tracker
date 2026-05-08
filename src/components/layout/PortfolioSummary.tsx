@@ -45,7 +45,7 @@ const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProp
 
     return (
         <div
-            className="glass rounded-2xl p-6 relative overflow-hidden transition-all duration-300 flex flex-col justify-between min-h-[120px]"
+            className="glass rounded-2xl p-4 sm:p-6 relative overflow-hidden transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[120px]"
             style={{ border: `1px solid ${borderColor}` }}
         >
             {flash && glowBg && (
@@ -57,7 +57,7 @@ const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProp
                     style={{ color: 'var(--text-muted)' }}>
                     {label}
                 </p>
-                <div className="text-3xl font-semibold tabular-nums leading-none"
+                <div className="text-2xl sm:text-3xl font-semibold tabular-nums leading-none"
                     style={{ color: valueColor }}>
                     {value}
                 </div>
