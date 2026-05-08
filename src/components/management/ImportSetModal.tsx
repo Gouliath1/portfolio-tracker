@@ -1,0 +1,220 @@
+'use client';
+
+import React, { useState } from 'react';
+import { MdClose, MdDownload, MdRefresh, MdUpload } from 'react-icons/md';
+import { importPositionSet } from '../../utils/localPositions';
+import { RawPosition } from '@portfolio/types';
+
+const TEMPLATE_POSITIONS: RawPosition[] = [
+    {
+        transactionDate: '2023/01/10',
+        ticker: 'AAPL',
+        fullName: 'Apple Inc.',
+        broker: 'My Broker',
+        account: 'Main Account',
+        quantity: 10,
+        costPerUnit: 130.0,
+        transactionCcy: 'USD',
+        stockCcy: 'USD',
+    },
+];
+
+interface ImportSetModalProps {
+    onImported: (positionCount: number, setAsActive: boolean) => void;
+    onClose: () => void;
+}
+
+export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
+    const [fields, setFields] = useState({ name: '', description: '', set_as_active: false });
+    const [importing, setImporting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [dragging, setDragging] = useState(false);
+
+    const handleDownloadTemplate = () => {
+        const blob = new Blob([JSON.stringify(TEMPLATE_POSITIONS, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'positions-template.json';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+
+    const processFile = async (file: File) => {
+        setImporting(true);
+        setError(null);
+        try {
+            const content = await file.text();
+            const jsonData = JSON.parse(content);
+            let positions: RawPosition[];
+            if (Array.isArray(jsonData)) {
+                positions = jsonData;
+            } else if (jsonData.positions && Array.isArray(jsonData.positions)) {
+                positions = jsonData.positions;
+            } else {
+                throw new Error('Invalid JSON format. Expected a positions array.');
+            }
+
+            importPositionSet(
+                fields.name || `imported-${Date.now()}`,
+                fields.name || file.name.replace('.json', ''),
+                fields.description || `Imported from ${file.name}`,
+                positions,
+                fields.set_as_active,
+            );
+
+            onImported(positions.length, fields.set_as_active);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to import');
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFile(file);
+        e.target.value = '';
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) processFile(file);
+    };
+
+    const inputClass = 'w-full px-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1';
+    const inputStyle = { color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+            onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div
+                className="relative w-full max-w-md rounded-2xl flex flex-col"
+                style={{
+                    background: 'var(--surface-popover)',
+                    border: '1px solid var(--border-strong)',
+                    boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+                    maxHeight: '90vh',
+                }}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Import position set</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+                        <MdClose size={18} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                    {error && (
+                        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
+                            <input
+                                type="text"
+                                value={fields.name}
+                                onChange={e => setFields(p => ({ ...p, name: e.target.value }))}
+                                placeholder="My Portfolio 2025"
+                                className={inputClass}
+                                style={inputStyle}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Description</label>
+                            <input
+                                type="text"
+                                value={fields.description}
+                                onChange={e => setFields(p => ({ ...p, description: e.target.value }))}
+                                placeholder="Optional description"
+                                className={inputClass}
+                                style={inputStyle}
+                            />
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={fields.set_as_active}
+                            onChange={e => setFields(p => ({ ...p, set_as_active: e.target.checked }))}
+                            style={{ accentColor: 'var(--accent)' }}
+                        />
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Set as active after import</span>
+                    </label>
+
+                    {/* Drop zone */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>JSON File *</span>
+                            <button
+                                onClick={handleDownloadTemplate}
+                                className="text-xs flex items-center gap-1 transition-opacity opacity-70 hover:opacity-100"
+                                style={{ color: 'var(--accent)' }}
+                            >
+                                <MdDownload className="w-3 h-3" />
+                                Download template
+                            </button>
+                        </div>
+
+                        <label
+                            className="flex flex-col items-center justify-center gap-3 w-full rounded-xl cursor-pointer transition-all"
+                            style={{
+                                border: `1px dashed ${dragging ? 'var(--accent)' : 'var(--border)'}`,
+                                background: dragging ? 'var(--accent-dim)' : 'var(--glass-bg)',
+                                padding: '2rem 1rem',
+                                color: 'var(--text-secondary)',
+                            }}
+                            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                            onDragLeave={() => setDragging(false)}
+                            onDrop={handleDrop}
+                        >
+                            {importing ? (
+                                <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--accent)' }}>
+                                    <MdRefresh className="w-4 h-4 animate-spin" />
+                                    Importing…
+                                </div>
+                            ) : (
+                                <>
+                                    <MdUpload className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+                                    <span className="text-sm text-center">
+                                        Drop a JSON file here or <span style={{ color: 'var(--accent)' }}>browse</span>
+                                    </span>
+                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — positions array</span>
+                                </>
+                            )}
+                            <input type="file" accept=".json" onChange={handleFileInput} disabled={importing} className="sr-only" />
+                        </label>
+
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            Each position requires: ticker, fullName, account, quantity, costPerUnit, transactionCcy, stockCcy, transactionDate
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm glass glass-hover rounded-lg transition-all"
+                            style={{ color: 'var(--text-secondary)' }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

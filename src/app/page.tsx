@@ -12,7 +12,10 @@ import DemoBanner from '../components/layout/DemoBanner';
 import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
-import { MdCloudOff, MdRefresh, MdSettings } from 'react-icons/md';
+import { MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdDownload } from 'react-icons/md';
+import ImportSetModal from '../components/management/ImportSetModal';
+import AddPositionModal from '../components/management/AddPositionModal';
+import { getActiveSetId, exportSetPositions } from '../utils/localPositions';
 
 // ── Component ────────────────────────────────────────────────
 export default function Home() {
@@ -22,6 +25,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [addPositionOpen, setAddPositionOpen] = useState(false);
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
   const [showValues, setShowValues] = useState(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
@@ -85,6 +90,20 @@ export default function Home() {
     setPortfolioSummary(null);
     setLoading(true);
     loadData(false, false, next);
+  };
+
+  const handleExportActive = () => {
+    const id = getActiveSetId();
+    const positions = exportSetPositions(id);
+    const blob = new Blob([JSON.stringify(positions, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${id}-positions.json`;
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const hasStalePrice = portfolioSummary?.positions.some(p => p.currentPrice === null) ?? false;
@@ -194,9 +213,62 @@ export default function Home() {
           <DemoBanner refreshTrigger={demoBannerRefresh} />
           <PortfolioSummary summary={portfolioSummary} showValues={showValues} symbol={symbol} formatValue={formatValue} />
           <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} currency={currency} symbol={symbol} />
+
+          {/* ── Data actions toolbar ─────────────────────────── */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setImportModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}
+            >
+              <MdUpload size={15} />
+              Import set
+            </button>
+            <button
+              onClick={() => setAddPositionOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium glass glass-hover transition-all"
+              style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              <MdAdd size={15} />
+              Add position
+            </button>
+            <button
+              onClick={handleExportActive}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium glass glass-hover transition-all"
+              style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              <MdDownload size={15} />
+              Export
+            </button>
+          </div>
+
           <PositionsTable positions={portfolioSummary.positions} showValues={showValues} baseCurrency={currency} />
         </div>
       </main>
+
+      {/* ── Import set modal ─────────────────────────────── */}
+      {importModalOpen && (
+        <ImportSetModal
+          onImported={(count, wasActive) => {
+            setImportModalOpen(false);
+            setDemoBannerRefresh(prev => prev + 1);
+            if (wasActive) handlePositionSetChanged();
+          }}
+          onClose={() => setImportModalOpen(false)}
+        />
+      )}
+
+      {/* ── Add position modal ───────────────────────────── */}
+      {addPositionOpen && (
+        <AddPositionModal
+          setId={getActiveSetId()}
+          onSaved={() => {
+            setAddPositionOpen(false);
+            handlePositionSetChanged();
+          }}
+          onClose={() => setAddPositionOpen(false)}
+        />
+      )}
 
       {/* ── Welcome modal (first visit only) ────────────── */}
       <WelcomeModal onOpenSettings={() => setSettingsOpen(true)} />
