@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { MdClose, MdAdd, MdInfo } from 'react-icons/md';
-import { RawPosition } from '@portfolio/types';
+import { Transaction } from '@portfolio/types';
 import { DEMO_SET_ID } from '../../data/demoPositions';
-import { getPositionsForSet } from '../../utils/localPositions';
+import { getTransactionsForSet } from '../../utils/localPositions';
 
 interface AddPositionModalProps {
     setId: string;
@@ -29,22 +29,23 @@ const EMPTY = {
 
 type FormState = typeof EMPTY;
 
-function toRawPosition(f: FormState): RawPosition {
+function toTransaction(f: FormState): Transaction {
     const qty = parseFloat(f.quantity);
     const cpu = parseFloat(f.costPerUnit);
     const fees = parseFloat(f.fees) || 0;
-    const effectiveCostPerUnit = fees > 0 ? (cpu * qty + fees) / qty : cpu;
 
     return {
+        way: 'buy',
+        date: f.transactionDate.replace(/-/g, '/'),
         ticker: f.ticker.trim().toUpperCase(),
         fullName: f.fullName.trim(),
         broker: f.broker.trim() || undefined,
         account: f.account.trim(),
         quantity: qty,
-        costPerUnit: effectiveCostPerUnit,
-        transactionCcy: f.transactionCcy,
+        pricePerUnit: cpu,
+        fees,
+        ccy: f.transactionCcy,
         stockCcy: f.stockCcy,
-        transactionDate: f.transactionDate.replace(/-/g, '/'),
     };
 }
 
@@ -63,9 +64,9 @@ function validate(f: FormState): string | null {
 }
 
 function useKnownValues(setId: string) {
-    const positions = getPositionsForSet(setId);
-    const brokers = [...new Set(positions.map(p => p.broker).filter(Boolean) as string[])];
-    const accounts = [...new Set(positions.map(p => p.account).filter(Boolean))];
+    const txs = getTransactionsForSet(setId);
+    const brokers = [...new Set(txs.map(p => p.broker).filter(Boolean) as string[])];
+    const accounts = [...new Set(txs.map(p => p.account).filter(Boolean))];
     return { brokers, accounts };
 }
 
@@ -124,8 +125,8 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
         e.preventDefault();
         const err = validate(form);
         if (err) { setError(err); return; }
-        const { addPositionToSet } = await import('../../utils/localPositions');
-        addPositionToSet(setId, toRawPosition(form));
+        const { addTransactionToSet } = await import('../../utils/localPositions');
+        addTransactionToSet(setId, toTransaction(form));
         onSaved();
     };
 

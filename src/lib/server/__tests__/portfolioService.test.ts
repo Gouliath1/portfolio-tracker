@@ -91,8 +91,13 @@ describe('portfolioService', () => {
           pnlPercentage: 11.11,
           transactionFxRate: 1,
           currentFxRate: 1,
+          status: 'open',
         },
       ],
+      closedPositions: [],
+      realizedPnlJPY: 0,
+      realizedCostJPY: 0,
+      realizedPnlPercentage: 0,
     };
 
     mockedCalculatePortfolioSummary.mockResolvedValue(fakeSummary);

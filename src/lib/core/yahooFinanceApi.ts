@@ -538,29 +538,36 @@ export const convertToJPY = convertToBaseCurrency;
 // Export BASE_CURRENCY_CONSTANT kept for backward-compat; prefer passing baseCurrency explicitly
 export const BASE_CURRENCY_CONSTANT = BASE_CURRENCY;
 
-async function fetchWithRetry(url: string, retries = 3, baseDelay = 1000): Promise<Response> {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)'
-                }
-            });
+// Deduplicates concurrent fetches for the same URL.
+const _inFlight = new Map<string, Promise<Response>>();
 
-            if (response.ok) {
-                return response;
+async function fetchWithRetry(url: string, retries = 2, baseDelay = 1000): Promise<Response> {
+    const existing = _inFlight.get(url);
+    if (existing) return existing;
+
+    const promise = (async () => {
+        for (let i = 0; i < retries; i++) {
+            let response: Response;
+            try {
+                response = await fetch(url);
+            } catch {
+                // Network error (Load failed / connection refused) — never retry.
+                throw new TypeError(`Network error fetching ${url}`);
             }
 
-            if (response.status === 429) {
+            if (response.ok) return response;
+
+            const retryable = response.status === 429 || response.status >= 500;
+            if (retryable && i < retries - 1) {
                 await delay(baseDelay * Math.pow(2, i));
                 continue;
             }
-
-            throw new Error(`HTTP error! status: ${response.status}`);
-        } catch (error) {
-            if (i === retries - 1) throw error;
-            await delay(baseDelay * Math.pow(2, i));
+            throw new Error(`HTTP ${response.status}`);
         }
-    }
-    throw new Error('Max retries reached');
+        throw new Error('Max retries reached');
+    })();
+
+    _inFlight.set(url, promise);
+    promise.finally(() => _inFlight.delete(url));
+    return promise;
 }

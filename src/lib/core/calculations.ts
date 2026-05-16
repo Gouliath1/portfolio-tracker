@@ -43,23 +43,13 @@ async function convertCurrency(amount: number, fromCcy: string, toCcy: string, i
 }
 
 export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null, baseCurrency: string = 'JPY'): Promise<Position> => {
+    const isClosed = !!rawPosition.saleDate;
+
     // 1. Calculate original FX rate (only if transaction was not in base currency)
     let origFxRate = 1;
     let costPerUnitInBase = rawPosition.costPerUnit;
 
-    if (rawPosition.transactionCcy !== rawPosition.stockCcy) {
-        if (rawPosition.transactionCcy !== baseCurrency) {
-            const conversion = await convertCurrency(
-                rawPosition.costPerUnit,
-                rawPosition.transactionCcy,
-                baseCurrency,
-                true, // historical
-                rawPosition.transactionDate
-            );
-            costPerUnitInBase = conversion.convertedAmount;
-            origFxRate = conversion.fxRate;
-        }
-    } else if (rawPosition.transactionCcy !== baseCurrency) {
+    if (rawPosition.transactionCcy !== baseCurrency) {
         const conversion = await convertCurrency(
             rawPosition.costPerUnit,
             rawPosition.transactionCcy,
@@ -74,7 +64,45 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
     // 2. Calculate cost in base currency
     const costInJPY = costPerUnitInBase * rawPosition.quantity;
 
-    // 3. Calculate current value and FX rate
+    // 3a. Closed lot: compute realized P&L using historical FX at sale date.
+    if (isClosed) {
+        const saleCcy = rawPosition.saleCcy ?? rawPosition.stockCcy;
+        const salePricePerUnit = rawPosition.salePricePerUnit ?? 0;
+        let salePricePerUnitInBase = salePricePerUnit;
+        let saleFxRate = 1;
+        if (saleCcy !== baseCurrency) {
+            const conversion = await convertCurrency(
+                salePricePerUnit,
+                saleCcy,
+                baseCurrency,
+                true, // historical
+                rawPosition.saleDate
+            );
+            salePricePerUnitInBase = conversion.convertedAmount;
+            saleFxRate = conversion.fxRate;
+        }
+        const proceedsJPY = salePricePerUnitInBase * rawPosition.quantity;
+        const realizedPnlJPY = proceedsJPY - costInJPY;
+        const realizedPnlPercentage = costInJPY === 0 ? 0 : (realizedPnlJPY / costInJPY) * 100;
+
+        return {
+            ...rawPosition,
+            status: 'closed',
+            currentPrice: null,
+            costInJPY,
+            currentValueJPY: 0,
+            pnlJPY: 0,
+            pnlPercentage: 0,
+            transactionFxRate: origFxRate,
+            currentFxRate: 1,
+            proceedsJPY,
+            realizedPnlJPY,
+            realizedPnlPercentage,
+            saleFxRate,
+        };
+    }
+
+    // 3b. Open lot: current value and FX rate
     let currentValueJPY = 0;
     let currentFxRate = 1;
 
@@ -99,6 +127,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 
     return {
         ...rawPosition,
+        status: 'open',
         currentPrice,
         costInJPY,
         currentValueJPY,
@@ -112,15 +141,15 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 export const calculatePortfolioSummary = async (rawPositions: RawPosition[], forceRefresh: boolean = false, baseCurrency: string = 'JPY'): Promise<PortfolioSummary> => {
     console.log(`📊 calculatePortfolioSummary called with ${rawPositions.length} positions, forceRefresh: ${forceRefresh}, baseCurrency: ${baseCurrency}`);
 
-    const uniqueTickers = [...new Set(rawPositions.map(pos => pos.ticker.toString()))];
+    // Only fetch live prices for tickers that have at least one open lot.
+    const openTickers = [...new Set(rawPositions.filter(p => !p.saleDate).map(pos => pos.ticker.toString()))];
 
     let currentPrices: { [key: string]: number | null } = {};
 
     if (forceRefresh) {
-        currentPrices = await updateAllPositions(uniqueTickers);
+        currentPrices = await updateAllPositions(openTickers);
     } else {
-        for (const pos of rawPositions) {
-            const ticker = pos.ticker.toString();
+        for (const ticker of openTickers) {
             if (!currentPrices[ticker]) {
                 currentPrices[ticker] = await fetchStockPrice(ticker, forceRefresh);
             }
@@ -128,9 +157,12 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
     }
 
     const positionPromises = rawPositions.map(pos =>
-        calculatePosition(pos, currentPrices[pos.ticker.toString()], baseCurrency)
+        calculatePosition(pos, pos.saleDate ? null : currentPrices[pos.ticker.toString()] ?? null, baseCurrency)
     );
-    const positions = await Promise.all(positionPromises);
+    const allPositions = await Promise.all(positionPromises);
+
+    const positions = allPositions.filter(p => p.status === 'open');
+    const closedPositions = allPositions.filter(p => p.status === 'closed');
 
     const totalCostJPY = positions.reduce((sum, pos) => sum + pos.costInJPY, 0);
     const totalValueJPY = positions.reduce((sum, pos) => sum + pos.currentValueJPY, 0);
@@ -139,11 +171,21 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         ? 0
         : (totalPnlJPY / totalCostJPY) * 100;
 
+    const realizedCostJPY = closedPositions.reduce((sum, pos) => sum + pos.costInJPY, 0);
+    const realizedPnlJPY = closedPositions.reduce((sum, pos) => sum + (pos.realizedPnlJPY ?? 0), 0);
+    const realizedPnlPercentage = realizedCostJPY === 0
+        ? 0
+        : (realizedPnlJPY / realizedCostJPY) * 100;
+
     return {
         totalValueJPY,
         totalCostJPY,
         totalPnlJPY,
         totalPnlPercentage,
-        positions
+        positions,
+        closedPositions,
+        realizedPnlJPY,
+        realizedCostJPY,
+        realizedPnlPercentage,
     };
 };

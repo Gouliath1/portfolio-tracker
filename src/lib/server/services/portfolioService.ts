@@ -18,6 +18,10 @@ const createEmptySummary = (): PortfolioSummary => ({
   totalPnlJPY: 0,
   totalPnlPercentage: 0,
   positions: [],
+  closedPositions: [],
+  realizedPnlJPY: 0,
+  realizedCostJPY: 0,
+  realizedPnlPercentage: 0,
 });
 
 export const getActivePositions = async (): Promise<RawPosition[]> => {

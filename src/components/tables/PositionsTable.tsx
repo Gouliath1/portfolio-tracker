@@ -21,6 +21,7 @@ declare module '@tanstack/react-table' {
         showValues: boolean;
         baseCurrency: string;
         onDeleteRow?: (position: Position) => void;
+        onSellRow?: (position: Position) => void;
         isDemoSet?: boolean;
     }
 }
@@ -30,6 +31,7 @@ interface PositionsTableProps {
     showValues: boolean;
     baseCurrency?: string;
     onDeletePosition?: (position: Position) => void;
+    onSellPosition?: (position: Position) => void;
     isDemoSet?: boolean;
 }
 
@@ -48,7 +50,7 @@ interface PositionsTableProps {
  * @param showValues - Boolean to control value visibility (privacy mode)
  * @returns JSX element containing the complete positions table interface
  */
-export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, isDemoSet = false }: PositionsTableProps) => {
+export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, onSellPosition, isDemoSet = false }: PositionsTableProps) => {
     // Use custom hooks for state management
     const {
         sorting,
@@ -68,7 +70,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
     const filteredData = useFilteredPositions(positions, filterText);
 
     // Get column definitions
-    const columns = createTableColumns({ showDelete: !isDemoSet });
+    const columns = createTableColumns({ showDelete: !isDemoSet, showSell: !isDemoSet && !!onSellPosition });
 
     /**
      * Creates and configures the react-table instance with all necessary options
@@ -88,6 +90,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
             showValues,
             baseCurrency,
             onDeleteRow: onDeletePosition ? (pos: Position) => onDeletePosition(pos) : undefined,
+            onSellRow: onSellPosition ? (pos: Position) => onSellPosition(pos) : undefined,
             isDemoSet,
         },
         onSortingChange: setSorting,

@@ -51,6 +51,10 @@ describe('PortfolioSummary Component', () => {
     totalPnlJPY: 500000,
     totalPnlPercentage: 11.11,
     positions: [],
+    closedPositions: [],
+    realizedPnlJPY: 0,
+    realizedCostJPY: 0,
+    realizedPnlPercentage: 0,
   }
 
   it('should render portfolio summary data correctly', () => {
@@ -79,6 +83,10 @@ describe('PortfolioSummary Component', () => {
       totalPnlJPY: -1000000,
       totalPnlPercentage: -20.0,
       positions: [],
+      closedPositions: [],
+      realizedPnlJPY: 0,
+      realizedCostJPY: 0,
+      realizedPnlPercentage: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={lossySummary} />)
@@ -94,6 +102,10 @@ describe('PortfolioSummary Component', () => {
       totalPnlJPY: 234567890,
       totalPnlPercentage: 23.46,
       positions: [],
+      closedPositions: [],
+      realizedPnlJPY: 0,
+      realizedCostJPY: 0,
+      realizedPnlPercentage: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={largeSummary} />)
@@ -110,6 +122,10 @@ describe('PortfolioSummary Component', () => {
       totalPnlJPY: 0,
       totalPnlPercentage: 0,
       positions: [],
+      closedPositions: [],
+      realizedPnlJPY: 0,
+      realizedCostJPY: 0,
+      realizedPnlPercentage: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={zeroSummary} />)
@@ -128,6 +144,10 @@ describe('PortfolioSummary Component', () => {
         totalPnlJPY: 233.57,
         totalPnlPercentage: 23.36,
         positions: [],
+        closedPositions: [],
+        realizedPnlJPY: 0,
+        realizedCostJPY: 0,
+        realizedPnlPercentage: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)
@@ -146,6 +166,10 @@ describe('PortfolioSummary Component', () => {
         totalPnlJPY: 100000,
         totalPnlPercentage: 10.0,
         positions: [],
+        closedPositions: [],
+        realizedPnlJPY: 0,
+        realizedCostJPY: 0,
+        realizedPnlPercentage: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)
@@ -160,6 +184,10 @@ describe('PortfolioSummary Component', () => {
         totalPnlJPY: -100000,
         totalPnlPercentage: -10.0,
         positions: [],
+        closedPositions: [],
+        realizedPnlJPY: 0,
+        realizedCostJPY: 0,
+        realizedPnlPercentage: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)

@@ -1,62 +1,71 @@
-import { RawPosition } from '@portfolio/types';
+import { RawPosition, Transaction } from '@portfolio/types';
+import { deriveLotsFromTransactions } from '../lib/core/fifo';
 
-export const DEMO_POSITIONS: RawPosition[] = [
+export const DEMO_TRANSACTIONS: Transaction[] = [
     {
-        transactionDate: '2020/01/15',
+        way: 'buy',
+        date: '2020/01/15',
         ticker: 'AAPL',
         fullName: 'Apple Inc.',
         broker: 'Demo Broker',
         account: 'US Account',
         quantity: 50,
-        costPerUnit: 75.5,
-        transactionCcy: 'USD',
+        pricePerUnit: 75.5,
+        ccy: 'USD',
         stockCcy: 'USD',
     },
     {
-        transactionDate: '2021/03/10',
+        way: 'buy',
+        date: '2021/03/10',
         ticker: 'MSFT',
         fullName: 'Microsoft Corp.',
         broker: 'Demo Broker',
         account: 'US Account',
         quantity: 30,
-        costPerUnit: 230.0,
-        transactionCcy: 'USD',
+        pricePerUnit: 230.0,
+        ccy: 'USD',
         stockCcy: 'USD',
     },
     {
-        transactionDate: '2022/09/01',
+        way: 'buy',
+        date: '2022/09/01',
         ticker: 'NVDA',
         fullName: 'NVIDIA Corp.',
         broker: 'Demo Broker',
         account: 'US Account',
         quantity: 20,
-        costPerUnit: 155.0,
-        transactionCcy: 'USD',
+        pricePerUnit: 155.0,
+        ccy: 'USD',
         stockCcy: 'USD',
     },
     {
-        transactionDate: '2019/06/01',
+        way: 'buy',
+        date: '2019/06/01',
         ticker: '7203.T',
         fullName: 'Toyota Motor Corp.',
         broker: 'Demo Broker',
         account: 'Japan Account',
         quantity: 100,
-        costPerUnit: 6800,
-        transactionCcy: 'JPY',
+        pricePerUnit: 6800,
+        ccy: 'JPY',
         stockCcy: 'JPY',
     },
     {
-        transactionDate: '2020/07/20',
+        way: 'buy',
+        date: '2020/07/20',
         ticker: '9984.T',
         fullName: 'SoftBank Group Corp.',
         broker: 'Demo Broker',
         account: 'Japan Account',
         quantity: 50,
-        costPerUnit: 5800,
-        transactionCcy: 'JPY',
+        pricePerUnit: 5800,
+        ccy: 'JPY',
         stockCcy: 'JPY',
     },
 ];
+
+// Derived lot view kept for any legacy consumers.
+export const DEMO_POSITIONS: RawPosition[] = deriveLotsFromTransactions(DEMO_TRANSACTIONS);
 
 export const DEMO_SET_ID = 'demo';
 

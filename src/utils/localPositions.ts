@@ -1,10 +1,17 @@
 /**
- * Client-side localStorage store for position sets and positions.
- * Replaces the server-side SQLite database for multi-user safety.
+ * Client-side localStorage store for position sets and transactions.
+ *
+ * The on-disk format is a flat list of buy/sell `Transaction` records.
+ * Lot views (open + closed) are derived on read via FIFO matching.
+ *
+ * Legacy storage from earlier versions used a flat `RawPosition[]` (each
+ * record was a lot, with optional sale fields). On read we auto-migrate
+ * those into transactions; writes always emit the new format.
  */
 
-import { RawPosition } from '@portfolio/types';
-import { DEMO_POSITIONS, DEMO_SET, DEMO_SET_ID } from '../data/demoPositions';
+import { RawPosition, Transaction } from '@portfolio/types';
+import { deriveLotsFromTransactions } from '@portfolio/core';
+import { DEMO_POSITIONS, DEMO_TRANSACTIONS, DEMO_SET, DEMO_SET_ID } from '../data/demoPositions';
 
 export interface PositionSetLocal {
     id: string;
@@ -21,6 +28,65 @@ const SETS_KEY = 'pt_sets';
 const ACTIVE_KEY = 'pt_active_set';
 
 const positionsKey = (id: string) => `pt_positions_${id}`;
+
+// ── Migration ────────────────────────────────────────────────
+
+type LegacyRawPosition = {
+    transactionDate: string;
+    ticker: string | number;
+    fullName: string;
+    broker?: string;
+    account: string;
+    quantity: number;
+    costPerUnit: number;
+    transactionCcy: string;
+    stockCcy: string;
+    saleDate?: string;
+    salePricePerUnit?: number;
+    saleCcy?: string;
+};
+
+function isLegacyArray(arr: unknown): arr is LegacyRawPosition[] {
+    if (!Array.isArray(arr) || arr.length === 0) return false;
+    // Treat as legacy if every element looks like a lot (has costPerUnit, no way).
+    return arr.every(el => typeof el === 'object' && el !== null
+        && 'costPerUnit' in el && !('way' in el));
+}
+
+function migrateLegacy(legacy: LegacyRawPosition[]): Transaction[] {
+    const txs: Transaction[] = [];
+    for (const p of legacy) {
+        txs.push({
+            way: 'buy',
+            date: p.transactionDate,
+            ticker: p.ticker,
+            fullName: p.fullName,
+            broker: p.broker,
+            account: p.account,
+            quantity: p.quantity,
+            pricePerUnit: p.costPerUnit, // already effective, treat fees as 0
+            fees: 0,
+            ccy: p.transactionCcy,
+            stockCcy: p.stockCcy,
+        });
+        if (p.saleDate && p.salePricePerUnit !== undefined) {
+            txs.push({
+                way: 'sell',
+                date: p.saleDate,
+                ticker: p.ticker,
+                fullName: p.fullName,
+                broker: p.broker,
+                account: p.account,
+                quantity: p.quantity,
+                pricePerUnit: p.salePricePerUnit,
+                fees: 0,
+                ccy: p.saleCcy ?? p.stockCcy,
+                stockCcy: p.stockCcy,
+            });
+        }
+    }
+    return txs;
+}
 
 // ── Reads ─────────────────────────────────────────────────────
 
@@ -43,14 +109,32 @@ export function getActiveSet(): PositionSetLocal {
     return getPositionSets().find(s => s.id === id) ?? DEMO_SET;
 }
 
-export function getPositionsForSet(id: string): RawPosition[] {
-    if (id === DEMO_SET_ID) return DEMO_POSITIONS;
+export function getTransactionsForSet(id: string): Transaction[] {
+    if (id === DEMO_SET_ID) return DEMO_TRANSACTIONS;
     try {
         const raw = localStorage.getItem(positionsKey(id));
-        return raw ? JSON.parse(raw) : DEMO_POSITIONS;
+        if (raw === null) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        if (isLegacyArray(parsed)) {
+            const migrated = migrateLegacy(parsed);
+            localStorage.setItem(positionsKey(id), JSON.stringify(migrated));
+            return migrated;
+        }
+        return parsed as Transaction[];
     } catch {
-        return DEMO_POSITIONS;
+        return [];
     }
+}
+
+export function getActiveTransactions(): Transaction[] {
+    return getTransactionsForSet(getActiveSetId());
+}
+
+/** Lot view (open + closed), derived from the transactions of a set. */
+export function getPositionsForSet(id: string): RawPosition[] {
+    if (id === DEMO_SET_ID) return DEMO_POSITIONS;
+    return deriveLotsFromTransactions(getTransactionsForSet(id));
 }
 
 export function getActivePositions(): RawPosition[] {
@@ -71,11 +155,12 @@ export function uniqueDisplayName(base: string): string {
     return `${base} ${n}`;
 }
 
+/** Imports raw transactions into a new set (or migrates legacy on the way in). */
 export function importPositionSet(
     name: string,
     display_name: string,
     description: string,
-    positions: RawPosition[],
+    transactions: Transaction[] | LegacyRawPosition[],
     setAsActive: boolean
 ): PositionSetLocal {
     const stored = getStoredSets();
@@ -100,7 +185,10 @@ export function importPositionSet(
 
     stored.push(newSet);
     saveStoredSets(stored);
-    localStorage.setItem(positionsKey(id), JSON.stringify(positions));
+    const finalTxs: Transaction[] = isLegacyArray(transactions)
+        ? migrateLegacy(transactions)
+        : (transactions as Transaction[]);
+    localStorage.setItem(positionsKey(id), JSON.stringify(finalTxs));
     return newSet;
 }
 
@@ -134,70 +222,64 @@ export function deleteSet(id: string): void {
     }
 }
 
-export function exportSetPositions(id: string): RawPosition[] {
-    return getPositionsForSet(id);
+/** Raw export — emits the new Transaction format. */
+export function exportSetTransactions(id: string): Transaction[] {
+    return getTransactionsForSet(id);
 }
 
 /**
- * Removes a position from a set by index.
- * If the active set is the demo, promotes it to "My Portfolio" first (same
- * pattern as addPositionToSet), then removes. Returns the actual set ID written
- * to (may differ from the input when demo promotion occurs) and the removed position.
+ * Append a transaction to a set. If acting on the demo set, promotes it to
+ * a real "My Portfolio" set first. Returns the id of the set written to.
  */
-export function removePositionFromSet(setId: string, index: number): { removedPosition: RawPosition; actualSetId: string } | null {
-    if (setId === DEMO_SET_ID) {
-        const demoPositions = getPositionsForSet(DEMO_SET_ID);
-        if (index < 0 || index >= demoPositions.length) return null;
-        const removed = demoPositions[index];
-        const remaining = [...demoPositions.slice(0, index), ...demoPositions.slice(index + 1)];
-        const displayName = uniqueDisplayName('My Portfolio');
-        const newSet = importPositionSet(
-            'my-portfolio',
-            displayName,
-            'Started from demo data',
-            remaining,
-            true,
-        );
-        return { removedPosition: removed, actualSetId: newSet.id };
+export function addTransactionToSet(setId: string, tx: Transaction): string {
+    if (setId !== DEMO_SET_ID) {
+        const existing = getTransactionsForSet(setId);
+        localStorage.setItem(positionsKey(setId), JSON.stringify([...existing, tx]));
+        return setId;
     }
-    const positions = getPositionsForSet(setId);
-    if (index < 0 || index >= positions.length) return null;
-    const removed = positions[index];
-    const updated = [...positions.slice(0, index), ...positions.slice(index + 1)];
-    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
-    return { removedPosition: removed, actualSetId: setId };
-}
-
-export function insertPositionIntoSet(setId: string, position: RawPosition, index: number): void {
-    if (setId === DEMO_SET_ID) return;
-    const positions = getPositionsForSet(setId);
-    const clamped = Math.max(0, Math.min(index, positions.length));
-    const updated = [...positions.slice(0, clamped), position, ...positions.slice(clamped)];
-    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
-}
-
-/**
- * Adds a position to a set.
- * If the active set is the demo, promotes it: clones the demo positions into a
- * new real set ("My Portfolio"), activates it, then appends the new position.
- * Returns the id of the set that was written to.
- */
-export function addPositionToSet(id: string, position: RawPosition): string {
-    if (id !== DEMO_SET_ID) {
-        const existing = getPositionsForSet(id);
-        localStorage.setItem(positionsKey(id), JSON.stringify([...existing, position]));
-        return id;
-    }
-
-    // Promote demo → real set
     const newSet = importPositionSet(
         'my-portfolio',
         uniqueDisplayName('My Portfolio'),
         'Started from demo data',
-        [...DEMO_POSITIONS, position],
+        [...DEMO_TRANSACTIONS, tx],
         true,
     );
     return newSet.id;
+}
+
+/**
+ * Remove a transaction by its index in the on-disk array. Returns the removed
+ * transaction and the set id written to (may differ on demo promotion).
+ */
+export function removeTransactionFromSet(setId: string, index: number): { removed: Transaction; actualSetId: string } | null {
+    if (setId === DEMO_SET_ID) {
+        const demo = getTransactionsForSet(DEMO_SET_ID);
+        if (index < 0 || index >= demo.length) return null;
+        const removed = demo[index];
+        const remaining = [...demo.slice(0, index), ...demo.slice(index + 1)];
+        const newSet = importPositionSet(
+            'my-portfolio',
+            uniqueDisplayName('My Portfolio'),
+            'Started from demo data',
+            remaining,
+            true,
+        );
+        return { removed, actualSetId: newSet.id };
+    }
+    const txs = getTransactionsForSet(setId);
+    if (index < 0 || index >= txs.length) return null;
+    const removed = txs[index];
+    const updated = [...txs.slice(0, index), ...txs.slice(index + 1)];
+    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
+    return { removed, actualSetId: setId };
+}
+
+export function insertTransactionIntoSet(setId: string, tx: Transaction, index: number): void {
+    if (setId === DEMO_SET_ID) return;
+    const txs = getTransactionsForSet(setId);
+    const clamped = Math.max(0, Math.min(index, txs.length));
+    const updated = [...txs.slice(0, clamped), tx, ...txs.slice(clamped)];
+    localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
 }
 
 // ── Internal helpers ──────────────────────────────────────────

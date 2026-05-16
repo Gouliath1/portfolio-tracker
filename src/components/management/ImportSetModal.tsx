@@ -1,20 +1,35 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MdClose, MdDownload, MdRefresh, MdUpload } from 'react-icons/md';
 import { importPositionSet } from '../../utils/localPositions';
-import { RawPosition } from '@portfolio/types';
+import { Transaction } from '@portfolio/types';
 
-const TEMPLATE_POSITIONS: RawPosition[] = [
+const TEMPLATE_TRANSACTIONS: Transaction[] = [
     {
-        transactionDate: '2023/01/10',
+        way: 'buy',
+        date: '2023/01/10',
         ticker: 'AAPL',
         fullName: 'Apple Inc.',
         broker: 'My Broker',
         account: 'Main Account',
         quantity: 10,
-        costPerUnit: 130.0,
-        transactionCcy: 'USD',
+        pricePerUnit: 130.0,
+        fees: 0,
+        ccy: 'USD',
+        stockCcy: 'USD',
+    },
+    {
+        way: 'sell',
+        date: '2024/05/01',
+        ticker: 'AAPL',
+        fullName: 'Apple Inc.',
+        broker: 'My Broker',
+        account: 'Main Account',
+        quantity: 4,
+        pricePerUnit: 180.0,
+        fees: 0,
+        ccy: 'USD',
         stockCcy: 'USD',
     },
 ];
@@ -30,8 +45,19 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
     const [error, setError] = useState<string | null>(null);
     const [dragging, setDragging] = useState(false);
 
+    // Prevent the browser from navigating to a dropped file anywhere outside the drop zone.
+    useEffect(() => {
+        const stop = (e: DragEvent) => e.preventDefault();
+        window.addEventListener('dragover', stop);
+        window.addEventListener('drop', stop);
+        return () => {
+            window.removeEventListener('dragover', stop);
+            window.removeEventListener('drop', stop);
+        };
+    }, []);
+
     const handleDownloadTemplate = () => {
-        const blob = new Blob([JSON.stringify(TEMPLATE_POSITIONS, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(TEMPLATE_TRANSACTIONS, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -48,24 +74,28 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
         try {
             const content = await file.text();
             const jsonData = JSON.parse(content);
-            let positions: RawPosition[];
+            let records: unknown[];
             if (Array.isArray(jsonData)) {
-                positions = jsonData;
+                records = jsonData;
+            } else if (jsonData.transactions && Array.isArray(jsonData.transactions)) {
+                records = jsonData.transactions;
             } else if (jsonData.positions && Array.isArray(jsonData.positions)) {
-                positions = jsonData.positions;
+                records = jsonData.positions;
             } else {
-                throw new Error('Invalid JSON format. Expected a positions array.');
+                throw new Error('Invalid JSON format. Expected a transactions array.');
             }
 
+            // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             importPositionSet(
                 fields.name || `imported-${Date.now()}`,
                 fields.name || file.name.replace('.json', ''),
                 fields.description || `Imported from ${file.name}`,
-                positions,
+                records as any,
                 fields.set_as_active,
             );
 
-            onImported(positions.length, fields.set_as_active);
+            onImported(records.length, fields.set_as_active);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to import');
         } finally {
@@ -193,14 +223,14 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                                     <span className="text-sm text-center">
                                         Drop a JSON file here or <span style={{ color: 'var(--accent)' }}>browse</span>
                                     </span>
-                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — positions array</span>
+                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — transactions array</span>
                                 </>
                             )}
-                            <input type="file" accept=".json" onChange={handleFileInput} disabled={importing} className="sr-only" />
+                            <input type="file" accept=".json,application/json" onChange={handleFileInput} disabled={importing} className="sr-only" />
                         </label>
 
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Each position requires: ticker, fullName, account, quantity, costPerUnit, transactionCcy, stockCcy, transactionDate
+                            Each record requires: way (buy/sell), date, ticker, fullName, account, quantity, pricePerUnit, ccy, stockCcy. Legacy position files are auto-migrated.
                         </p>
                     </div>
 

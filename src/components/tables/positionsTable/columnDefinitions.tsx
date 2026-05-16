@@ -9,7 +9,7 @@ import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
-import { MdDeleteOutline } from 'react-icons/md';
+import { MdDeleteOutline, MdRemoveCircleOutline } from 'react-icons/md';
 
 const columnHelper = createColumnHelper<Position>();
 
@@ -18,7 +18,7 @@ const columnHelper = createColumnHelper<Position>();
  * Each column includes header, size, and custom cell rendering logic
  * @returns Array of column definitions for react-table
  */
-export function createTableColumns({ showDelete = false }: { showDelete?: boolean } = {}) {
+export function createTableColumns({ showDelete = false, showSell = false }: { showDelete?: boolean; showSell?: boolean } = {}) {
     const cols = [
         /**
          * Transaction date column - shows when the position was acquired
@@ -354,6 +354,30 @@ export function createTableColumns({ showDelete = false }: { showDelete?: boolea
             },
         }),
     ];
+
+    if (showSell) {
+        const sellCol = columnHelper.display({
+            id: 'sell',
+            size: 40,
+            header: () => <MdRemoveCircleOutline size={14} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />,
+            cell: props => {
+                const onSell = props.table.options.meta?.onSellRow;
+                return (
+                    <button
+                        onClick={e => { e.stopPropagation(); onSell?.(props.row.original); }}
+                        className="flex items-center justify-center p-1 rounded-md transition-all opacity-30 hover:opacity-100"
+                        style={{ color: 'var(--pnl-red)' }}
+                        aria-label="Sell position"
+                        title="Sell position"
+                    >
+                        <MdRemoveCircleOutline size={15} />
+                    </button>
+                );
+            },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cols.unshift(sellCol as any);
+    }
 
     if (showDelete) {
         const deleteCol = columnHelper.display({

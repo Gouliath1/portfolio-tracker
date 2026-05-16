@@ -18,6 +18,10 @@ const calculatePortfolioSummary = (positions: Position[]): PortfolioSummary => {
     totalPnlJPY,
     totalPnlPercentage,
     positions,
+    closedPositions: [],
+    realizedPnlJPY: 0,
+    realizedCostJPY: 0,
+    realizedPnlPercentage: 0,
   }
 }
 
@@ -40,6 +44,7 @@ describe('Portfolio Summary Calculations', () => {
       pnlPercentage: 6.67,
       transactionFxRate: 130,
       currentFxRate: 130,
+      status: 'open',
     },
     {
       transactionDate: '2023-02-01',
@@ -58,6 +63,7 @@ describe('Portfolio Summary Calculations', () => {
       pnlPercentage: 5.88,
       transactionFxRate: 1,
       currentFxRate: 1,
+      status: 'open',
     },
   ]
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
-import { PortfolioSummary as PortfolioSummaryType, Position } from '@portfolio/types';
+import { PortfolioSummary as PortfolioSummaryType, Position, Transaction } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
 import { PerformanceChart } from '../components/charts/PerformanceChart';
 import { PositionsTable } from '../components/tables/PositionsTable';
@@ -15,11 +15,14 @@ import { useBaseCurrency } from '../hooks/useBaseCurrency';
 import { MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdDownload, MdUndo } from 'react-icons/md';
 import ImportSetModal from '../components/management/ImportSetModal';
 import AddPositionModal from '../components/management/AddPositionModal';
-import { getActiveSetId, exportSetPositions, removePositionFromSet, insertPositionIntoSet } from '../utils/localPositions';
+import SellPositionModal from '../components/management/SellPositionModal';
+import { ClosedPositionsTable } from '../components/tables/ClosedPositionsTable';
+import { getActiveSetId, exportSetTransactions, removeTransactionFromSet, insertTransactionIntoSet } from '../utils/localPositions';
 
 interface UndoEntry {
-  position: Position;
-  index: number;
+  position: Position;       // for the toast label
+  transaction: Transaction; // what to restore
+  index: number;            // original index in the transactions array
   setId: string;
 }
 
@@ -33,6 +36,8 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [addPositionOpen, setAddPositionOpen] = useState(false);
+  const [sellTarget, setSellTarget] = useState<{ position: Position; setId: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,12 +109,12 @@ export default function Home() {
 
   const handleExportActive = () => {
     const id = getActiveSetId();
-    const positions = exportSetPositions(id);
-    const blob = new Blob([JSON.stringify(positions, null, 2)], { type: 'application/json' });
+    const transactions = exportSetTransactions(id);
+    const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${id}-positions.json`;
+    a.download = `${id}-transactions.json`;
     document.body.appendChild(a);
     a.click();
     URL.revokeObjectURL(url);
@@ -117,20 +122,28 @@ export default function Home() {
   };
 
   const handleDeletePosition = useCallback((position: Position) => {
-    const setId = getActiveSetId();
-    const rawPositions = exportSetPositions(setId);
-    const index = rawPositions.findIndex(
-      p => String(p.ticker) === String(position.ticker) &&
-           p.transactionDate === position.transactionDate &&
-           p.quantity === position.quantity &&
-           p.costPerUnit === position.costPerUnit
-    );
-    if (index === -1) return;
+    if (position.status === 'closed') {
+      setActionError('Closed lots can’t be deleted from here — remove the underlying sell transaction from the exported JSON instead.');
+      return;
+    }
+    if (position.txBuyIndex === undefined) return;
 
-    const result = removePositionFromSet(setId, index);
+    const setId = getActiveSetId();
+    const txs = exportSetTransactions(setId);
+    const buyTx = txs[position.txBuyIndex];
+    if (!buyTx || buyTx.way !== 'buy') return;
+
+    // Block deletion if FIFO has matched any portion of this buy to a sell.
+    if (position.quantity < buyTx.quantity) {
+      setActionError(`Cannot delete this buy — ${buyTx.quantity - position.quantity} of ${buyTx.quantity} have already been sold (FIFO). Delete the sells first.`);
+      return;
+    }
+
+    const result = removeTransactionFromSet(setId, position.txBuyIndex);
     if (!result) return;
 
-    // Optimistic UI: splice position out of current summary without reloading
+    // Optimistic UI: drop this lot from the open list. Realized totals are unaffected
+    // since fully-unsold buys don't contribute to closed lots.
     setPortfolioSummary(prev => {
       if (!prev) return prev;
       const positions = prev.positions.filter(p => p !== position);
@@ -138,38 +151,35 @@ export default function Home() {
       const totalValueJPY = positions.reduce((s, p) => s + p.currentValueJPY, 0);
       const totalPnlJPY = totalValueJPY - totalCostJPY;
       const totalPnlPercentage = totalCostJPY === 0 ? 0 : (totalPnlJPY / totalCostJPY) * 100;
-      return { positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
+      return { ...prev, positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
     });
 
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    // Use actualSetId so undo knows the real set (post demo-promotion if applicable)
-    setUndoEntry({ position, index, setId: result.actualSetId });
+    setUndoEntry({ position, transaction: result.removed, index: position.txBuyIndex, setId: result.actualSetId });
 
-    // After 5s, confirm deletion with a silent background reload
     undoTimerRef.current = setTimeout(() => {
       setUndoEntry(null);
       handlePositionSetChanged(true);
     }, 5000);
   }, [handlePositionSetChanged]);
 
+  const handleSellPosition = useCallback((position: Position) => {
+    setSellTarget({ position, setId: getActiveSetId() });
+  }, []);
+
   const handleUndo = useCallback(() => {
     if (!undoEntry) return;
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    // Restore in localStorage
-    insertPositionIntoSet(undoEntry.setId, undoEntry.position, undoEntry.index);
-    // Restore in UI optimistically
+    insertTransactionIntoSet(undoEntry.setId, undoEntry.transaction, undoEntry.index);
+    // Restore in UI optimistically: re-add the open lot.
     setPortfolioSummary(prev => {
       if (!prev) return prev;
-      const positions = [
-        ...prev.positions.slice(0, undoEntry.index),
-        undoEntry.position,
-        ...prev.positions.slice(undoEntry.index),
-      ];
+      const positions = [...prev.positions, undoEntry.position];
       const totalCostJPY = positions.reduce((s, p) => s + p.costInJPY, 0);
       const totalValueJPY = positions.reduce((s, p) => s + p.currentValueJPY, 0);
       const totalPnlJPY = totalValueJPY - totalCostJPY;
       const totalPnlPercentage = totalCostJPY === 0 ? 0 : (totalPnlJPY / totalCostJPY) * 100;
-      return { positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
+      return { ...prev, positions, totalCostJPY, totalValueJPY, totalPnlJPY, totalPnlPercentage };
     });
     setUndoEntry(null);
   }, [undoEntry]);
@@ -320,6 +330,16 @@ export default function Home() {
             showValues={showValues}
             baseCurrency={currency}
             onDeletePosition={handleDeletePosition}
+            onSellPosition={handleSellPosition}
+          />
+
+          <ClosedPositionsTable
+            positions={portfolioSummary.closedPositions}
+            showValues={showValues}
+            baseCurrency={currency}
+            realizedPnlJPY={portfolioSummary.realizedPnlJPY}
+            realizedCostJPY={portfolioSummary.realizedCostJPY}
+            realizedPnlPercentage={portfolioSummary.realizedPnlPercentage}
           />
         </div>
       </main>
@@ -370,6 +390,40 @@ export default function Home() {
           }}
           onClose={() => setAddPositionOpen(false)}
         />
+      )}
+
+      {/* ── Sell position modal ──────────────────────────── */}
+      {sellTarget && (
+        <SellPositionModal
+          setId={sellTarget.setId}
+          position={sellTarget.position}
+          onSaved={() => {
+            setSellTarget(null);
+            handlePositionSetChanged();
+          }}
+          onClose={() => setSellTarget(null)}
+        />
+      )}
+
+      {/* ── Action error toast ───────────────────────────── */}
+      {actionError && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl max-w-md"
+          style={{
+            background: 'var(--surface-popover)',
+            border: '1px solid var(--pnl-red)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span className="text-sm" style={{ color: 'var(--pnl-red)' }}>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all glass glass-hover"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Dismiss
+          </button>
+        </div>
       )}
 
       {/* ── Welcome modal (first visit only) ────────────── */}

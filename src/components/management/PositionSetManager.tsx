@@ -10,7 +10,7 @@ import {
     getActiveSetId,
     activateSet,
     deleteSet,
-    exportSetPositions,
+    exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
 import AddPositionModal from './AddPositionModal';
@@ -64,12 +64,12 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
 
     const handleExport = (id: string, name: string) => {
         try {
-            const positions = exportSetPositions(id);
-            const blob = new Blob([JSON.stringify(positions, null, 2)], { type: 'application/json' });
+            const transactions = exportSetTransactions(id);
+            const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${name}-positions.json`;
+            a.download = `${name}-transactions.json`;
             document.body.appendChild(a);
             a.click();
             URL.revokeObjectURL(url);
