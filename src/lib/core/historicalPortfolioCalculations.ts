@@ -79,45 +79,31 @@ function getPositionsAtDate(positions: Position[], targetDate: Date): PositionAt
     return Array.from(positionMap.values());
 }
 
-// Get the closest historical price to a target date
+// Get the closest historical price on or before a target date (binary search, O(log N)).
+// Falls back to the earliest available price if target predates all data.
 function getClosestHistoricalPrice(historicalPrices: {[date: string]: number}, targetDate: Date): number | null {
     const targetDateStr = targetDate.toISOString().split('T')[0];
-    
-    // Try exact match first
-    if (historicalPrices[targetDateStr]) {
+
+    if (historicalPrices[targetDateStr] !== undefined) {
         return historicalPrices[targetDateStr];
     }
-    
-    // Find the closest date (preferably before the target date)
-    const availableDates = Object.keys(historicalPrices).sort();
-    let closestDate = null;
-    let minDiff = Infinity;
-    
-    for (const dateStr of availableDates) {
-        const date = new Date(dateStr);
-        const diff = Math.abs(date.getTime() - targetDate.getTime());
-        
-        // Prefer dates before or on the target date
-        if (date <= targetDate && diff < minDiff) {
-            minDiff = diff;
-            closestDate = dateStr;
+
+    const sortedDates = Object.keys(historicalPrices).sort();
+    if (sortedDates.length === 0) return null;
+
+    let lo = 0, hi = sortedDates.length - 1, best = -1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (sortedDates[mid] <= targetDateStr) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
         }
     }
-    
-    // If no date before target, use the closest after
-    if (!closestDate) {
-        for (const dateStr of availableDates) {
-            const date = new Date(dateStr);
-            const diff = Math.abs(date.getTime() - targetDate.getTime());
-            
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestDate = dateStr;
-            }
-        }
-    }
-    
-    return closestDate ? historicalPrices[closestDate] : null;
+
+    const idx = best !== -1 ? best : 0;
+    return historicalPrices[sortedDates[idx]];
 }
 
 // Calculate portfolio value at a specific historical date

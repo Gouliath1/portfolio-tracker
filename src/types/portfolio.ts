@@ -1,4 +1,4 @@
-export type Currency = 'JPY' | 'USD' | string;
+export type Currency = 'USD' | 'JPY' | 'EUR' | 'GBP' | 'HKD' | 'SGD' | 'AUD' | 'CAD' | 'CHF' | 'CNY' | 'KRW';
 
 export type TransactionWay = 'buy' | 'sell';
 

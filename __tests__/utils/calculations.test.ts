@@ -3,6 +3,7 @@
  */
 
 import { calculatePosition, calculatePortfolioSummary } from '@portfolio/core'
+import type { RawPosition } from '@portfolio/types'
 import { mockApiResponse, mockPositions } from '../__mocks__/mockData'
 import { mockFetchOnce } from '../__mocks__/testUtils'
 
@@ -49,7 +50,7 @@ describe('Calculations Utils', () => {
       const { fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate
 
-      const result = await calculatePosition(rawPosition, 160.0) // Current price $160
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, 160.0) // Current price $160
 
       expect(result).toMatchObject({
         ticker: 'AAPL',
@@ -78,7 +79,7 @@ describe('Calculations Utils', () => {
         broker: 'Japanese Broker',
       }
 
-      const result = await calculatePosition(rawPosition, 1800) // Current price ¥1800
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, 1800) // Current price ¥1800
 
       expect(result).toMatchObject({
         ticker: '7203.T',
@@ -112,7 +113,7 @@ describe('Calculations Utils', () => {
       const { fetchCurrentFxRate } = require('@portfolio/core/yahooFinanceApi')
       fetchCurrentFxRate.mockResolvedValue(130.0)
 
-      const result = await calculatePosition(rawPosition, null)
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, null)
 
       expect(result.currentPrice).toBeNull()
       expect(result.currentValueJPY).toBe(0)
@@ -138,7 +139,7 @@ describe('Calculations Utils', () => {
       fetchCurrentFxRate.mockResolvedValue(130.0) // Fallback rate
 
       // Should still calculate the position using fallback rate
-      const result = await calculatePosition(rawPosition, 160.0)
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, 160.0)
 
       expect(result).toBeDefined()
       expect(result.ticker).toBe('AAPL')
@@ -163,7 +164,7 @@ describe('Calculations Utils', () => {
         broker: 'Japanese Broker',
       }
 
-      const result = await calculatePosition(rawPosition, 1800)
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, 1800)
 
       // No FX conversion should occur for JPY to JPY
       expect(result.costInJPY).toBe(1700 * 100)
@@ -194,7 +195,7 @@ describe('Calculations Utils', () => {
       // Mock current USD/JPY rate for current value
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate
 
-      const result = await calculatePosition(rawPosition, 160.0) // Current price $160
+      const result = await calculatePosition(rawPosition as unknown as RawPosition, 160.0) // Current price $160
 
       expect(result.ticker).toBe('AAPL')
       expect(result.quantity).toBe(50)
@@ -250,7 +251,7 @@ describe('Calculations Utils', () => {
       // Mock FX rate for USD positions
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate
 
-      const result = await calculatePortfolioSummary(rawPositions)
+      const result = await calculatePortfolioSummary(rawPositions as unknown as RawPosition[])
 
       expect(result).toMatchObject({
         totalCostJPY: expect.any(Number),
@@ -287,7 +288,7 @@ describe('Calculations Utils', () => {
         'AAPL': 165.0
       })
 
-      const result = await calculatePortfolioSummary(rawPositions, true)
+      const result = await calculatePortfolioSummary(rawPositions as unknown as RawPosition[], true)
 
       expect(updateAllPositions).toHaveBeenCalledWith(['AAPL'])
       expect(result.positions).toHaveLength(1)
@@ -357,7 +358,7 @@ describe('Calculations Utils', () => {
         .mockResolvedValueOnce(130.0) // USD/JPY
         .mockResolvedValueOnce(140.0) // EUR/JPY
 
-      const result = await calculatePortfolioSummary(mixedPositions)
+      const result = await calculatePortfolioSummary(mixedPositions as unknown as RawPosition[])
 
       expect(result.positions).toHaveLength(3)
       expect(result.totalCostJPY).toBeGreaterThan(0)
@@ -403,7 +404,7 @@ describe('Calculations Utils', () => {
       fetchStockPrice.mockResolvedValue(170.0) // AAPL current price
       fetchCurrentFxRate.mockResolvedValue(130.0) // USD/JPY rate
 
-      const result = await calculatePortfolioSummary(duplicatePositions)
+      const result = await calculatePortfolioSummary(duplicatePositions as unknown as RawPosition[])
 
       expect(result.positions).toHaveLength(2)
       // The implementation efficiently fetches each unique ticker only once

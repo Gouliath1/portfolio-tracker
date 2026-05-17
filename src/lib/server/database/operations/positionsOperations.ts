@@ -1,4 +1,4 @@
-import { RawPosition } from '@portfolio/types';
+import { RawPosition, Currency } from '@portfolio/types';
 import { getDbClient } from '../config';
 import { getActivePositionSet } from './positionSetOperations';
 
@@ -24,8 +24,8 @@ const mapRowToRawPosition = (row: PositionRow): RawPosition => ({
   account: String(row.account),
   quantity: Number(row.quantity),
   costPerUnit: Number(row.costPerUnit),
-  transactionCcy: String(row.transactionCcy),
-  stockCcy: String(row.stockCcy || row.transactionCcy),
+  transactionCcy: String(row.transactionCcy) as Currency,
+  stockCcy: String(row.stockCcy || row.transactionCcy) as Currency,
 });
 
 export const getPositionsForSet = async (

@@ -17,9 +17,10 @@ import AddPositionModal from './AddPositionModal';
 
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
+    refreshTrigger?: number; // bump to force a re-read from localStorage
 }
 
-const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged }) => {
+const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger }) => {
     const [sets, setSets] = useState<PositionSetLocal[]>([]);
     const [activeId, setActiveId] = useState<string>('demo');
     const [error, setError] = useState<string | null>(null);
@@ -31,7 +32,10 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
         setActiveId(getActiveSetId());
     };
 
-    useEffect(() => { refresh(); }, []);
+    // Re-read on mount and whenever the parent signals a change (e.g. an import
+    // happened in a sibling modal). The Settings drawer stays mounted across
+    // open/close, so this trigger is how we stay in sync.
+    useEffect(() => { refresh(); }, [refreshTrigger]);
 
     useEffect(() => {
         if (success) {
@@ -54,9 +58,13 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     const handleDelete = (id: string, name: string) => {
         if (!confirm(`Delete "${name}"? This will permanently remove all positions in this set.`)) return;
         try {
+            const wasActive = getActiveSetId() === id;
             deleteSet(id);
             refresh();
             setSuccess('Position set deleted');
+            // If we just deleted the active set, storage falls back to demo (or
+            // the first remaining set) — tell the parent to reload the table.
+            if (wasActive) onPositionSetChanged?.();
         } catch {
             setError('Failed to delete position set');
         }

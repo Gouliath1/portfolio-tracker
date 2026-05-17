@@ -12,9 +12,10 @@ interface SettingsPanelProps {
     onPositionSetChanged: () => void;
     currency: BaseCurrency;
     onCurrencyChange: (currency: BaseCurrency) => void;
+    refreshTrigger?: number;
 }
 
-export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, onCurrencyChange }: SettingsPanelProps) => {
+export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, onCurrencyChange, refreshTrigger }: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const panelRef = useRef<HTMLDivElement>(null);
 
@@ -145,7 +146,10 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, o
                             style={{ color: 'var(--text-muted)' }}>
                             Position Sets
                         </h3>
-                        <PositionSetManager onPositionSetChanged={() => { onPositionSetChanged(); onClose(); }} />
+                        <PositionSetManager
+                            onPositionSetChanged={() => { onPositionSetChanged(); onClose(); }}
+                            refreshTrigger={refreshTrigger}
+                        />
                     </section>
                 </div>
             </div>

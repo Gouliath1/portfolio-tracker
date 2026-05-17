@@ -20,6 +20,12 @@ export function getCachedTodayPrice(symbol: string): number | null {
   return null;
 }
 
+// Last known price for a symbol regardless of date — used as a fallback when
+// Yahoo is rate-limiting us. Avoids leaving rows stuck at "Loading…".
+export function getLastKnownPrice(symbol: string): { price: number; date: string } | null {
+  return priceStore.get(symbol) ?? null;
+}
+
 export function setCachedPrice(symbol: string, price: number): void {
   priceStore.set(symbol, { price, date: todayString() });
 }

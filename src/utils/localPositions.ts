@@ -9,7 +9,7 @@
  * those into transactions; writes always emit the new format.
  */
 
-import { RawPosition, Transaction } from '@portfolio/types';
+import { RawPosition, Transaction, Currency } from '@portfolio/types';
 import { deriveLotsFromTransactions } from '@portfolio/core';
 import { DEMO_POSITIONS, DEMO_TRANSACTIONS, DEMO_SET, DEMO_SET_ID } from '../data/demoPositions';
 
@@ -66,8 +66,8 @@ function migrateLegacy(legacy: LegacyRawPosition[]): Transaction[] {
             quantity: p.quantity,
             pricePerUnit: p.costPerUnit, // already effective, treat fees as 0
             fees: 0,
-            ccy: p.transactionCcy,
-            stockCcy: p.stockCcy,
+            ccy: p.transactionCcy as Currency,
+            stockCcy: p.stockCcy as Currency,
         });
         if (p.saleDate && p.salePricePerUnit !== undefined) {
             txs.push({
@@ -80,8 +80,8 @@ function migrateLegacy(legacy: LegacyRawPosition[]): Transaction[] {
                 quantity: p.quantity,
                 pricePerUnit: p.salePricePerUnit,
                 fees: 0,
-                ccy: p.saleCcy ?? p.stockCcy,
-                stockCcy: p.stockCcy,
+                ccy: (p.saleCcy ?? p.stockCcy) as Currency,
+                stockCcy: p.stockCcy as Currency,
             });
         }
     }

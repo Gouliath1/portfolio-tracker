@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { MdClose, MdAdd, MdInfo } from 'react-icons/md';
-import { Transaction } from '@portfolio/types';
+import { Transaction, Currency } from '@portfolio/types';
 import { DEMO_SET_ID } from '../../data/demoPositions';
 import { getTransactionsForSet } from '../../utils/localPositions';
 
@@ -44,8 +44,8 @@ function toTransaction(f: FormState): Transaction {
         quantity: qty,
         pricePerUnit: cpu,
         fees,
-        ccy: f.transactionCcy,
-        stockCcy: f.stockCcy,
+        ccy: f.transactionCcy as Currency,
+        stockCcy: f.stockCcy as Currency,
     };
 }
 
@@ -53,12 +53,14 @@ function validate(f: FormState): string | null {
     if (!f.ticker.trim()) return 'Ticker is required';
     if (!f.fullName.trim()) return 'Company name is required';
     if (!f.account.trim()) return 'Account is required';
-    if (!f.quantity || isNaN(parseFloat(f.quantity)) || parseFloat(f.quantity) <= 0)
-        return 'Quantity must be a positive number';
-    if (!f.costPerUnit || isNaN(parseFloat(f.costPerUnit)) || parseFloat(f.costPerUnit) < 0)
-        return 'Cost per unit must be a non-negative number';
-    if (f.fees && (isNaN(parseFloat(f.fees)) || parseFloat(f.fees) < 0))
-        return 'Fees must be a non-negative number';
+    const qty = parseFloat(f.quantity);
+    if (!f.quantity || isNaN(qty) || qty <= 0) return 'Quantity must be a positive number';
+    const cpu = parseFloat(f.costPerUnit);
+    if (!f.costPerUnit || isNaN(cpu) || cpu < 0) return 'Cost per unit must be a non-negative number';
+    if (f.fees) {
+        const fees = parseFloat(f.fees);
+        if (isNaN(fees) || fees < 0) return 'Fees must be a non-negative number';
+    }
     if (!f.transactionDate) return 'Transaction date is required';
     return null;
 }

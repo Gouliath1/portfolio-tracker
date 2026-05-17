@@ -45,6 +45,15 @@ next-env.d.ts
 data/positions.json
 data/positions.json.*
 data/portfolio.db
+data/marketCache.db
+data/marketCache.db-journal
+data/marketCache.db-wal
+data/marketCache.db-shm
+# Local-only files
+/positions.json
+.claude/PROJECT_CONTEXT.md
+.claude/WEB_AGENT_CONTEXT.md
+.claude/worktrees/
 
 # VSCode auto-generated empty files and directories
 src/components/transactionManager/

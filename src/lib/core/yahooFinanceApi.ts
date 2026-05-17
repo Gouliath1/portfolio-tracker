@@ -6,9 +6,19 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Portfolio configuration – kept as default fallback only; callers should pass baseCurrency explicitly
 const BASE_CURRENCY = 'JPY';
 
-// Queue for rate limiting
-let lastRequestTime = 0;
-const MIN_REQUEST_DELAY = 100; // Base delay of 0.1s between requests
+const MIN_REQUEST_DELAY = 100;
+
+// Serializes all outgoing Yahoo Finance requests to avoid rate-limit races
+// in long-lived Node.js processes (local dev / vercel dev).
+let rateLimitQueue = Promise.resolve();
+function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+    const result = rateLimitQueue.then(async () => {
+        await delay(MIN_REQUEST_DELAY + Math.random() * 100);
+        return fn();
+    });
+    rateLimitQueue = result.then(() => {}, () => {});
+    return result;
+}
 
 // Interface for position data
 interface Position {
@@ -64,24 +74,33 @@ export async function fetchHistoricalPrices(symbol: string, positions: Position[
         // For daily resolution we only need a short recent window (5d covers weekends)
         const range = interval === '1d' ? '5d' : getYahooRange(monthsSincePurchase);
 
-        // Rate limiting with randomization
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastRequestTime;
-        const randomDelay = Math.random() * 100;
-        const totalDelay = MIN_REQUEST_DELAY + randomDelay;
-
-        if (timeSinceLastRequest < totalDelay) {
-            await delay(totalDelay - timeSinceLastRequest);
-        }
-        lastRequestTime = Date.now();
-
         const isServerSide = typeof window === 'undefined';
-        const url = isServerSide
-            ? `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`
-            : `/yahoo-finance/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
 
-        const response = await fetchWithRetry(url);
-        const data = await response.json();
+        // Client-side: hit our cached API endpoint instead of Yahoo directly. The
+        // route returns { prices: {date: price} } already parsed.
+        if (!isServerSide) {
+            const apiUrl = `/api/historical-prices?symbol=${encodeURIComponent(symbol)}&interval=${interval}&range=${range}`;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const json = await fetchJson(apiUrl) as any;
+            const prices: {[date: string]: number} = json?.prices ?? {};
+            // Filter to the earliest-date window to match prior behavior.
+            const filtered: {[date: string]: number} = {};
+            for (const [dateStr, price] of Object.entries(prices)) {
+                if (new Date(dateStr) >= earliestDate) {
+                    filtered[dateStr] = Math.round(price * 100) / 100;
+                }
+            }
+            const sortedDates = Object.keys(filtered).sort((a, b) => b.localeCompare(a));
+            const sortedPrices: {[date: string]: number} = {};
+            sortedDates.forEach(d => { sortedPrices[d] = filtered[d]; });
+            return Object.keys(sortedPrices).length > 0 ? sortedPrices : null;
+        }
+
+        // Server-side: hit Yahoo directly (this code path is what the new API
+        // route uses internally).
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
 
         const result = data.chart?.result?.[0];
         if (!result || !result.timestamp || !result.indicators?.quote?.[0]?.close) {
@@ -119,6 +138,30 @@ export async function fetchHistoricalPrices(symbol: string, positions: Position[
 
 export async function fetchStockPrice(symbol: string, forceRefresh: boolean = false): Promise<number | null> {
     try {
+        const isServerSide = typeof window === 'undefined';
+
+        // Client-side: always go through /api/prices. The server route handles
+        // both today's-cache hit and the stale-price fallback on Yahoo 429.
+        // forceRefresh becomes ?fresh=1 to bypass today's cache server-side.
+        if (!isServerSide) {
+            try {
+                const url = `/api/prices?symbol=${encodeURIComponent(symbol)}${forceRefresh ? '&fresh=1' : ''}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.price !== null && data.price !== undefined) {
+                        console.log(`${symbol}: ${data.price}${data.stale ? ' (stale fallback)' : ''}`);
+                        return data.price;
+                    }
+                }
+            } catch (err) {
+                console.error(`Error calling /api/prices for ${symbol}:`, err);
+            }
+            return null;
+        }
+
+        // Server-side: skip the API route (would be a self-fetch), use the
+        // server's memory cache directly unless forceRefresh.
         if (!forceRefresh) {
             const cachedPrice = await getCachedPrice(symbol);
             if (cachedPrice !== null) {
@@ -126,24 +169,10 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
             }
         }
 
-        // Rate limiting with randomization
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastRequestTime;
-        const randomDelay = Math.random() * 100;
-        const totalDelay = MIN_REQUEST_DELAY + randomDelay;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
 
-        if (timeSinceLastRequest < totalDelay) {
-            await delay(totalDelay - timeSinceLastRequest);
-        }
-        lastRequestTime = Date.now();
-
-        const isServerSide = typeof window === 'undefined';
-        const url = isServerSide
-            ? `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`
-            : `/yahoo-finance/v8/finance/chart/${symbol}?interval=1d&range=1d`;
-
-        const response = await fetchWithRetry(url);
-        const data = await response.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
 
         const price = data.chart?.result?.[0]?.meta?.regularMarketPrice;
         if (price) {
@@ -203,7 +232,7 @@ export async function fetchHistoricalFxRates(fxPair: string, availableDates: str
             return null;
         }
 
-        const sortedAvailableDates = availableDates.sort();
+        const sortedAvailableDates = [...availableDates].sort();
         const earliestDate = new Date(sortedAvailableDates[0]);
         const latestDate = new Date(sortedAvailableDates[sortedAvailableDates.length - 1]);
 
@@ -211,26 +240,37 @@ export async function fetchHistoricalFxRates(fxPair: string, availableDates: str
                           (latestDate.getMonth() - earliestDate.getMonth());
         const range = getYahooRange(Math.max(1, monthsDiff));
 
-        // Rate limiting with randomization
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastRequestTime;
-        const randomDelay = Math.random() * 100;
-        const totalDelay = MIN_REQUEST_DELAY + randomDelay;
-
-        if (timeSinceLastRequest < totalDelay) {
-            await delay(totalDelay - timeSinceLastRequest);
-        }
-        lastRequestTime = Date.now();
-
         const yahooSymbol = getYahooFxSymbol(fxPair);
 
         const isServerSide = typeof window === 'undefined';
-        const url = isServerSide
-            ? `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=${range}`
-            : `/yahoo-finance/v8/finance/chart/${yahooSymbol}?interval=1d&range=${range}`;
 
-        const response = await fetchWithRetry(url);
-        const data = await response.json();
+        // Client-side: hit cached API. The route returns { rates: {date: rate} }.
+        if (!isServerSide) {
+            const apiUrl = `/api/historical-fx-rates?pair=${encodeURIComponent(fxPair)}&dates=${encodeURIComponent(availableDates.join(','))}`;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const json = await fetchJson(apiUrl) as any;
+            const allRates: {[date: string]: number} = json?.rates ?? {};
+
+            // Mirror the server-side forward-fill behavior for missing dates.
+            const result: {[date: string]: number} = {};
+            for (const target of availableDates) {
+                if (allRates[target] !== undefined) {
+                    result[target] = allRates[target];
+                    continue;
+                }
+                let bestDate: string | null = null;
+                for (const d of Object.keys(allRates)) {
+                    if (d <= target && (bestDate === null || d > bestDate)) bestDate = d;
+                }
+                if (bestDate) result[target] = allRates[bestDate];
+            }
+            return Object.keys(result).length > 0 ? result : null;
+        }
+
+        // Server-side: hit Yahoo directly.
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=${range}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
 
         const result = data.chart?.result?.[0];
         if (!result || !result.timestamp || !result.indicators?.quote?.[0]?.close) {
@@ -303,6 +343,31 @@ export async function fetchHistoricalFxRates(fxPair: string, availableDates: str
 
 export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean = false): Promise<number | null> {
     try {
+        const isServerSide = typeof window === 'undefined';
+
+        // Client-side: route through /api/fx-rates so both the server in-memory
+        // cache and the client TTL cache (in fetchJson) are bypassed when the
+        // caller asks for fresh data. Otherwise the FX rate stays frozen at
+        // whatever was cached on first load, even after Refresh.
+        if (!isServerSide) {
+            try {
+                const url = `/api/fx-rates?pair=${encodeURIComponent(fxPair)}${forceRefresh ? '&fresh=1' : ''}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.rate !== null && data.rate !== undefined) {
+                        return data.rate;
+                    }
+                }
+            } catch (err) {
+                console.error(`Error calling /api/fx-rates for ${fxPair}:`, err);
+            }
+            return null;
+        }
+
+        // Server-side: skip the API route (would be a self-fetch). Use the
+        // client-side cache utility only when not forcing refresh; otherwise
+        // go straight to Yahoo.
         if (!forceRefresh) {
             const cachedRate = await getCachedFxRate(fxPair);
             if (cachedRate !== null) {
@@ -310,26 +375,10 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
             }
         }
 
-        // Rate limiting with randomization
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastRequestTime;
-        const randomDelay = Math.random() * 100;
-        const totalDelay = MIN_REQUEST_DELAY + randomDelay;
-
-        if (timeSinceLastRequest < totalDelay) {
-            await delay(totalDelay - timeSinceLastRequest);
-        }
-        lastRequestTime = Date.now();
-
         const yahooSymbol = getYahooFxSymbol(fxPair);
-
-        const isServerSide = typeof window === 'undefined';
-        const url = isServerSide
-            ? `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`
-            : `/yahoo-finance/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
-
-        const response = await fetchWithRetry(url);
-        const data = await response.json();
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
 
         const rate = data.chart?.result?.[0]?.meta?.regularMarketPrice;
         if (rate) {
@@ -538,36 +587,61 @@ export const convertToJPY = convertToBaseCurrency;
 // Export BASE_CURRENCY_CONSTANT kept for backward-compat; prefer passing baseCurrency explicitly
 export const BASE_CURRENCY_CONSTANT = BASE_CURRENCY;
 
-// Deduplicates concurrent fetches for the same URL.
-const _inFlight = new Map<string, Promise<Response>>();
-
 async function fetchWithRetry(url: string, retries = 2, baseDelay = 1000): Promise<Response> {
-    const existing = _inFlight.get(url);
+    for (let i = 0; i < retries; i++) {
+        let response: Response;
+        try {
+            response = await fetch(url);
+        } catch {
+            // Network error (Load failed / connection refused) — never retry.
+            throw new TypeError(`Network error fetching ${url}`);
+        }
+
+        if (response.ok) return response;
+
+        const retryable = response.status === 429 || response.status >= 500;
+        if (retryable && i < retries - 1) {
+            await delay(baseDelay * Math.pow(2, i));
+            continue;
+        }
+        throw new Error(`HTTP ${response.status}`);
+    }
+    throw new Error('Max retries reached');
+}
+
+// Deduplicates concurrent fetches AND caches results for a short TTL — concurrent
+// React effects, Strict-Mode double-mounts, and view changes otherwise hammer
+// Yahoo's per-IP rate limit (429). Failures are negative-cached for a shorter
+// window so we back off when Yahoo is throttling.
+const _inFlightJson = new Map<string, Promise<unknown>>();
+type CacheEntry = { data?: unknown; error?: Error; expiresAt: number };
+const _cachedJson = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min for successful responses.
+const NEG_TTL_MS = 30 * 1000; // 30s for failures — gives Yahoo's rate-limit window time to reset.
+
+async function fetchJson(url: string): Promise<unknown> {
+    const now = Date.now();
+    const cached = _cachedJson.get(url);
+    if (cached && cached.expiresAt > now) {
+        if (cached.error) throw cached.error;
+        return cached.data;
+    }
+
+    const existing = _inFlightJson.get(url);
     if (existing) return existing;
 
     const promise = (async () => {
-        for (let i = 0; i < retries; i++) {
-            let response: Response;
-            try {
-                response = await fetch(url);
-            } catch {
-                // Network error (Load failed / connection refused) — never retry.
-                throw new TypeError(`Network error fetching ${url}`);
-            }
-
-            if (response.ok) return response;
-
-            const retryable = response.status === 429 || response.status >= 500;
-            if (retryable && i < retries - 1) {
-                await delay(baseDelay * Math.pow(2, i));
-                continue;
-            }
-            throw new Error(`HTTP ${response.status}`);
+        try {
+            const response = await withRateLimit(() => fetchWithRetry(url));
+            const data = await response.json();
+            _cachedJson.set(url, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+            return data;
+        } catch (error) {
+            _cachedJson.set(url, { error: error as Error, expiresAt: Date.now() + NEG_TTL_MS });
+            throw error;
         }
-        throw new Error('Max retries reached');
     })();
-
-    _inFlight.set(url, promise);
-    promise.finally(() => _inFlight.delete(url));
+    _inFlightJson.set(url, promise);
+    promise.finally(() => _inFlightJson.delete(url));
     return promise;
 }

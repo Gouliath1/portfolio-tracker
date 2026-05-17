@@ -1,4 +1,4 @@
-import { RawPosition } from '@portfolio/types';
+import { RawPosition, Currency } from '@portfolio/types';
 import { getDbClient } from '../database/config';
 import {
   createPositionSet,
@@ -117,8 +117,8 @@ export const exportPositionSetById = async (
     account: String(row.account ?? 'General'),
     quantity: Number(row.quantity ?? 0),
     costPerUnit: Number(row.average_cost ?? 0),
-    transactionCcy: String(row.transactionCcy ?? 'USD'),
-    stockCcy: String(row.stockCcy ?? row.transactionCcy ?? 'USD'),
+    transactionCcy: String(row.transactionCcy ?? 'USD') as Currency,
+    stockCcy: String(row.stockCcy ?? row.transactionCcy ?? 'USD') as Currency,
   }));
 
   return {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MdClose, MdDownload, MdRefresh, MdUpload } from 'react-icons/md';
+import { MdClose, MdDownload, MdRefresh, MdUpload, MdInsertDriveFile } from 'react-icons/md';
 import { importPositionSet } from '../../utils/localPositions';
 import { Transaction } from '@portfolio/types';
 
@@ -41,6 +41,7 @@ interface ImportSetModalProps {
 
 export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
     const [fields, setFields] = useState({ name: '', description: '', set_as_active: false });
+    const [stagedFile, setStagedFile] = useState<File | null>(null);
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [dragging, setDragging] = useState(false);
@@ -68,11 +69,35 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
         document.body.removeChild(a);
     };
 
-    const processFile = async (file: File) => {
+    // Stage the file but don't import yet — wait for the explicit "Add" click.
+    const stageFile = (file: File) => {
+        setError(null);
+        setStagedFile(file);
+        // Pre-fill the name from the file if the user hasn't set one.
+        if (!fields.name) {
+            setFields(p => ({ ...p, name: file.name.replace(/\.json$/i, '') }));
+        }
+    };
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) stageFile(file);
+        e.target.value = '';
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) stageFile(file);
+    };
+
+    const handleAdd = async () => {
+        if (!stagedFile) return;
         setImporting(true);
         setError(null);
         try {
-            const content = await file.text();
+            const content = await stagedFile.text();
             const jsonData = JSON.parse(content);
             let records: unknown[];
             if (Array.isArray(jsonData)) {
@@ -86,11 +111,11 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
             }
 
             // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             importPositionSet(
                 fields.name || `imported-${Date.now()}`,
-                fields.name || file.name.replace('.json', ''),
-                fields.description || `Imported from ${file.name}`,
+                fields.name || stagedFile.name.replace('.json', ''),
+                fields.description || `Imported from ${stagedFile.name}`,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 records as any,
                 fields.set_as_active,
             );
@@ -103,21 +128,10 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
         }
     };
 
-    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) processFile(file);
-        e.target.value = '';
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) processFile(file);
-    };
-
     const inputClass = 'w-full px-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1';
     const inputStyle = { color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' };
+
+    const canAdd = stagedFile !== null && !importing;
 
     return (
         <div
@@ -186,7 +200,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Set as active after import</span>
                     </label>
 
-                    {/* Drop zone */}
+                    {/* Drop zone / staged file */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>JSON File *</span>
@@ -200,47 +214,75 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             </button>
                         </div>
 
-                        <label
-                            className="flex flex-col items-center justify-center gap-3 w-full rounded-xl cursor-pointer transition-all"
-                            style={{
-                                border: `1px dashed ${dragging ? 'var(--accent)' : 'var(--border)'}`,
-                                background: dragging ? 'var(--accent-dim)' : 'var(--glass-bg)',
-                                padding: '2rem 1rem',
-                                color: 'var(--text-secondary)',
-                            }}
-                            onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                            onDragLeave={() => setDragging(false)}
-                            onDrop={handleDrop}
-                        >
-                            {importing ? (
-                                <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--accent)' }}>
-                                    <MdRefresh className="w-4 h-4 animate-spin" />
-                                    Importing…
+                        {stagedFile ? (
+                            <div
+                                className="flex items-center justify-between gap-3 w-full rounded-xl px-4 py-3"
+                                style={{ border: '1px solid var(--accent-glow)', background: 'var(--accent-dim)' }}
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <MdInsertDriveFile className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+                                    <div className="min-w-0">
+                                        <div className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{stagedFile.name}</div>
+                                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{(stagedFile.size / 1024).toFixed(1)} KB</div>
+                                    </div>
                                 </div>
-                            ) : (
-                                <>
-                                    <MdUpload className="w-6 h-6" style={{ color: 'var(--accent)' }} />
-                                    <span className="text-sm text-center">
-                                        Drop a JSON file here or <span style={{ color: 'var(--accent)' }}>browse</span>
-                                    </span>
-                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — transactions array</span>
-                                </>
-                            )}
-                            <input type="file" accept=".json,application/json" onChange={handleFileInput} disabled={importing} className="sr-only" />
-                        </label>
+                                <button
+                                    onClick={() => setStagedFile(null)}
+                                    className="text-xs px-2 py-1 rounded-md transition-opacity opacity-70 hover:opacity-100"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    aria-label="Remove file"
+                                >
+                                    Change
+                                </button>
+                            </div>
+                        ) : (
+                            <label
+                                className="flex flex-col items-center justify-center gap-3 w-full rounded-xl cursor-pointer transition-all"
+                                style={{
+                                    border: `1px dashed ${dragging ? 'var(--accent)' : 'var(--border)'}`,
+                                    background: dragging ? 'var(--accent-dim)' : 'var(--glass-bg)',
+                                    padding: '2rem 1rem',
+                                    color: 'var(--text-secondary)',
+                                }}
+                                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                                onDragLeave={() => setDragging(false)}
+                                onDrop={handleDrop}
+                            >
+                                <MdUpload className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+                                <span className="text-sm text-center">
+                                    Drop a JSON file here or <span style={{ color: 'var(--accent)' }}>browse</span>
+                                </span>
+                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — transactions array</span>
+                                <input type="file" accept=".json,application/json" onChange={handleFileInput} className="sr-only" />
+                            </label>
+                        )}
 
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                             Each record requires: way (buy/sell), date, ticker, fullName, account, quantity, pricePerUnit, ccy, stockCcy. Legacy position files are auto-migrated.
                         </p>
                     </div>
 
-                    <div className="flex justify-end pt-2">
+                    <div className="flex justify-end gap-2 pt-2">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 text-sm glass glass-hover rounded-lg transition-all"
+                            disabled={importing}
+                            className="px-4 py-2 text-sm glass glass-hover rounded-lg transition-all disabled:opacity-50"
                             style={{ color: 'var(--text-secondary)' }}
                         >
                             Cancel
+                        </button>
+                        <button
+                            onClick={handleAdd}
+                            disabled={!canAdd}
+                            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                background: 'var(--accent-dim)',
+                                color: 'var(--accent)',
+                                border: '1px solid var(--accent-glow)',
+                            }}
+                        >
+                            {importing && <MdRefresh className="w-4 h-4 animate-spin" />}
+                            {importing ? 'Importing…' : 'Add'}
                         </button>
                     </div>
                 </div>

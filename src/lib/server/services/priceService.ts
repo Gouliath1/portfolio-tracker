@@ -5,7 +5,7 @@ export interface PriceLookupOptions {
   forceRefresh?: boolean;
 }
 
-export type PriceSource = 'database' | 'fresh';
+export type PriceSource = 'database' | 'fresh' | 'unavailable';
 
 export interface PriceLookupResult {
   symbol: string;
@@ -67,7 +67,7 @@ export const getLatestPriceForSymbol = async (
     symbol: trimmedSymbol,
     price: null,
     date: null,
-    source: 'fresh'
+    source: 'unavailable'
   };
 };
 

@@ -139,8 +139,6 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 };
 
 export const calculatePortfolioSummary = async (rawPositions: RawPosition[], forceRefresh: boolean = false, baseCurrency: string = 'JPY'): Promise<PortfolioSummary> => {
-    console.log(`📊 calculatePortfolioSummary called with ${rawPositions.length} positions, forceRefresh: ${forceRefresh}, baseCurrency: ${baseCurrency}`);
-
     // Only fetch live prices for tickers that have at least one open lot.
     const openTickers = [...new Set(rawPositions.filter(p => !p.saleDate).map(pos => pos.ticker.toString()))];
 
@@ -148,12 +146,21 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
 
     if (forceRefresh) {
         currentPrices = await updateAllPositions(openTickers);
+
+        // Also refresh the current FX rate for each pair we'll convert through.
+        // calculatePosition uses cached current FX rates, so without this the
+        // cache stays stale across "Refresh" clicks even though prices update.
+        const openPairs = [...new Set(
+            rawPositions
+                .filter(p => !p.saleDate && p.stockCcy !== baseCurrency)
+                .map(p => `${p.stockCcy}${baseCurrency}`)
+        )];
+        await Promise.all(openPairs.map(pair => fetchCurrentFxRate(pair, true)));
     } else {
-        for (const ticker of openTickers) {
-            if (!currentPrices[ticker]) {
-                currentPrices[ticker] = await fetchStockPrice(ticker, forceRefresh);
-            }
-        }
+        const entries = await Promise.all(
+            openTickers.map(async ticker => [ticker, await fetchStockPrice(ticker, forceRefresh)] as const)
+        );
+        currentPrices = Object.fromEntries(entries);
     }
 
     const positionPromises = rawPositions.map(pos =>

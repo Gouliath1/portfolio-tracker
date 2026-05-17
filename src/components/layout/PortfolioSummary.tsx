@@ -96,7 +96,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
         : null;
 
     // Daily P&L sign helpers
-    const dailyPositive = dailyPnl === null ? null : dailyPnl.absoluteChange >= 0 ? true : false;
+    const dailyPositive = dailyPnl === null ? null : dailyPnl.absoluteChange >= 0;
     const dailySign = dailyPnl && dailyPnl.absoluteChange >= 0 ? '+' : '';
 
     return (
@@ -108,7 +108,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 value={hasNullPrices
                     ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
                     : formatValue(summary.totalValueJPY, showValues)}
-                positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY ? true : false}
+                positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY}
                 flash={valueChanged}
                 footnote={
                     <span>Cost: {formatValue(summary.totalCostJPY, showValues)}</span>
@@ -126,11 +126,11 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                             : `${annualizedReturn.return >= 0 ? '+' : ''}${annualizedReturn.return.toFixed(2)}%`
                 }
                 sub={!hasNullPrices && annualizedReturn ? sinceLabel ?? undefined : undefined}
-                positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0 ? true : false}
+                positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0}
                 flash={valueChanged}
             />
 
-            {/* 3 — Total P&L (% headline, absolute + since as sub) */}
+            {/* 3 — Total P&L (% headline, absolute + since as sub, realized as footnote) */}
             <StatCard
                 label="Total P&L"
                 value={hasNullPrices
@@ -139,8 +139,20 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 sub={!hasNullPrices
                     ? <>{formatValue(summary.totalPnlJPY, showValues)}{sinceLabel ? <span style={{ opacity: 0.6 }}> · {sinceLabel}</span> : null}</>
                     : undefined}
-                positive={hasNullPrices ? null : summary.totalPnlJPY >= 0 ? true : false}
+                positive={hasNullPrices ? null : summary.totalPnlJPY >= 0}
                 flash={valueChanged}
+                footnote={summary.closedPositions.length > 0
+                    ? (
+                        <span>
+                            Realized:{' '}
+                            <span style={{ color: summary.realizedPnlJPY >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
+                                {summary.realizedPnlJPY >= 0 ? '+' : ''}{formatValue(summary.realizedPnlJPY, showValues)}
+                                {' · '}
+                                {summary.realizedPnlPercentage >= 0 ? '+' : ''}{summary.realizedPnlPercentage.toFixed(2)}%
+                            </span>
+                        </span>
+                    )
+                    : undefined}
             />
 
             {/* 4 — Daily P&L */}

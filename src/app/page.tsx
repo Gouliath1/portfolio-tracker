@@ -38,6 +38,7 @@ export default function Home() {
   const [addPositionOpen, setAddPositionOpen] = useState(false);
   const [sellTarget, setSellTarget] = useState<{ position: Position; setId: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionInfo, setActionInfo] = useState<string | null>(null);
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -373,8 +374,16 @@ export default function Home() {
         <ImportSetModal
           onImported={(count, wasActive) => {
             setImportModalOpen(false);
-            setDemoBannerRefresh(prev => prev + 1);
-            if (wasActive) handlePositionSetChanged();
+            if (wasActive) {
+              handlePositionSetChanged();
+            } else {
+              // The active portfolio didn't change — don't refetch its data.
+              // Just bump the refresh trigger so the set list in Settings and
+              // the demo banner re-read localStorage and pick up the new set.
+              setDemoBannerRefresh(prev => prev + 1);
+              setActionInfo(`Imported ${count} transactions — switch to the new set in Settings to view it.`);
+              setTimeout(() => setActionInfo(null), 5000);
+            }
           }}
           onClose={() => setImportModalOpen(false)}
         />
@@ -426,6 +435,27 @@ export default function Home() {
         </div>
       )}
 
+      {/* ── Action info toast (auto-dismiss) ─────────────── */}
+      {actionInfo && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl max-w-md"
+          style={{
+            background: 'var(--surface-popover)',
+            border: '1px solid var(--accent-glow)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{actionInfo}</span>
+          <button
+            onClick={() => setActionInfo(null)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all glass glass-hover"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ── Welcome modal (first visit only) ────────────── */}
       <WelcomeModal onOpenSettings={() => setSettingsOpen(true)} />
 
@@ -436,6 +466,7 @@ export default function Home() {
         onPositionSetChanged={handlePositionSetChanged}
         currency={currency}
         onCurrencyChange={handleCurrencyChange}
+        refreshTrigger={demoBannerRefresh}
       />
     </>
   );
