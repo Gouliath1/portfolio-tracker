@@ -13,15 +13,43 @@ export const SUPPORTED_BASE_CURRENCIES: { code: BaseCurrency; name: string; symb
 ];
 
 const STORAGE_KEY = 'baseCurrency';
-const DEFAULT: BaseCurrency = 'JPY';
+const FALLBACK: BaseCurrency = 'USD';
+
+const REGION_TO_CURRENCY: Record<string, BaseCurrency> = {
+    JP: 'JPY',
+    GB: 'GBP',
+    AT: 'EUR', BE: 'EUR', CY: 'EUR', DE: 'EUR', EE: 'EUR', ES: 'EUR',
+    FI: 'EUR', FR: 'EUR', GR: 'EUR', HR: 'EUR', IE: 'EUR', IT: 'EUR',
+    LT: 'EUR', LU: 'EUR', LV: 'EUR', MT: 'EUR', NL: 'EUR', PT: 'EUR',
+    SI: 'EUR', SK: 'EUR',
+};
+
+function detectRegionCurrency(): BaseCurrency {
+    if (typeof navigator === 'undefined') return FALLBACK;
+    const locales = [
+        ...(navigator.languages ?? []),
+        navigator.language,
+    ].filter(Boolean) as string[];
+    for (const loc of locales) {
+        try {
+            const region = new Intl.Locale(loc).maximize().region;
+            if (region && REGION_TO_CURRENCY[region]) {
+                return REGION_TO_CURRENCY[region];
+            }
+        } catch {
+            // ignore malformed locale
+        }
+    }
+    return FALLBACK;
+}
 
 function readStored(): BaseCurrency {
-    if (typeof window === 'undefined') return DEFAULT;
+    if (typeof window === 'undefined') return FALLBACK;
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && SUPPORTED_BASE_CURRENCIES.some(c => c.code === stored)) {
         return stored as BaseCurrency;
     }
-    return DEFAULT;
+    return detectRegionCurrency();
 }
 
 export function useBaseCurrency() {
