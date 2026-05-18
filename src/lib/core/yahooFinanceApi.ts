@@ -71,8 +71,9 @@ export async function fetchHistoricalPrices(symbol: string, positions: Position[
         }, new Date(symbolPositions[0].transactionDate));
 
         const monthsSincePurchase = getMonthsSincePurchase(earliestDate.toISOString().split('T')[0]);
-        // For daily resolution we only need a short recent window (5d covers weekends)
-        const range = interval === '1d' ? '5d' : getYahooRange(monthsSincePurchase);
+        // Always cover the position's full history. Daily resolution at multi-year
+        // ranges is fine for Yahoo and lets one cache serve both chart and daily P&L.
+        const range = getYahooRange(monthsSincePurchase);
 
         const isServerSide = typeof window === 'undefined';
 

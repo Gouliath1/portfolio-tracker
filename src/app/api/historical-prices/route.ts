@@ -1,9 +1,16 @@
 /**
  * Server-side cached fetcher for historical stock prices.
  *
- * Layers, on cache miss:
- *   1. SQLite cache (data/marketCache.db locally, Turso in prod)
- *   2. Yahoo Finance (with retry + serialized rate limiting)
+ * One ticker → one daily series in cache. Both the chart and the daily P&L
+ * hook read from the same series; we never mix resolutions in storage.
+ *
+ * On every request we:
+ *   1. Compute the start date the caller needs from ?range=.
+ *   2. Look up cached daily prices for the ticker.
+ *   3. If the cache covers the requested start AND its latest row is from
+ *      the last expected business day, serve cache.
+ *   4. Otherwise fetch the missing window from Yahoo (always interval=1d),
+ *      merge into cache, and serve the merged series.
  *
  * Concurrent requests for the same ticker share one in-flight promise so
  * Strict-Mode double-mounts and parallel components don't trigger duplicate
@@ -21,23 +28,7 @@ type PriceMap = Record<string, number>;
 
 const _inFlight = new Map<string, Promise<PriceMap>>();
 
-function inFlightKey(symbol: string, interval: string, range: string): string {
-    return `${symbol}::${interval}::${range}`;
-}
-
-async function fetchAndCache(symbol: string, interval: '1d' | '1mo', range: string): Promise<PriceMap> {
-    // The core fetcher takes positions to compute the date range; pass a single
-    // synthetic position so it asks Yahoo for the right window.
-    const synthetic = [{ transactionDate: rangeToStartDate(range), ticker: symbol }];
-    const fetched = await fetchHistoricalPrices(symbol, synthetic, interval);
-    if (fetched && Object.keys(fetched).length > 0) {
-        await setCachedHistoricalPrices(symbol, fetched);
-    }
-    return fetched ?? {};
-}
-
 function rangeToStartDate(range: string): string {
-    // Just used to nudge fetchHistoricalPrices towards the right window.
     const now = new Date();
     const match = /^(\d+)([dy])$/.exec(range);
     if (match) {
@@ -50,42 +41,69 @@ function rangeToStartDate(range: string): string {
     return now.toISOString().split('T')[0];
 }
 
+function lastExpectedBusinessDay(): string {
+    const d = new Date();
+    while (d.getDay() === 0 || d.getDay() === 6) {
+        d.setDate(d.getDate() - 1);
+    }
+    return d.toISOString().split('T')[0];
+}
+
+async function fetchAndCache(symbol: string, startDate: string): Promise<PriceMap> {
+    const synthetic = [{ transactionDate: startDate, ticker: symbol }];
+    const fetched = await fetchHistoricalPrices(symbol, synthetic, '1d');
+    if (fetched && Object.keys(fetched).length > 0) {
+        await setCachedHistoricalPrices(symbol, fetched);
+    }
+    return fetched ?? {};
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
-    const interval = (searchParams.get('interval') ?? '1mo') as '1d' | '1mo';
     const range = searchParams.get('range') ?? '5y';
 
     if (!symbol) {
         return NextResponse.json({ error: 'symbol is required' }, { status: 400 });
     }
 
-    // Cache check first.
     const cached = await getCachedHistoricalPrices(symbol);
-    if (Object.keys(cached).length > 0) {
-        // We have something — return it. The client can decide whether to
-        // request a refresh if it needs newer dates.
+    const cachedDates = Object.keys(cached);
+    const requestedStart = rangeToStartDate(range);
+    const lastBusinessDay = lastExpectedBusinessDay();
+
+    let minCached: string | null = null;
+    let maxCached: string | null = null;
+    for (const d of cachedDates) {
+        if (minCached === null || d < minCached) minCached = d;
+        if (maxCached === null || d > maxCached) maxCached = d;
+    }
+
+    const coversStart = minCached !== null && minCached <= requestedStart;
+    const isFresh = maxCached !== null && maxCached >= lastBusinessDay;
+
+    if (coversStart && isFresh) {
         return NextResponse.json({ symbol, prices: cached, source: 'cache' });
     }
 
-    // Miss → coalesce concurrent fetches for the same window.
-    const key = inFlightKey(symbol, interval, range);
-    let promise = _inFlight.get(key);
+    // Need to refetch. Coalesce concurrent requests for this ticker.
+    let promise = _inFlight.get(symbol);
     if (!promise) {
-        promise = fetchAndCache(symbol, interval, range);
-        _inFlight.set(key, promise);
-        promise.finally(() => _inFlight.delete(key));
+        promise = fetchAndCache(symbol, requestedStart);
+        _inFlight.set(symbol, promise);
+        promise.finally(() => _inFlight.delete(symbol));
     }
 
     try {
-        const prices = await promise;
-        return NextResponse.json({ symbol, prices, source: 'fresh' });
+        const fresh = await promise;
+        const merged = { ...cached, ...fresh };
+        return NextResponse.json({ symbol, prices: merged, source: 'fresh' });
     } catch (error) {
         return NextResponse.json({
             symbol,
-            prices: {},
+            prices: cached,
             source: 'error',
             error: error instanceof Error ? error.message : 'fetch failed',
-        }, { status: 502 });
+        }, { status: Object.keys(cached).length > 0 ? 200 : 502 });
     }
 }

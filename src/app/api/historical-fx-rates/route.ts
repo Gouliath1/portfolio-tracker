@@ -1,7 +1,9 @@
 /**
  * Server-side cached fetcher for historical FX rates.
- * Same architecture as /api/historical-prices: SQLite cache → Yahoo fallback,
- * with in-flight dedup for concurrent requests.
+ *
+ * Same shape as /api/historical-prices: one pair → one daily series in
+ * cache; refresh when the requested window isn't fully covered or the
+ * latest cached date isn't from the last business day.
  */
 
 import { NextResponse } from 'next/server';
@@ -15,7 +17,30 @@ type RateMap = Record<string, number>;
 
 const _inFlight = new Map<string, Promise<RateMap>>();
 
-async function fetchAndCache(pair: string, dates: string[]): Promise<RateMap> {
+function lastExpectedBusinessDay(): string {
+    const d = new Date();
+    while (d.getDay() === 0 || d.getDay() === 6) {
+        d.setDate(d.getDate() - 1);
+    }
+    return d.toISOString().split('T')[0];
+}
+
+function buildFillRange(earliest: string): string[] {
+    // Generate every calendar day from `earliest` through today. The Yahoo
+    // fetch ignores most of these (it returns its own trading-day grid) but
+    // we use the range to size the Yahoo `range=` window correctly.
+    const dates: string[] = [];
+    const start = new Date(earliest);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+        dates.push(d.toISOString().split('T')[0]);
+    }
+    return dates;
+}
+
+async function fetchAndCache(pair: string, earliestDate: string): Promise<RateMap> {
+    const dates = buildFillRange(earliestDate);
     const fetched = await fetchHistoricalFxRates(pair, dates);
     if (fetched && Object.keys(fetched).length > 0) {
         await setCachedHistoricalFxRates(pair, fetched);
@@ -32,28 +57,41 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'pair is required' }, { status: 400 });
     }
 
-    const dates = datesParam ? datesParam.split(',') : [];
-
+    const requestedDates = datesParam ? datesParam.split(',').filter(Boolean) : [];
     const cached = await getCachedHistoricalFxRates(pair);
+    const cachedDates = Object.keys(cached);
 
-    // If we have any cache hit AND all requested dates are covered, serve cached.
-    const allCovered = dates.length > 0 && dates.every(d => d in cached);
-    if (allCovered || (dates.length === 0 && Object.keys(cached).length > 0)) {
+    let minCached: string | null = null;
+    let maxCached: string | null = null;
+    for (const d of cachedDates) {
+        if (minCached === null || d < minCached) minCached = d;
+        if (maxCached === null || d > maxCached) maxCached = d;
+    }
+
+    const requestedStart = requestedDates.length > 0
+        ? requestedDates.reduce((a, b) => (a < b ? a : b))
+        : null;
+
+    const coversStart = requestedStart === null
+        ? cachedDates.length > 0
+        : minCached !== null && minCached <= requestedStart;
+    const isFresh = maxCached !== null && maxCached >= lastExpectedBusinessDay();
+
+    if (coversStart && isFresh) {
         return NextResponse.json({ pair, rates: cached, source: 'cache' });
     }
 
-    // Need a fresh fetch — coalesce concurrent requests.
-    const key = `${pair}::${dates.join(',')}`;
-    let promise = _inFlight.get(key);
+    const earliest = requestedStart ?? minCached ?? lastExpectedBusinessDay();
+
+    let promise = _inFlight.get(pair);
     if (!promise) {
-        promise = fetchAndCache(pair, dates);
-        _inFlight.set(key, promise);
-        promise.finally(() => _inFlight.delete(key));
+        promise = fetchAndCache(pair, earliest);
+        _inFlight.set(pair, promise);
+        promise.finally(() => _inFlight.delete(pair));
     }
 
     try {
         const fresh = await promise;
-        // Merge with anything already cached so caller gets the full picture.
         return NextResponse.json({ pair, rates: { ...cached, ...fresh }, source: 'fresh' });
     } catch (error) {
         return NextResponse.json({
@@ -61,6 +99,6 @@ export async function GET(request: Request) {
             rates: cached,
             source: 'error',
             error: error instanceof Error ? error.message : 'fetch failed',
-        }, { status: cached && Object.keys(cached).length > 0 ? 200 : 502 });
+        }, { status: cachedDates.length > 0 ? 200 : 502 });
     }
 }
