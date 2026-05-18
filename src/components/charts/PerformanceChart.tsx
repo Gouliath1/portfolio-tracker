@@ -63,6 +63,28 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
                 selectedTimeline={selectedTimeline}
                 onTimelineChange={setSelectedTimeline}
             />
+            {showValues && (
+                <div
+                    className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm mt-2 mb-1"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    <span>
+                        <span style={{ color: 'var(--chart-line1)', fontWeight: 600 }}>Left axis</span>
+                        {' · '}
+                        <span style={{ color: 'var(--chart-line1)' }}>Total Value</span>
+                        {' + '}
+                        <span style={{ color: 'var(--chart-line2)' }}>Total Cost</span>
+                        {` (${currency})`}
+                    </span>
+                    <span aria-hidden="true">│</span>
+                    <span>
+                        <span style={{ color: 'var(--chart-line3)', fontWeight: 600 }}>Right axis</span>
+                        {' · '}
+                        <span style={{ color: 'var(--chart-line3)' }}>P&L</span>
+                        {` (${currency}) — separate scale`}
+                    </span>
+                </div>
+            )}
             <div style={{ height: '420px' }}>
                 {renderChart()}
             </div>

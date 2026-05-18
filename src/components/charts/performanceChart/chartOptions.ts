@@ -63,8 +63,11 @@ export const createChartOptions = (
             display: true,
             position: 'left',
             beginAtZero: true,
+            // Axis names live in the horizontal caption strip above the chart
+            // (rendered in PerformanceChart.tsx) — keeps them readable instead
+            // of rotated 90° in a corner.
             ticks: {
-                color: cssVar('--chart-tick'),
+                color: cssVar('--chart-line1'),
                 callback: function(value) {
                     if (typeof value === 'number') {
                         if (!showValues) return `${value.toFixed(2)}%`;
@@ -83,14 +86,8 @@ export const createChartOptions = (
             display: showValues,
             position: 'right',
             beginAtZero: false,
-            title: {
-                display: true,
-                text: `P&L (${currency})`,
-                color: cssVar('--chart-tick'),
-                font: { size: 11 }
-            },
             ticks: {
-                color: cssVar('--chart-tick'),
+                color: cssVar('--chart-line3'),
                 callback: function(value) {
                     if (typeof value === 'number') {
                         const sign = value >= 0 ? '+' : '';

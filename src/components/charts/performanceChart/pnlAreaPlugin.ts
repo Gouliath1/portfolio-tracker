@@ -8,10 +8,11 @@ export const pnlAreaPlugin = {
         // Type guards and null checks
         if (!ctx || !data?.datasets || !scales) return;
         
-        // Find the P&L dataset (could be JPY or percentage)
+        // Find the P&L dataset. Label is `P&L (<currency>)` when showing values
+        // (currency varies — JPY, EUR, …) or `P&L (%)` in percentage mode.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pnlDatasetIndex = data.datasets.findIndex((dataset: any) => 
-            dataset.label === 'P&L (JPY)' || dataset.label === 'P&L (%)'
+        const pnlDatasetIndex = data.datasets.findIndex((dataset: any) =>
+            typeof dataset.label === 'string' && dataset.label.startsWith('P&L (')
         );
         if (pnlDatasetIndex === -1) return;
         
