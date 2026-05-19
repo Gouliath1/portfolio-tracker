@@ -26,6 +26,7 @@ export interface PositionSetLocal {
 
 const SETS_KEY = 'pt_sets';
 const ACTIVE_KEY = 'pt_active_set';
+export const JUST_IMPORTED_KEY = 'pt_just_imported_set';
 
 const positionsKey = (id: string) => `pt_positions_${id}`;
 
@@ -189,6 +190,7 @@ export function importPositionSet(
         ? migrateLegacy(transactions)
         : (transactions as Transaction[]);
     localStorage.setItem(positionsKey(id), JSON.stringify(finalTxs));
+    try { sessionStorage.setItem(JUST_IMPORTED_KEY, id); } catch { /* sessionStorage unavailable */ }
     return newSet;
 }
 

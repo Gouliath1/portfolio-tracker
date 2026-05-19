@@ -15,8 +15,20 @@ export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
     useEffect(() => {
         setIsVisible(true);
         try {
-            import('../../utils/localPositions').then(({ getActiveSet }) => {
-                setActiveSet(getActiveSet());
+            import('../../utils/localPositions').then(({ getActiveSet, JUST_IMPORTED_KEY }) => {
+                const set = getActiveSet();
+                if (set.info_type === 'info') {
+                    // One-shot: only show right after the matching import action.
+                    const justImported = sessionStorage.getItem(JUST_IMPORTED_KEY);
+                    if (justImported === set.id) {
+                        sessionStorage.removeItem(JUST_IMPORTED_KEY);
+                        setActiveSet(set);
+                    } else {
+                        setActiveSet(null);
+                    }
+                } else {
+                    setActiveSet(set);
+                }
             }).catch(() => setActiveSet(DEMO_SET));
         } catch {
             setActiveSet(DEMO_SET);
