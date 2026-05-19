@@ -69,6 +69,7 @@ export default function Home() {
       //   3. No cache → full compute path (DB → Yahoo if stale).
       //   4. forceRefresh (Refresh button) → bypass cache; recompute fetches
       //      live data and updates the cache.
+      const isDev = process.env.NODE_ENV !== 'production';
       let cacheFromToday = false;
       if (!forceRefresh) {
         const cached = readCachedSummary(currentPositions, baseCurrency);
@@ -77,10 +78,18 @@ export default function Home() {
           setError(null);
           setLoading(false);
           cacheFromToday = cached.fromToday;
+          if (isDev) console.log(`[pnl-cache] HIT — fromToday=${cached.fromToday}, positions=${currentPositions.length}, ccy=${baseCurrency}`);
+        } else if (isDev) {
+          console.log(`[pnl-cache] MISS — positions=${currentPositions.length}, ccy=${baseCurrency}`);
         }
+      } else if (isDev) {
+        console.log(`[pnl-cache] BYPASS — forceRefresh`);
       }
 
-      if (cacheFromToday) return; // skip recompute entirely
+      if (cacheFromToday) {
+        if (isDev) console.log('[pnl-cache] SKIPPING recompute — cache is from today');
+        return; // skip recompute entirely
+      }
 
       if (!forceRefresh && !showRefreshing) {
         await autoRefreshHistoricalDataIfNeeded();
