@@ -141,7 +141,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
     }
 
     // 2. Calculate cost in base currency
-    const costInJPY = costPerUnitInBase * rawPosition.quantity;
+    const costInBase = costPerUnitInBase * rawPosition.quantity;
 
     // 3a. Closed lot: compute realized P&L using historical FX at sale date.
     if (isClosed) {
@@ -161,29 +161,29 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             salePricePerUnitInBase = conversion.convertedAmount;
             saleFxRate = conversion.fxRate;
         }
-        const proceedsJPY = salePricePerUnitInBase * rawPosition.quantity;
-        const realizedPnlJPY = proceedsJPY - costInJPY;
-        const realizedPnlPercentage = costInJPY === 0 ? 0 : (realizedPnlJPY / costInJPY) * 100;
+        const proceedsInBase = salePricePerUnitInBase * rawPosition.quantity;
+        const realizedPnl = proceedsInBase - costInBase;
+        const realizedPnlPercentage = costInBase === 0 ? 0 : (realizedPnl / costInBase) * 100;
 
         return {
             ...rawPosition,
             status: 'closed',
             currentPrice: null,
-            costInJPY,
+            costInJPY: costInBase,
             currentValueJPY: 0,
             pnlJPY: 0,
             pnlPercentage: 0,
             transactionFxRate: origFxRate,
             currentFxRate: 1,
-            proceedsJPY,
-            realizedPnlJPY,
+            proceedsJPY: proceedsInBase,
+            realizedPnlJPY: realizedPnl,
             realizedPnlPercentage,
             saleFxRate,
         };
     }
 
     // 3b. Open lot: current value and FX rate
-    let currentValueJPY = 0;
+    let currentValueInBase = 0;
     let currentFxRate = 1;
 
     if (currentPrice !== null) {
@@ -196,24 +196,24 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
                 undefined,
                 fxLookup,
             );
-            currentValueJPY = valueConversion.convertedAmount;
+            currentValueInBase = valueConversion.convertedAmount;
             currentFxRate = valueConversion.fxRate;
         } else {
-            currentValueJPY = rawPosition.quantity * currentPrice;
+            currentValueInBase = rawPosition.quantity * currentPrice;
             currentFxRate = 1;
         }
     }
 
-    const pnlJPY = currentPrice !== null ? currentValueJPY - costInJPY : 0;
-    const pnlPercentage = currentPrice !== null ? (pnlJPY / costInJPY) * 100 : 0;
+    const pnlInBase = currentPrice !== null ? currentValueInBase - costInBase : 0;
+    const pnlPercentage = currentPrice !== null ? (pnlInBase / costInBase) * 100 : 0;
 
     return {
         ...rawPosition,
         status: 'open',
         currentPrice,
-        costInJPY,
-        currentValueJPY,
-        pnlJPY,
+        costInJPY: costInBase,
+        currentValueJPY: currentValueInBase,
+        pnlJPY: pnlInBase,
         pnlPercentage,
         transactionFxRate: origFxRate,
         currentFxRate
@@ -281,28 +281,28 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
     const positions = allPositions.filter(p => p.status === 'open');
     const closedPositions = allPositions.filter(p => p.status === 'closed');
 
-    const totalCostJPY = positions.reduce((sum, pos) => sum + pos.costInJPY, 0);
-    const totalValueJPY = positions.reduce((sum, pos) => sum + pos.currentValueJPY, 0);
-    const totalPnlJPY = totalValueJPY - totalCostJPY;
-    const totalPnlPercentage = totalCostJPY === 0
+    const totalCostInBase = positions.reduce((sum, pos) => sum + pos.costInJPY, 0);
+    const totalValueInBase = positions.reduce((sum, pos) => sum + pos.currentValueJPY, 0);
+    const totalPnlInBase = totalValueInBase - totalCostInBase;
+    const totalPnlPercentage = totalCostInBase === 0
         ? 0
-        : (totalPnlJPY / totalCostJPY) * 100;
+        : (totalPnlInBase / totalCostInBase) * 100;
 
-    const realizedCostJPY = closedPositions.reduce((sum, pos) => sum + pos.costInJPY, 0);
-    const realizedPnlJPY = closedPositions.reduce((sum, pos) => sum + (pos.realizedPnlJPY ?? 0), 0);
-    const realizedPnlPercentage = realizedCostJPY === 0
+    const realizedCostInBase = closedPositions.reduce((sum, pos) => sum + pos.costInJPY, 0);
+    const realizedPnlInBase = closedPositions.reduce((sum, pos) => sum + (pos.realizedPnlJPY ?? 0), 0);
+    const realizedPnlPercentage = realizedCostInBase === 0
         ? 0
-        : (realizedPnlJPY / realizedCostJPY) * 100;
+        : (realizedPnlInBase / realizedCostInBase) * 100;
 
     return {
-        totalValueJPY,
-        totalCostJPY,
-        totalPnlJPY,
+        totalValueJPY: totalValueInBase,
+        totalCostJPY: totalCostInBase,
+        totalPnlJPY: totalPnlInBase,
         totalPnlPercentage,
         positions,
         closedPositions,
-        realizedPnlJPY,
-        realizedCostJPY,
+        realizedPnlJPY: realizedPnlInBase,
+        realizedCostJPY: realizedCostInBase,
         realizedPnlPercentage,
     };
 };

@@ -1,10 +1,13 @@
-import { getCachedPrice, updatePriceCache } from './priceCache';
-import { getCachedFxRate, updateFxRateCache } from './fxRateCache';
+// Minimal shape required by fetchHistoricalPrices / refreshAllHistoricalData —
+// allows both full Position objects and lightweight synthetic entries (e.g.
+// { transactionDate, ticker }) from API route callers.
+interface PositionLike {
+    transactionDate: string;
+    ticker: string | number;
+    transactionCcy?: string;
+}
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Portfolio configuration – kept as default fallback only; callers should pass baseCurrency explicitly
-const BASE_CURRENCY = 'JPY';
 
 const MIN_REQUEST_DELAY = 100;
 
@@ -18,24 +21,6 @@ function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
     });
     rateLimitQueue = result.then(() => {}, () => {});
     return result;
-}
-
-// Interface for position data
-interface Position {
-    transactionDate: string;
-    ticker: string;
-    transactionCcy?: string;
-}
-
-// Interface for raw position data (from file)
-interface RawPosition {
-    transactionDate: string;
-    ticker: string | number;
-    transactionCcy: string;
-    fullName?: string;
-    account?: string;
-    quantity?: number;
-    costPerUnit?: number;
 }
 
 // Calculate how long ago a position was purchased
@@ -57,7 +42,7 @@ function getYahooRange(monthsSincePurchase: number): string {
 }
 
 // Fetch historical prices for a symbol. interval='1mo' for chart history, '1d' for daily P&L.
-export async function fetchHistoricalPrices(symbol: string, positions: Position[], interval: '1mo' | '1d' = '1mo'): Promise<{[date: string]: number} | null> {
+export async function fetchHistoricalPrices(symbol: string, positions: PositionLike[], interval: '1mo' | '1d' = '1mo'): Promise<{[date: string]: number} | null> {
     try {
         // Find the earliest purchase date for this symbol
         const symbolPositions = positions.filter(pos => pos.ticker === symbol);
@@ -161,15 +146,8 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
             return null;
         }
 
-        // Server-side: skip the API route (would be a self-fetch), use the
-        // server's memory cache directly unless forceRefresh.
-        if (!forceRefresh) {
-            const cachedPrice = await getCachedPrice(symbol);
-            if (cachedPrice !== null) {
-                return cachedPrice;
-            }
-        }
-
+        // Server-side: skip the API route (would be a self-fetch) and hit
+        // Yahoo directly. The /api/prices route handles the memory-cache layer.
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,11 +155,6 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
 
         const price = data.chart?.result?.[0]?.meta?.regularMarketPrice;
         if (price) {
-            try {
-                await updatePriceCache(symbol, price);
-            } catch {
-                // In server-side context cache updates are handled by the calling endpoint
-            }
             return price;
         }
 
@@ -209,10 +182,10 @@ export async function updateAllPositions(symbols: string[]): Promise<{[key: stri
 }
 
 // Function to refresh historical data for all positions
-export async function refreshAllHistoricalData(positions: Position[]): Promise<{[symbol: string]: {[date: string]: number} | null}> {
+export async function refreshAllHistoricalData(positions: PositionLike[]): Promise<{[symbol: string]: {[date: string]: number} | null}> {
     const results: {[symbol: string]: {[date: string]: number} | null} = {};
 
-    const uniqueSymbols = [...new Set(positions.map(pos => pos.ticker))];
+    const uniqueSymbols = [...new Set(positions.map(pos => String(pos.ticker)))];
 
     for (let i = 0; i < uniqueSymbols.length; i++) {
         const symbol = uniqueSymbols[i];
@@ -366,16 +339,8 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
             return null;
         }
 
-        // Server-side: skip the API route (would be a self-fetch). Use the
-        // client-side cache utility only when not forcing refresh; otherwise
-        // go straight to Yahoo.
-        if (!forceRefresh) {
-            const cachedRate = await getCachedFxRate(fxPair);
-            if (cachedRate !== null) {
-                return cachedRate;
-            }
-        }
-
+        // Server-side: skip the API route (would be a self-fetch) and hit
+        // Yahoo directly. The /api/fx-rates route handles the memory-cache layer.
         const yahooSymbol = getYahooFxSymbol(fxPair);
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -384,11 +349,6 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
         const rate = data.chart?.result?.[0]?.meta?.regularMarketPrice;
         if (rate) {
             const roundedRate = Math.round(rate * 10000) / 10000;
-            try {
-                await updateFxRateCache(fxPair, roundedRate);
-            } catch {
-                // In server-side context cache updates are handled by the calling endpoint
-            }
             return roundedRate;
         }
 
@@ -399,194 +359,11 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
     }
 }
 
-// Utility function to extract unique transaction dates from positions
-function getTransactionDates(positions: (Position | RawPosition)[]): string[] {
-    const transactionDates = new Set<string>();
-
-    for (const position of positions) {
-        if (position.transactionDate) {
-            const formattedDate = position.transactionDate.replace(/\//g, '-');
-            transactionDates.add(formattedDate);
-        }
-    }
-
-    return Array.from(transactionDates).sort();
-}
-
-// Function to refresh FX rates for all available dates
-export async function refreshFxRatesForDates(priceData: {[symbol: string]: {[date: string]: number}}, positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): Promise<{[fxPair: string]: {[date: string]: number} | null}> {
-    const results: {[fxPair: string]: {[date: string]: number} | null} = {};
-
-    const priceDates = new Set<string>();
-    for (const symbolData of Object.values(priceData)) {
-        for (const date of Object.keys(symbolData)) {
-            priceDates.add(date);
-        }
-    }
-
-    const transactionDates = getTransactionDates(positions);
-    const allDates = new Set([...priceDates, ...transactionDates]);
-    const availableDates = Array.from(allDates).sort();
-
-    if (availableDates.length === 0) {
-        return results;
-    }
-
-    const fxPairs = getRequiredFxPairs(positions, baseCurrency);
-
-    if (fxPairs.length === 0) {
-        return results;
-    }
-
-    for (let i = 0; i < fxPairs.length; i++) {
-        const fxPair = fxPairs[i];
-        results[fxPair] = await fetchHistoricalFxRates(fxPair, availableDates);
-
-        if (i < fxPairs.length - 1) {
-            await delay(200 + Math.random() * 200);
-        }
-    }
-
-    return results;
-}
-
-// Function to refresh current FX rates for required pairs
-export async function refreshCurrentFxRates(positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): Promise<{[fxPair: string]: number | null}> {
-    const results: {[fxPair: string]: number | null} = {};
-
-    const fxPairs = getRequiredFxPairs(positions, baseCurrency);
-
-    if (fxPairs.length === 0) {
-        return results;
-    }
-
-    for (let i = 0; i < fxPairs.length; i++) {
-        const fxPair = fxPairs[i];
-        results[fxPair] = await fetchCurrentFxRate(fxPair, true);
-
-        if (i < fxPairs.length - 1) {
-            await delay(100 + Math.random() * 100);
-        }
-    }
-
-    return results;
-}
-
-// Utility function to get required FX pairs from positions
-function getRequiredFxPairs(positions: (Position | RawPosition)[], baseCurrency: string = BASE_CURRENCY): string[] {
-    const uniqueCurrencies = new Set<string>();
-
-    for (const position of positions) {
-        if (position.transactionCcy && position.transactionCcy !== baseCurrency) {
-            uniqueCurrencies.add(position.transactionCcy);
-        }
-    }
-
-    const fxPairs: string[] = [];
-    for (const currency of uniqueCurrencies) {
-        fxPairs.push(`${currency}${baseCurrency}`);
-    }
-
-    return fxPairs;
-}
-
 // Convert FX pair to Yahoo Finance symbol format
 function getYahooFxSymbol(fxPair: string): string {
     if (fxPair === 'USDJPY') return 'JPY=X';
     return `${fxPair}=X`;
 }
-
-// Utility function to get FX pair for a position
-export function getFxPairForPosition(position: Position | RawPosition, baseCurrency: string = BASE_CURRENCY): string | null {
-    if (!position.transactionCcy || position.transactionCcy === baseCurrency) {
-        return null;
-    }
-    return `${position.transactionCcy}${baseCurrency}`;
-}
-
-// Helper function to get current FX rate for a pair
-async function getCurrentFxRate(fxPair: string): Promise<number> {
-    const rate = await fetchCurrentFxRate(fxPair);
-    return rate || 1;
-}
-
-// Helper function to get historical FX rate for a pair and date
-async function getHistoricalFxRate(fxPair: string, transactionDate: string): Promise<number> {
-    try {
-        if (typeof window === 'undefined') {
-            const fs = await import('fs/promises');
-            const path = await import('path');
-            const fxRatesPath = path.join(process.cwd(), 'data/fxRates.json');
-            const data = await fs.readFile(fxRatesPath, 'utf-8');
-            const fxRates = JSON.parse(data);
-
-            if (fxRates[fxPair]) {
-                if (fxRates[fxPair][transactionDate]) {
-                    return fxRates[fxPair][transactionDate];
-                }
-
-                // If no exact match, find the closest earlier date (forward fill)
-                const availableDates = Object.keys(fxRates[fxPair]).sort((a, b) => b.localeCompare(a));
-                const targetDate = new Date(transactionDate);
-
-                for (const availableDate of availableDates) {
-                    if (new Date(availableDate) <= targetDate) {
-                        return fxRates[fxPair][availableDate];
-                    }
-                }
-            }
-
-            console.warn(`No historical FX rate found for ${fxPair} on or before ${transactionDate}`);
-        } else {
-            const response = await fetch(`/api/fx-rates?pair=${fxPair}&date=${transactionDate}`);
-            const data = await response.json();
-
-            if (data.rate) {
-                return data.rate;
-            }
-        }
-    } catch (error) {
-        console.warn(`Failed to get historical FX rate for ${fxPair} on ${transactionDate}:`, error);
-    }
-
-    const fallbackRate = await getCurrentFxRate(fxPair);
-    console.warn(`Using current rate as fallback for historical ${fxPair}: ${fallbackRate}`);
-    return fallbackRate;
-}
-
-// Utility function to convert amount to base currency using direct FX rates
-export async function convertToBaseCurrency(amount: number, position: Position | RawPosition, isHistorical: boolean = false, baseCurrency: string = BASE_CURRENCY): Promise<{ convertedAmount: number, effectiveRate: number, rates: { [pair: string]: number } }> {
-    if (position.transactionCcy === baseCurrency) {
-        return { convertedAmount: amount, effectiveRate: 1, rates: {} };
-    }
-
-    const rates: { [pair: string]: number } = {};
-    const transactionDate = position.transactionDate?.replace(/\//g, '-');
-
-    const directPair = `${position.transactionCcy}${baseCurrency}`;
-    let directRate: number;
-
-    if (isHistorical && transactionDate) {
-        directRate = await getHistoricalFxRate(directPair, transactionDate);
-    } else {
-        directRate = await getCurrentFxRate(directPair);
-    }
-
-    const directPairName = `${position.transactionCcy}/${baseCurrency}`;
-    rates[directPairName] = directRate;
-
-    return {
-        convertedAmount: amount * directRate,
-        effectiveRate: directRate,
-        rates
-    };
-}
-
-/** @deprecated use convertToBaseCurrency */
-export const convertToJPY = convertToBaseCurrency;
-
-// Export BASE_CURRENCY_CONSTANT kept for backward-compat; prefer passing baseCurrency explicitly
-export const BASE_CURRENCY_CONSTANT = BASE_CURRENCY;
 
 async function fetchWithRetry(url: string, retries = 2, baseDelay = 1000): Promise<Response> {
     for (let i = 0; i < retries; i++) {
@@ -645,4 +422,50 @@ async function fetchJson(url: string): Promise<unknown> {
     _inFlightJson.set(url, promise);
     promise.finally(() => _inFlightJson.delete(url));
     return promise;
+}
+
+function getTransactionDates(positions: PositionLike[]): string[] {
+    const dates = new Set<string>();
+    for (const p of positions) {
+        if (p.transactionDate) dates.add(p.transactionDate.replace(/\//g, '-'));
+    }
+    return Array.from(dates).sort();
+}
+
+function getRequiredFxPairs(positions: PositionLike[], baseCurrency: string): string[] {
+    const pairs: string[] = [];
+    const seen = new Set<string>();
+    for (const p of positions) {
+        if (p.transactionCcy && p.transactionCcy !== baseCurrency) {
+            const pair = `${p.transactionCcy}${baseCurrency}`;
+            if (!seen.has(pair)) { seen.add(pair); pairs.push(pair); }
+        }
+    }
+    return pairs;
+}
+
+export async function refreshFxRatesForDates(
+    priceData: { [symbol: string]: { [date: string]: number } },
+    positions: PositionLike[],
+    baseCurrency = 'JPY',
+): Promise<{ [fxPair: string]: { [date: string]: number } | null }> {
+    const results: { [fxPair: string]: { [date: string]: number } | null } = {};
+
+    const priceDates = new Set<string>();
+    for (const symbolData of Object.values(priceData)) {
+        for (const date of Object.keys(symbolData)) priceDates.add(date);
+    }
+
+    const allDates = Array.from(new Set([...priceDates, ...getTransactionDates(positions)])).sort();
+    if (allDates.length === 0) return results;
+
+    const fxPairs = getRequiredFxPairs(positions, baseCurrency);
+    if (fxPairs.length === 0) return results;
+
+    for (let i = 0; i < fxPairs.length; i++) {
+        results[fxPairs[i]] = await fetchHistoricalFxRates(fxPairs[i], allDates);
+        if (i < fxPairs.length - 1) await delay(200 + Math.random() * 200);
+    }
+
+    return results;
 }
