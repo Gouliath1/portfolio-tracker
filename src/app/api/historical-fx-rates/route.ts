@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { fetchHistoricalFxRates } from '@portfolio/core';
+import { fetchHistoricalFxRates, forwardFillLookup } from '@portfolio/core';
 import {
     getCachedHistoricalFxRates,
     setCachedHistoricalFxRates,
@@ -86,17 +86,11 @@ export async function GET(request: Request) {
     // entries — shipping the whole map serializes 100KB+ per request.
     function filterToRequested(all: RateMap): RateMap {
         if (requestedDates.length === 0) return all;
-        const sortedAll = Object.keys(all).sort();
+        const allMap = new Map(Object.entries(all));
         const out: RateMap = {};
         for (const target of requestedDates) {
-            if (all[target] !== undefined) { out[target] = all[target]; continue; }
-            // Forward-fill: latest cached date <= target.
-            let bestDate: string | null = null;
-            for (const d of sortedAll) {
-                if (d <= target && (bestDate === null || d > bestDate)) bestDate = d;
-                if (d > target) break;
-            }
-            if (bestDate) out[target] = all[bestDate];
+            const rate = forwardFillLookup(allMap, target);
+            if (rate !== null) out[target] = rate;
         }
         return out;
     }

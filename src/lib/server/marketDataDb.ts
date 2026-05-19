@@ -15,6 +15,7 @@
  */
 
 import { createClient, Client } from '@libsql/client';
+import { forwardFillLookup } from '@portfolio/core';
 import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -237,12 +238,5 @@ export async function getCachedFxRateOnOrBefore(pair: string, date: DateString):
     await loadFxForPair(pair);
     const map = _memFx.get(pair);
     if (!map || map.size === 0) return null;
-    if (map.has(date)) return map.get(date)!;
-
-    // Forward-fill: find the latest date <= target.
-    let bestDate: DateString | null = null;
-    for (const d of map.keys()) {
-        if (d <= date && (bestDate === null || d > bestDate)) bestDate = d;
-    }
-    return bestDate ? map.get(bestDate)! : null;
+    return forwardFillLookup(map, date);
 }

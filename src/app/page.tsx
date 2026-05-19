@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
-import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
 import { readCachedSummary, writeCachedSummary } from '../utils/pnlCache';
 import { PortfolioSummary as PortfolioSummaryType, Position, Transaction } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
@@ -91,9 +90,6 @@ export default function Home() {
         return; // skip recompute entirely
       }
 
-      if (!forceRefresh && !showRefreshing) {
-        await autoRefreshHistoricalDataIfNeeded();
-      }
       const summary = await calculatePortfolioSummary(currentPositions, forceRefresh, baseCurrency);
       setPortfolioSummary(summary);
       writeCachedSummary(currentPositions, baseCurrency, summary);

@@ -12,14 +12,18 @@ export type FxLookup = {
 // Forward-fill: latest cached date <= target. Mirrors the server-side fallback
 // in /api/historical-fx-rates so a transaction on a weekend/holiday still maps
 // to the previous business day's rate.
-function lookupHistorical(map: Map<string, number>, date: string): number | null {
-    const exact = map.get(date);
+export function forwardFillLookup(map: Map<string, number>, target: string): number | null {
+    const exact = map.get(target);
     if (exact !== undefined) return exact;
-    let bestDate: string | null = null;
-    for (const d of map.keys()) {
-        if (d <= date && (bestDate === null || d > bestDate)) bestDate = d;
+    let bestKey: string | null = null;
+    for (const k of map.keys()) {
+        if (k <= target && (bestKey === null || k > bestKey)) bestKey = k;
     }
-    return bestDate ? map.get(bestDate)! : null;
+    return bestKey !== null ? map.get(bestKey)! : null;
+}
+
+function lookupHistorical(map: Map<string, number>, date: string): number | null {
+    return forwardFillLookup(map, date);
 }
 
 async function getHistoricalFxRate(fxPair: string, date: string, lookup?: FxLookup): Promise<number> {
@@ -36,14 +40,17 @@ async function getHistoricalFxRate(fxPair: string, date: string, lookup?: FxLook
 
     console.warn(`Historical FX rate not available for ${fxPair} on ${date}, using current rate`);
     const currentRate = lookup?.current.get(fxPair) ?? await fetchCurrentFxRate(fxPair);
-    return currentRate || 1;
+    if (currentRate === null || currentRate === undefined) {
+        console.error(`No FX rate available for ${fxPair} on ${date} — falling back to 1`);
+    }
+    return currentRate ?? 1;
 }
 
 async function getCurrentFxRate(fxPair: string, lookup?: FxLookup): Promise<number> {
     const pre = lookup?.current.get(fxPair);
     if (pre !== undefined) return pre;
     const rate = await fetchCurrentFxRate(fxPair);
-    return rate || 1;
+    return rate ?? 1;
 }
 
 async function convertCurrency(
@@ -205,7 +212,9 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
     }
 
     const pnlInBase = currentPrice !== null ? currentValueInBase - costInBase : 0;
-    const pnlPercentage = currentPrice !== null ? (pnlInBase / costInBase) * 100 : 0;
+    const pnlPercentage = currentPrice !== null && costInBase !== 0
+        ? (pnlInBase / costInBase) * 100
+        : 0;
 
     return {
         ...rawPosition,

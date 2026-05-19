@@ -45,20 +45,22 @@ function getPositionsAtDate(positions: Position[], targetDate: Date): PositionAt
         return posDate.getTime() <= targetTime;
     });
     
-    // Group positions by ticker to handle multiple transactions of the same stock
+    // Group positions by (ticker, account) to align with the FIFO model which
+    // treats each (ticker, account) pair as a distinct lot bucket.
     const positionMap = new Map<string, PositionAtDate>();
-    
+
     relevantPositions.forEach(pos => {
-        const existing = positionMap.get(pos.ticker.toString());
-        
+        const key = `${String(pos.ticker)}::${pos.account ?? ''}`;
+        const existing = positionMap.get(key);
+
         if (existing) {
             // Calculate weighted average cost for multiple transactions
             const totalCostExisting = existing.quantity * existing.costPerUnit;
             const totalCostNew = pos.quantity * pos.costPerUnit;
             const totalCost = totalCostExisting + totalCostNew;
             const totalQuantity = existing.quantity + pos.quantity;
-            
-            positionMap.set(pos.ticker.toString(), {
+
+            positionMap.set(key, {
                 ticker: pos.ticker.toString(),
                 quantity: totalQuantity,
                 costPerUnit: totalCost / totalQuantity,
@@ -66,7 +68,7 @@ function getPositionsAtDate(positions: Position[], targetDate: Date): PositionAt
                 transactionFxRate: existing.transactionFxRate // Keep the original FX rate for now
             });
         } else {
-            positionMap.set(pos.ticker.toString(), {
+            positionMap.set(key, {
                 ticker: pos.ticker.toString(),
                 quantity: pos.quantity,
                 costPerUnit: pos.costPerUnit,
@@ -180,8 +182,9 @@ export async function calculatePortfolioValueAtDate(
                 const fxPair = `${stockCcy}${baseCurrency}`;
                 if (!fxCache.has(fxPair)) {
                     const targetDateStr = targetDate.toISOString().split('T')[0];
-                    const rates = await fetchHistoricalFxRates(fxPair, [targetDateStr]);
-                    fxCache.set(fxPair, rates ?? {});
+                    const fetched = await fetchHistoricalFxRates(fxPair, [targetDateStr]);
+                    const existing = fxCache.get(fxPair) ?? {};
+                    fxCache.set(fxPair, { ...existing, ...(fetched ?? {}) });
                 }
                 const fxRates = fxCache.get(fxPair) ?? {};
                 const fxRate = getClosestHistoricalPrice(fxRates, targetDate) ?? position.transactionFxRate;
