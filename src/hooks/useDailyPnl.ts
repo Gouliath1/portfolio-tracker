@@ -4,10 +4,18 @@ import { useState, useEffect } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues } from '@portfolio/core';
 import { useBaseCurrency } from './useBaseCurrency';
+import { readCachedDailyValue, writeCachedDailyValue } from '../utils/pnlCache';
 
 export interface DailyPnl {
     absoluteChange: number;   // in base currency (uses same field names as HistoricalSnapshot)
     percentageChange: number;
+}
+
+function computeDelta(currentValue: number, yesterdayValue: number): DailyPnl | null {
+    if (yesterdayValue === 0) return null;
+    const absoluteChange = currentValue - yesterdayValue;
+    const percentageChange = (absoluteChange / yesterdayValue) * 100;
+    return { absoluteChange, percentageChange };
 }
 
 export function useDailyPnl(positions: Position[], currentValue: number): DailyPnl | null {
@@ -18,19 +26,31 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
         if (positions.length === 0 || currentValue === 0) return;
 
         let cancelled = false;
+        const isDev = process.env.NODE_ENV !== 'production';
+
+        // Same tiered caching as PnL/chart: same-day cache short-circuits the
+        // recompute. Yesterday's close doesn't change intraday.
+        let servedFromCache = false;
+        const cached = readCachedDailyValue(positions, currency);
+        if (cached) {
+            const delta = computeDelta(currentValue, cached.yesterdayValue);
+            if (delta) setDailyPnl(delta);
+            servedFromCache = true;
+            if (isDev) console.log(`[daily-cache] HIT — fromToday=${cached.fromToday}, yesterday=${cached.yesterdayValue}`);
+            if (cached.fromToday) return; // skip recompute entirely
+        } else if (isDev) {
+            console.log('[daily-cache] MISS');
+        }
 
         async function compute() {
             try {
-                // We only need the last two business days
                 const today = new Date();
                 const yesterday = new Date(today);
                 yesterday.setDate(yesterday.getDate() - 1);
-                // Step back further over weekends
                 while (yesterday.getDay() === 0 || yesterday.getDay() === 6) {
                     yesterday.setDate(yesterday.getDate() - 1);
                 }
 
-                // Use daily resolution so yesterday's price is accurate (not a monthly candle)
                 const snapshots = await calculateHistoricalPortfolioValues(
                     positions,
                     [yesterday],
@@ -42,19 +62,21 @@ export function useDailyPnl(positions: Position[], currentValue: number): DailyP
                 if (cancelled) return;
 
                 const ySnap = snapshots[0];
-
                 if (!ySnap || ySnap.totalValueJPY === 0) return;
 
-                const absoluteChange = currentValue - ySnap.totalValueJPY;
-                const percentageChange = (absoluteChange / ySnap.totalValueJPY) * 100;
-
-                setDailyPnl({ absoluteChange, percentageChange });
+                writeCachedDailyValue(positions, currency, ySnap.totalValueJPY);
+                const delta = computeDelta(currentValue, ySnap.totalValueJPY);
+                if (delta) setDailyPnl(delta);
             } catch {
                 // Non-critical — daily P&L is best-effort
             }
         }
 
-        compute();
+        // If we served from cache but it's not from today, still recompute in
+        // the background to refresh.
+        if (!servedFromCache || !cached?.fromToday) {
+            compute();
+        }
         return () => { cancelled = true; };
     }, [positions, currentValue, currency]);
 

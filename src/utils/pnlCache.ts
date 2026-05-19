@@ -11,10 +11,13 @@
  * invalidates the entry naturally because the hash changes.
  */
 
-import { PortfolioSummary, RawPosition } from '@portfolio/types';
+import { PortfolioSummary, RawPosition, Position } from '@portfolio/types';
+import type { HistoricalSnapshot } from '../lib/core/historicalPortfolioCalculations';
 
 const VERSION = 'v1';
 const KEY_PREFIX = `pt_pnl_${VERSION}_`;
+const CHART_KEY_PREFIX = `pt_chart_${VERSION}_`;
+const DAILY_KEY_PREFIX = `pt_daily_${VERSION}_`;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days — anything older recomputes
 
 type Stored = {
@@ -77,6 +80,109 @@ export function writeCachedSummary(positions: RawPosition[], baseCurrency: strin
     try {
         const stored: Stored = { summary, storedAt: Date.now(), storedDate: localDateStr() };
         localStorage.setItem(buildKey(positions, baseCurrency), JSON.stringify(stored));
+    } catch {
+        // Quota or serialization error — caching is best-effort.
+    }
+}
+
+// ── Chart snapshot cache ────────────────────────────────────────────────────
+//
+// Same shape and rationale as the PnL summary cache, but per-timeline. The
+// chart recomputes a full historical series each render which is expensive
+// (N tickers × M dates of price lookups + FX conversions). For same-day
+// reloads with unchanged positions, the series is identical to last time.
+
+type StoredChart = {
+    snapshots: HistoricalSnapshot[];
+    storedAt: number;
+    storedDate: string;
+};
+
+export type CachedChartRead = {
+    snapshots: HistoricalSnapshot[];
+    fromToday: boolean;
+};
+
+function buildChartKey(positions: Position[], baseCurrency: string, timeline: string): string {
+    // Position has the same identity fields as RawPosition; hashing the same
+    // tuple keeps the chart cache aligned with the PnL cache invariants —
+    // adding/selling positions invalidates both naturally.
+    const sig = positions.map(p => [
+        p.transactionDate, p.ticker, p.quantity, p.costPerUnit,
+        p.transactionCcy, p.stockCcy, p.saleDate ?? '', p.salePricePerUnit ?? 0, p.saleCcy ?? '',
+    ]);
+    return `${CHART_KEY_PREFIX}${baseCurrency}_${timeline}_${hash(JSON.stringify(sig))}`;
+}
+
+export function readCachedChart(positions: Position[], baseCurrency: string, timeline: string): CachedChartRead | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(buildChartKey(positions, baseCurrency, timeline));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as StoredChart;
+        if (!Array.isArray(parsed.snapshots) || typeof parsed.storedAt !== 'number') return null;
+        if (Date.now() - parsed.storedAt > MAX_AGE_MS) return null;
+        return { snapshots: parsed.snapshots, fromToday: parsed.storedDate === localDateStr() };
+    } catch {
+        return null;
+    }
+}
+
+export function writeCachedChart(positions: Position[], baseCurrency: string, timeline: string, snapshots: HistoricalSnapshot[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const stored: StoredChart = { snapshots, storedAt: Date.now(), storedDate: localDateStr() };
+        localStorage.setItem(buildChartKey(positions, baseCurrency, timeline), JSON.stringify(stored));
+    } catch {
+        // Quota or serialization error — caching is best-effort.
+    }
+}
+
+// ── Daily PnL cache (yesterday's-close snapshot) ────────────────────────────
+//
+// useDailyPnl computes a single snapshot at yesterday's business-day close.
+// That value only changes once per day, so we cache the raw snapshot value
+// keyed by (positions, currency). The "Today's P&L" delta is recomputed from
+// it + the live currentValue.
+
+type StoredDaily = {
+    yesterdayValue: number;
+    storedAt: number;
+    storedDate: string;
+};
+
+export type CachedDailyRead = {
+    yesterdayValue: number;
+    fromToday: boolean;
+};
+
+function buildDailyKey(positions: Position[], baseCurrency: string): string {
+    const sig = positions.map(p => [
+        p.transactionDate, p.ticker, p.quantity, p.costPerUnit,
+        p.transactionCcy, p.stockCcy, p.saleDate ?? '', p.salePricePerUnit ?? 0, p.saleCcy ?? '',
+    ]);
+    return `${DAILY_KEY_PREFIX}${baseCurrency}_${hash(JSON.stringify(sig))}`;
+}
+
+export function readCachedDailyValue(positions: Position[], baseCurrency: string): CachedDailyRead | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(buildDailyKey(positions, baseCurrency));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as StoredDaily;
+        if (typeof parsed.yesterdayValue !== 'number' || typeof parsed.storedAt !== 'number') return null;
+        if (Date.now() - parsed.storedAt > MAX_AGE_MS) return null;
+        return { yesterdayValue: parsed.yesterdayValue, fromToday: parsed.storedDate === localDateStr() };
+    } catch {
+        return null;
+    }
+}
+
+export function writeCachedDailyValue(positions: Position[], baseCurrency: string, yesterdayValue: number): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const stored: StoredDaily = { yesterdayValue, storedAt: Date.now(), storedDate: localDateStr() };
+        localStorage.setItem(buildDailyKey(positions, baseCurrency), JSON.stringify(stored));
     } catch {
         // Quota or serialization error — caching is best-effort.
     }
