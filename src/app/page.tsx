@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { autoRefreshHistoricalDataIfNeeded } from '../utils/historicalDataChecker';
+import { readCachedSummary, writeCachedSummary } from '../utils/pnlCache';
 import { PortfolioSummary as PortfolioSummaryType, Position, Transaction } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
 import { PerformanceChart } from '../components/charts/PerformanceChart';
@@ -59,16 +60,40 @@ export default function Home() {
     if (showRefreshing) setRefreshing(true);
     try {
       const currentPositions = await loadPositions();
+
+      // Tiered caching:
+      //   1. Cache from today → just paint it and stop. Same-day reloads
+      //      shouldn't recompute or hit the DB.
+      //   2. Cache from an earlier day → paint instantly, then recompute
+      //      in the background to refresh prices/FX, and overwrite.
+      //   3. No cache → full compute path (DB → Yahoo if stale).
+      //   4. forceRefresh (Refresh button) → bypass cache; recompute fetches
+      //      live data and updates the cache.
+      let cacheFromToday = false;
+      if (!forceRefresh) {
+        const cached = readCachedSummary(currentPositions, baseCurrency);
+        if (cached) {
+          setPortfolioSummary(cached.summary);
+          setError(null);
+          setLoading(false);
+          cacheFromToday = cached.fromToday;
+        }
+      }
+
+      if (cacheFromToday) return; // skip recompute entirely
+
       if (!forceRefresh && !showRefreshing) {
         await autoRefreshHistoricalDataIfNeeded();
       }
       const summary = await calculatePortfolioSummary(currentPositions, forceRefresh, baseCurrency);
       setPortfolioSummary(summary);
+      writeCachedSummary(currentPositions, baseCurrency, summary);
       setError(null);
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
-    } finally {
       setLoading(false);
+    } finally {
       if (showRefreshing) setRefreshing(false);
     }
   }, [currency]);

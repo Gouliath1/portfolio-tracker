@@ -17,8 +17,12 @@ type RateMap = Record<string, number>;
 
 const _inFlight = new Map<string, Promise<RateMap>>();
 
+// The most recent business day whose CLOSE Yahoo would have. We start from
+// yesterday — today's close doesn't exist until end-of-day, so treating today
+// as "expected" causes pointless Yahoo refetches on every page load.
 function lastExpectedBusinessDay(): string {
     const d = new Date();
+    d.setDate(d.getDate() - 1);
     while (d.getDay() === 0 || d.getDay() === 6) {
         d.setDate(d.getDate() - 1);
     }
@@ -77,8 +81,28 @@ export async function GET(request: Request) {
         : minCached !== null && minCached <= requestedStart;
     const isFresh = maxCached !== null && maxCached >= lastExpectedBusinessDay();
 
+    // When the caller asked for specific dates, return only those (with
+    // forward-fill for non-trading days). The cache can hold thousands of
+    // entries — shipping the whole map serializes 100KB+ per request.
+    function filterToRequested(all: RateMap): RateMap {
+        if (requestedDates.length === 0) return all;
+        const sortedAll = Object.keys(all).sort();
+        const out: RateMap = {};
+        for (const target of requestedDates) {
+            if (all[target] !== undefined) { out[target] = all[target]; continue; }
+            // Forward-fill: latest cached date <= target.
+            let bestDate: string | null = null;
+            for (const d of sortedAll) {
+                if (d <= target && (bestDate === null || d > bestDate)) bestDate = d;
+                if (d > target) break;
+            }
+            if (bestDate) out[target] = all[bestDate];
+        }
+        return out;
+    }
+
     if (coversStart && isFresh) {
-        return NextResponse.json({ pair, rates: cached, source: 'cache' });
+        return NextResponse.json({ pair, rates: filterToRequested(cached), source: 'cache' });
     }
 
     const earliest = requestedStart ?? minCached ?? lastExpectedBusinessDay();
@@ -92,11 +116,12 @@ export async function GET(request: Request) {
 
     try {
         const fresh = await promise;
-        return NextResponse.json({ pair, rates: { ...cached, ...fresh }, source: 'fresh' });
+        const merged = { ...cached, ...fresh };
+        return NextResponse.json({ pair, rates: filterToRequested(merged), source: 'fresh' });
     } catch (error) {
         return NextResponse.json({
             pair,
-            rates: cached,
+            rates: filterToRequested(cached),
             source: 'error',
             error: error instanceof Error ? error.message : 'fetch failed',
         }, { status: cachedDates.length > 0 ? 200 : 502 });

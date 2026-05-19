@@ -1,27 +1,59 @@
 import { Position, RawPosition, PortfolioSummary } from '@portfolio/types';
 import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates } from './yahooFinanceApi';
 
-// Helper function to get a single historical FX rate for a specific date
-async function getHistoricalFxRate(fxPair: string, date: string): Promise<number> {
+// Preloaded FX rates for a whole portfolio. When present, calculatePosition uses
+// these instead of making its own network calls — collapses N positions × ~2
+// round-trips into M (unique pairs) parallel fetches batched up front.
+export type FxLookup = {
+    historical: Map<string, Map<string, number>>; // pair → date (YYYY-MM-DD) → rate
+    current: Map<string, number>;                 // pair → rate
+};
+
+// Forward-fill: latest cached date <= target. Mirrors the server-side fallback
+// in /api/historical-fx-rates so a transaction on a weekend/holiday still maps
+// to the previous business day's rate.
+function lookupHistorical(map: Map<string, number>, date: string): number | null {
+    const exact = map.get(date);
+    if (exact !== undefined) return exact;
+    let bestDate: string | null = null;
+    for (const d of map.keys()) {
+        if (d <= date && (bestDate === null || d > bestDate)) bestDate = d;
+    }
+    return bestDate ? map.get(bestDate)! : null;
+}
+
+async function getHistoricalFxRate(fxPair: string, date: string, lookup?: FxLookup): Promise<number> {
+    const pre = lookup?.historical.get(fxPair);
+    if (pre) {
+        const r = lookupHistorical(pre, date);
+        if (r !== null) return r;
+    }
+
     const rates = await fetchHistoricalFxRates(fxPair, [date]);
     if (rates && rates[date]) {
         return rates[date];
     }
 
-    // Fallback to current rate if historical not available
     console.warn(`Historical FX rate not available for ${fxPair} on ${date}, using current rate`);
-    const currentRate = await fetchCurrentFxRate(fxPair);
+    const currentRate = lookup?.current.get(fxPair) ?? await fetchCurrentFxRate(fxPair);
     return currentRate || 1;
 }
 
-// Helper function to get current FX rate
-async function getCurrentFxRate(fxPair: string): Promise<number> {
+async function getCurrentFxRate(fxPair: string, lookup?: FxLookup): Promise<number> {
+    const pre = lookup?.current.get(fxPair);
+    if (pre !== undefined) return pre;
     const rate = await fetchCurrentFxRate(fxPair);
     return rate || 1;
 }
 
-// Helper function to convert amount using FX rate (amount * rate)
-async function convertCurrency(amount: number, fromCcy: string, toCcy: string, isHistorical: boolean = false, transactionDate?: string): Promise<{ convertedAmount: number, fxRate: number }> {
+async function convertCurrency(
+    amount: number,
+    fromCcy: string,
+    toCcy: string,
+    isHistorical: boolean = false,
+    transactionDate?: string,
+    lookup?: FxLookup,
+): Promise<{ convertedAmount: number, fxRate: number }> {
     if (fromCcy === toCcy) {
         return { convertedAmount: amount, fxRate: 1 };
     }
@@ -31,9 +63,9 @@ async function convertCurrency(amount: number, fromCcy: string, toCcy: string, i
 
     if (isHistorical && transactionDate) {
         const dateFormatted = transactionDate.replace(/\//g, '-');
-        fxRate = await getHistoricalFxRate(fxPair, dateFormatted);
+        fxRate = await getHistoricalFxRate(fxPair, dateFormatted, lookup);
     } else {
-        fxRate = await getCurrentFxRate(fxPair);
+        fxRate = await getCurrentFxRate(fxPair, lookup);
     }
 
     return {
@@ -42,7 +74,53 @@ async function convertCurrency(amount: number, fromCcy: string, toCcy: string, i
     };
 }
 
-export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null, baseCurrency: string = 'JPY'): Promise<Position> => {
+// Build one FX lookup for the whole portfolio: one historical fetch per pair
+// (covers every transaction/sale date) and one current fetch per pair (covers
+// every open lot). Parallelized across pairs.
+export async function preloadFxRates(rawPositions: RawPosition[], baseCurrency: string): Promise<FxLookup> {
+    const historicalDates = new Map<string, Set<string>>();
+    const currentPairs = new Set<string>();
+
+    for (const p of rawPositions) {
+        if (p.transactionCcy && p.transactionCcy !== baseCurrency && p.transactionDate) {
+            const pair = `${p.transactionCcy}${baseCurrency}`;
+            const date = p.transactionDate.replace(/\//g, '-');
+            if (!historicalDates.has(pair)) historicalDates.set(pair, new Set());
+            historicalDates.get(pair)!.add(date);
+        }
+        if (p.saleDate) {
+            const saleCcy = p.saleCcy ?? p.stockCcy;
+            if (saleCcy && saleCcy !== baseCurrency) {
+                const pair = `${saleCcy}${baseCurrency}`;
+                const date = p.saleDate.replace(/\//g, '-');
+                if (!historicalDates.has(pair)) historicalDates.set(pair, new Set());
+                historicalDates.get(pair)!.add(date);
+            }
+        } else if (p.stockCcy && p.stockCcy !== baseCurrency) {
+            currentPairs.add(`${p.stockCcy}${baseCurrency}`);
+        }
+    }
+
+    const historical = new Map<string, Map<string, number>>();
+    const current = new Map<string, number>();
+
+    await Promise.all([
+        ...[...historicalDates.entries()].map(async ([pair, dates]) => {
+            const rates = await fetchHistoricalFxRates(pair, [...dates]);
+            const map = new Map<string, number>();
+            for (const [d, r] of Object.entries(rates ?? {})) map.set(d, r);
+            historical.set(pair, map);
+        }),
+        ...[...currentPairs].map(async pair => {
+            const rate = await fetchCurrentFxRate(pair);
+            if (rate !== null) current.set(pair, rate);
+        }),
+    ]);
+
+    return { historical, current };
+}
+
+export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null, baseCurrency: string = 'JPY', fxLookup?: FxLookup): Promise<Position> => {
     const isClosed = !!rawPosition.saleDate;
 
     // 1. Calculate original FX rate (only if transaction was not in base currency)
@@ -55,7 +133,8 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             rawPosition.transactionCcy,
             baseCurrency,
             true, // historical
-            rawPosition.transactionDate
+            rawPosition.transactionDate,
+            fxLookup,
         );
         costPerUnitInBase = conversion.convertedAmount;
         origFxRate = conversion.fxRate;
@@ -76,7 +155,8 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
                 saleCcy,
                 baseCurrency,
                 true, // historical
-                rawPosition.saleDate
+                rawPosition.saleDate,
+                fxLookup,
             );
             salePricePerUnitInBase = conversion.convertedAmount;
             saleFxRate = conversion.fxRate;
@@ -112,7 +192,9 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
                 rawPosition.quantity * currentPrice,
                 rawPosition.stockCcy,
                 baseCurrency,
-                false // current rates
+                false, // current rates
+                undefined,
+                fxLookup,
             );
             currentValueJPY = valueConversion.convertedAmount;
             currentFxRate = valueConversion.fxRate;
@@ -139,34 +221,62 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
 };
 
 export const calculatePortfolioSummary = async (rawPositions: RawPosition[], forceRefresh: boolean = false, baseCurrency: string = 'JPY'): Promise<PortfolioSummary> => {
+    // Timing logs are dev-only — they help diagnose regressions during local
+    // work but are noise in production.
+    const isDev = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
+    const t0 = performance.now();
+    const log = (label: string, since = t0) => { if (isDev) console.log(`[pnl] ${label}: ${Math.round(performance.now() - since)}ms`); };
+
     // Only fetch live prices for tickers that have at least one open lot.
     const openTickers = [...new Set(rawPositions.filter(p => !p.saleDate).map(pos => pos.ticker.toString()))];
+    if (isDev) console.log(`[pnl] start: ${rawPositions.length} positions, ${openTickers.length} open tickers, forceRefresh=${forceRefresh}`);
 
     let currentPrices: { [key: string]: number | null } = {};
 
-    if (forceRefresh) {
-        currentPrices = await updateAllPositions(openTickers);
+    // Run price loading and FX preloading in parallel — they're independent.
+    // Preloading FX once per pair (instead of once per position) collapses
+    // N positions × ~2 HTTP round-trips into M (unique pairs) parallel fetches.
+    const pricesPromise: Promise<{ [key: string]: number | null }> = forceRefresh
+        ? (async () => {
+            const tp = performance.now();
+            const prices = await updateAllPositions(openTickers);
+            // Also refresh current FX rates so they don't stay stale on Refresh.
+            const openPairs = [...new Set(
+                rawPositions
+                    .filter(p => !p.saleDate && p.stockCcy !== baseCurrency)
+                    .map(p => `${p.stockCcy}${baseCurrency}`)
+            )];
+            await Promise.all(openPairs.map(pair => fetchCurrentFxRate(pair, true)));
+            log('prices+currentFx (refresh)', tp);
+            return prices;
+        })()
+        : (async () => {
+            const tp = performance.now();
+            const entries = await Promise.all(
+                openTickers.map(async ticker => [ticker, await fetchStockPrice(ticker, false)] as const)
+            );
+            log('prices (cached)', tp);
+            return Object.fromEntries(entries);
+        })();
 
-        // Also refresh the current FX rate for each pair we'll convert through.
-        // calculatePosition uses cached current FX rates, so without this the
-        // cache stays stale across "Refresh" clicks even though prices update.
-        const openPairs = [...new Set(
-            rawPositions
-                .filter(p => !p.saleDate && p.stockCcy !== baseCurrency)
-                .map(p => `${p.stockCcy}${baseCurrency}`)
-        )];
-        await Promise.all(openPairs.map(pair => fetchCurrentFxRate(pair, true)));
-    } else {
-        const entries = await Promise.all(
-            openTickers.map(async ticker => [ticker, await fetchStockPrice(ticker, forceRefresh)] as const)
-        );
-        currentPrices = Object.fromEntries(entries);
-    }
+    const fxPromise = (async () => {
+        const tf = performance.now();
+        const lookup = await preloadFxRates(rawPositions, baseCurrency);
+        log(`fx preload (hist pairs=${lookup.historical.size}, current pairs=${lookup.current.size})`, tf);
+        return lookup;
+    })();
 
+    const [resolvedPrices, fxLookup] = await Promise.all([pricesPromise, fxPromise]);
+    currentPrices = resolvedPrices;
+    log('prices+fx (parallel)');
+
+    const tpos = performance.now();
     const positionPromises = rawPositions.map(pos =>
-        calculatePosition(pos, pos.saleDate ? null : currentPrices[pos.ticker.toString()] ?? null, baseCurrency)
+        calculatePosition(pos, pos.saleDate ? null : currentPrices[pos.ticker.toString()] ?? null, baseCurrency, fxLookup)
     );
     const allPositions = await Promise.all(positionPromises);
+    log('per-position calc', tpos);
+    log('TOTAL');
 
     const positions = allPositions.filter(p => p.status === 'open');
     const closedPositions = allPositions.filter(p => p.status === 'closed');

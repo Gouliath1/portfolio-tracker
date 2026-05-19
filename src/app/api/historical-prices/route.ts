@@ -41,8 +41,12 @@ function rangeToStartDate(range: string): string {
     return now.toISOString().split('T')[0];
 }
 
+// The most recent business day whose CLOSE Yahoo would have. We start from
+// yesterday — today's close doesn't exist until end-of-day, so treating today
+// as "expected" causes pointless Yahoo refetches on every page load.
 function lastExpectedBusinessDay(): string {
     const d = new Date();
+    d.setDate(d.getDate() - 1);
     while (d.getDay() === 0 || d.getDay() === 6) {
         d.setDate(d.getDate() - 1);
     }

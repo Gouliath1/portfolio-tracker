@@ -23,6 +23,16 @@ export async function GET(request: NextRequest) {
         if (cached !== null) {
             return NextResponse.json({ pair, rate: cached, date: requestedDate, source: 'memory' });
         }
+
+        // Persistent SQLite cache with forward-fill — covers reloads after a
+        // server restart (in-memory is empty but yesterday's close is on disk).
+        // Yahoo doesn't have today's close until end-of-day anyway, so the
+        // previous business day's rate is the right "current" value.
+        const persistent = await getCachedFxRateOnOrBefore(pair, requestedDate);
+        if (persistent !== null) {
+            setCachedFxRate(pair, persistent, requestedDate);
+            return NextResponse.json({ pair, rate: persistent, date: requestedDate, source: 'db' });
+        }
     }
 
     // Fetch live rates for today.
