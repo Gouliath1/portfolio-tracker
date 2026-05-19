@@ -151,6 +151,19 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, o
                             refreshTrigger={refreshTrigger}
                         />
                     </section>
+
+                    {/* Build info — confirms which commit is live in the browser */}
+                    <section className="pt-2 text-xs space-y-1" style={{ color: 'var(--text-muted)' }}>
+                        <div>
+                            Build:{' '}
+                            <code style={{ color: 'var(--text-secondary)' }}>
+                                {process.env.NEXT_PUBLIC_BUILD_SHA?.slice(0, 7) ?? 'dev'}
+                            </code>
+                            {process.env.NEXT_PUBLIC_BUILD_DATE && (
+                                <> · {process.env.NEXT_PUBLIC_BUILD_DATE}</>
+                            )}
+                        </div>
+                    </section>
                 </div>
             </div>
         </>

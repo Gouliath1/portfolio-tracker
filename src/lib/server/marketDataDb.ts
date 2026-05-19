@@ -24,47 +24,77 @@ const DEFAULT_LOCAL_PATH = './data/marketCache.db';
 
 let _client: Client | null = null;
 let _initPromise: Promise<void> | null = null;
+let _storageUnavailable = false; // sticky flag — once we know storage is broken, stop trying
 
-function getClient(): Client {
+// Vercel's runtime filesystem is read-only, so a local SQLite file can't be
+// created in serverless. If Turso credentials aren't set in that environment,
+// we treat the cache as unavailable rather than crashing every route.
+function isServerlessReadOnlyFs(): boolean {
+    return !!process.env.VERCEL;
+}
+
+function getClient(): Client | null {
+    if (_storageUnavailable) return null;
     if (_client) return _client;
 
     const tursoUrl = process.env.TURSO_DATABASE_URL;
     const tursoToken = process.env.TURSO_AUTH_TOKEN;
 
-    if (tursoUrl && tursoToken) {
-        _client = createClient({ url: tursoUrl, authToken: tursoToken });
-    } else {
-        const path = process.env.MARKET_DB_PATH ?? DEFAULT_LOCAL_PATH;
-        try { mkdirSync(dirname(path), { recursive: true }); } catch { /* exists */ }
-        _client = createClient({ url: `file:${path}` });
+    try {
+        if (tursoUrl && tursoToken) {
+            _client = createClient({ url: tursoUrl, authToken: tursoToken });
+        } else if (isServerlessReadOnlyFs()) {
+            console.warn('[marketDataDb] No TURSO_DATABASE_URL/TOKEN set and running on Vercel — disabling persistent cache. Routes will fall through to upstream APIs.');
+            _storageUnavailable = true;
+            return null;
+        } else {
+            const path = process.env.MARKET_DB_PATH ?? DEFAULT_LOCAL_PATH;
+            try { mkdirSync(dirname(path), { recursive: true }); } catch { /* exists */ }
+            _client = createClient({ url: `file:${path}` });
+        }
+        return _client;
+    } catch (err) {
+        console.warn('[marketDataDb] Failed to initialize storage:', err);
+        _storageUnavailable = true;
+        return null;
     }
-    return _client;
 }
 
-async function ensureInit(): Promise<void> {
-    if (_initPromise) return _initPromise;
+async function ensureInit(): Promise<boolean> {
+    if (_storageUnavailable) return false;
+    if (_initPromise) {
+        await _initPromise;
+        return !_storageUnavailable;
+    }
     _initPromise = (async () => {
         const c = getClient();
-        await c.execute(`
-            CREATE TABLE IF NOT EXISTS security_prices (
-                ticker TEXT NOT NULL,
-                price_date TEXT NOT NULL,
-                close_price REAL NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (ticker, price_date)
-            )
-        `);
-        await c.execute(`
-            CREATE TABLE IF NOT EXISTS market_fx_rates (
-                pair TEXT NOT NULL,
-                rate_date TEXT NOT NULL,
-                rate REAL NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (pair, rate_date)
-            )
-        `);
+        if (!c) return;
+        try {
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS security_prices (
+                    ticker TEXT NOT NULL,
+                    price_date TEXT NOT NULL,
+                    close_price REAL NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (ticker, price_date)
+                )
+            `);
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS market_fx_rates (
+                    pair TEXT NOT NULL,
+                    rate_date TEXT NOT NULL,
+                    rate REAL NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (pair, rate_date)
+                )
+            `);
+        } catch (err) {
+            console.warn('[marketDataDb] Schema init failed:', err);
+            _storageUnavailable = true;
+        }
     })();
-    return _initPromise;
+    await _initPromise;
+    return !_storageUnavailable;
 }
 
 // ── In-memory layer ──────────────────────────────────────────────────────────
@@ -80,32 +110,52 @@ const _loadedFxKeys = new Set<string>();
 
 async function loadPricesForTicker(ticker: string): Promise<void> {
     if (_loadedPriceKeys.has(ticker)) return;
-    await ensureInit();
-    const rows = await getClient().execute({
-        sql: 'SELECT price_date, close_price FROM security_prices WHERE ticker = ?',
-        args: [ticker],
-    });
-    const map = _memPrices.get(ticker) ?? new Map<DateString, number>();
-    for (const row of rows.rows) {
-        map.set(row.price_date as string, Number(row.close_price));
+    if (!(await ensureInit())) {
+        _loadedPriceKeys.add(ticker); // mark as "tried" so we don't retry every call
+        return;
     }
-    _memPrices.set(ticker, map);
-    _loadedPriceKeys.add(ticker);
+    const c = getClient();
+    if (!c) return;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT price_date, close_price FROM security_prices WHERE ticker = ?',
+            args: [ticker],
+        });
+        const map = _memPrices.get(ticker) ?? new Map<DateString, number>();
+        for (const row of rows.rows) {
+            map.set(row.price_date as string, Number(row.close_price));
+        }
+        _memPrices.set(ticker, map);
+        _loadedPriceKeys.add(ticker);
+    } catch (err) {
+        console.warn(`[marketDataDb] Read prices failed for ${ticker}:`, err);
+        _loadedPriceKeys.add(ticker);
+    }
 }
 
 async function loadFxForPair(pair: string): Promise<void> {
     if (_loadedFxKeys.has(pair)) return;
-    await ensureInit();
-    const rows = await getClient().execute({
-        sql: 'SELECT rate_date, rate FROM market_fx_rates WHERE pair = ?',
-        args: [pair],
-    });
-    const map = _memFx.get(pair) ?? new Map<DateString, number>();
-    for (const row of rows.rows) {
-        map.set(row.rate_date as string, Number(row.rate));
+    if (!(await ensureInit())) {
+        _loadedFxKeys.add(pair);
+        return;
     }
-    _memFx.set(pair, map);
-    _loadedFxKeys.add(pair);
+    const c = getClient();
+    if (!c) return;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT rate_date, rate FROM market_fx_rates WHERE pair = ?',
+            args: [pair],
+        });
+        const map = _memFx.get(pair) ?? new Map<DateString, number>();
+        for (const row of rows.rows) {
+            map.set(row.rate_date as string, Number(row.rate));
+        }
+        _memFx.set(pair, map);
+        _loadedFxKeys.add(pair);
+    } catch (err) {
+        console.warn(`[marketDataDb] Read FX failed for ${pair}:`, err);
+        _loadedFxKeys.add(pair);
+    }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -121,25 +171,30 @@ export async function getCachedHistoricalPrices(ticker: string): Promise<Record<
 export async function setCachedHistoricalPrices(ticker: string, prices: Record<DateString, number>): Promise<void> {
     const entries = Object.entries(prices);
     if (entries.length === 0) return;
-    await ensureInit();
 
-    // Update in-memory layer.
+    // Update in-memory layer regardless — keeps the within-process cache warm
+    // even when persistent storage is unavailable.
     const map = _memPrices.get(ticker) ?? new Map<DateString, number>();
     for (const [date, price] of entries) map.set(date, price);
     _memPrices.set(ticker, map);
     _loadedPriceKeys.add(ticker);
 
-    // Batch upsert. SQLite supports ON CONFLICT … DO UPDATE since 3.24.
+    if (!(await ensureInit())) return;
     const c = getClient();
-    await c.batch(
-        entries.map(([date, price]) => ({
-            sql: `INSERT INTO security_prices (ticker, price_date, close_price)
-                  VALUES (?, ?, ?)
-                  ON CONFLICT (ticker, price_date) DO UPDATE SET close_price = excluded.close_price`,
-            args: [ticker, date, price],
-        })),
-        'write',
-    );
+    if (!c) return;
+    try {
+        await c.batch(
+            entries.map(([date, price]) => ({
+                sql: `INSERT INTO security_prices (ticker, price_date, close_price)
+                      VALUES (?, ?, ?)
+                      ON CONFLICT (ticker, price_date) DO UPDATE SET close_price = excluded.close_price`,
+                args: [ticker, date, price],
+            })),
+            'write',
+        );
+    } catch (err) {
+        console.warn(`[marketDataDb] Write prices failed for ${ticker}:`, err);
+    }
 }
 
 /** Return all cached FX rates for a pair (e.g. "USDJPY") as { date: rate }. */
@@ -153,23 +208,28 @@ export async function getCachedHistoricalFxRates(pair: string): Promise<Record<D
 export async function setCachedHistoricalFxRates(pair: string, rates: Record<DateString, number>): Promise<void> {
     const entries = Object.entries(rates);
     if (entries.length === 0) return;
-    await ensureInit();
 
     const map = _memFx.get(pair) ?? new Map<DateString, number>();
     for (const [date, rate] of entries) map.set(date, rate);
     _memFx.set(pair, map);
     _loadedFxKeys.add(pair);
 
+    if (!(await ensureInit())) return;
     const c = getClient();
-    await c.batch(
-        entries.map(([date, rate]) => ({
-            sql: `INSERT INTO market_fx_rates (pair, rate_date, rate)
-                  VALUES (?, ?, ?)
-                  ON CONFLICT (pair, rate_date) DO UPDATE SET rate = excluded.rate`,
-            args: [pair, date, rate],
-        })),
-        'write',
-    );
+    if (!c) return;
+    try {
+        await c.batch(
+            entries.map(([date, rate]) => ({
+                sql: `INSERT INTO market_fx_rates (pair, rate_date, rate)
+                      VALUES (?, ?, ?)
+                      ON CONFLICT (pair, rate_date) DO UPDATE SET rate = excluded.rate`,
+                args: [pair, date, rate],
+            })),
+            'write',
+        );
+    } catch (err) {
+        console.warn(`[marketDataDb] Write FX failed for ${pair}:`, err);
+    }
 }
 
 /** Look up a single FX rate for a specific date, or forward-fill from earlier dates. */
