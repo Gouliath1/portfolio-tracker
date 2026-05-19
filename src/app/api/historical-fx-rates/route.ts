@@ -12,22 +12,12 @@ import {
     getCachedHistoricalFxRates,
     setCachedHistoricalFxRates,
 } from '../../../lib/server/marketDataDb';
+import { lastExpectedBusinessDay } from '../../../lib/server/dateUtils';
 
 type RateMap = Record<string, number>;
 
 const _inFlight = new Map<string, Promise<RateMap>>();
 
-// The most recent business day whose CLOSE Yahoo would have. We start from
-// yesterday — today's close doesn't exist until end-of-day, so treating today
-// as "expected" causes pointless Yahoo refetches on every page load.
-function lastExpectedBusinessDay(): string {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    while (d.getDay() === 0 || d.getDay() === 6) {
-        d.setDate(d.getDate() - 1);
-    }
-    return d.toISOString().split('T')[0];
-}
 
 function buildFillRange(earliest: string): string[] {
     // Generate every calendar day from `earliest` through today. The Yahoo

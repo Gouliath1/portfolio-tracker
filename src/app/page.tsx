@@ -42,10 +42,12 @@ export default function Home() {
   const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showValues, setShowValues] = useState(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('showValues') : null;
-    return saved ? JSON.parse(saved) : true;
-  });
+  const [showValues, setShowValues] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('showValues');
+    if (saved !== null) setShowValues(JSON.parse(saved));
+  }, []);
 
   const { currency, setCurrency, symbol, formatValue } = useBaseCurrency();
 

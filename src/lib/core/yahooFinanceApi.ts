@@ -169,13 +169,8 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
 export async function updateAllPositions(symbols: string[]): Promise<{[key: string]: number | null}> {
     const results: {[key: string]: number | null} = {};
 
-    for (let i = 0; i < symbols.length; i++) {
-        const symbol = symbols[i];
+    for (const symbol of symbols) {
         results[symbol] = await fetchStockPrice(symbol, true);
-
-        if (i < symbols.length - 1) {
-            await delay(100 + Math.random() * 100);
-        }
     }
 
     return results;

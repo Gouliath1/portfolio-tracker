@@ -20,12 +20,26 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                 <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                     {table.getHeaderGroups().map(headerGroup => (
                         <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            {headerGroup.headers.map(header => (
+                            {headerGroup.headers.map(header => {
+                                const isAction = header.id === 'sell' || header.id === 'delete';
+                                const isPinned = header.column.getIsPinned() === 'left';
+                                return (
                                 <th
                                     key={header.id}
-                                    className="relative px-4 py-3 text-left text-xs font-medium uppercase tracking-widest cursor-pointer select-none"
-                                    style={{ color: 'var(--text-muted)', width: header.getSize() }}
-                                    onClick={header.column.getToggleSortingHandler()}
+                                    className={isAction
+                                        ? 'relative px-1 py-3 text-left text-xs font-medium uppercase tracking-widest select-none'
+                                        : 'relative px-4 py-3 text-left text-xs font-medium uppercase tracking-widest cursor-pointer select-none'}
+                                    style={{
+                                        color: 'var(--text-muted)',
+                                        width: header.getSize(),
+                                        ...(isPinned && {
+                                            position: 'sticky',
+                                            left: header.column.getStart('left'),
+                                            zIndex: 12,
+                                            background: 'var(--table-header-bg)',
+                                        }),
+                                    }}
+                                    onClick={isAction ? undefined : header.column.getToggleSortingHandler()}
                                 >
                                     <div className="flex items-center justify-between w-full">
                                         <span className="flex-1 min-w-0 pr-1">
@@ -48,7 +62,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                             style={{ background: header.column.getIsResizing() ? 'var(--accent)' : 'var(--border)' }} />
                                     </div>
                                 </th>
-                            ))}
+                                );
+                            })}
                         </tr>
                     ))}
                 </thead>
@@ -66,15 +81,30 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                             onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-hover)')}
                             onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)')}
                         >
-                            {row.getVisibleCells().map(cell => (
-                                <td
-                                    key={cell.id}
-                                    className="px-4 py-3 text-sm truncate tabular-nums"
-                                    style={{ color: 'var(--text-primary)', width: cell.column.getSize() }}
-                                >
-                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </td>
-                            ))}
+                            {row.getVisibleCells().map(cell => {
+                                const isAction = cell.column.id === 'sell' || cell.column.id === 'delete';
+                                const isPinned = cell.column.getIsPinned() === 'left';
+                                return (
+                                    <td
+                                        key={cell.id}
+                                        className={isAction
+                                            ? 'px-1 py-2 text-sm'
+                                            : 'px-4 py-3 text-sm truncate tabular-nums'}
+                                        style={{
+                                            color: 'var(--text-primary)',
+                                            width: cell.column.getSize(),
+                                            ...(isPinned && {
+                                                position: 'sticky',
+                                                left: cell.column.getStart('left'),
+                                                zIndex: 1,
+                                                background: 'var(--surface-popover)',
+                                            }),
+                                        }}
+                                    >
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                );
+                            })}
                         </tr>
                     ))}
                 </tbody>

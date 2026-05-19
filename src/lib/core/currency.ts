@@ -16,26 +16,6 @@ export const SUPPORTED_CURRENCIES = [
 
 export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number]['code'];
 
-// Default FX rates to JPY (approximate values as of 2025)
-export const DEFAULT_FX_RATES: Record<string, number> = {
-    'JPY': 1.0,
-    'USD': 150.0,
-    'EUR': 170.0,
-    'GBP': 190.0,
-    'CHF': 165.0,
-    'CAD': 110.0,
-    'AUD': 100.0,
-    'HKD': 19.0,
-    'SGD': 110.0,
-    'KRW': 0.11,
-    'CNY': 20.5
-};
-
-// Get default FX rate for a currency to JPY
-export function getDefaultFxRate(currency: string): number {
-    return DEFAULT_FX_RATES[currency] || 1.0;
-}
-
 // Get currency symbol for a currency code
 export function getCurrencySymbol(currencyCode: string): string {
     const currencyInfo = SUPPORTED_CURRENCIES.find(c => c.code === currencyCode);

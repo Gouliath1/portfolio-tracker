@@ -9,7 +9,7 @@ import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
-import { MdDeleteOutline, MdRemoveCircleOutline } from 'react-icons/md';
+import { MdDelete } from 'react-icons/md';
 
 const columnHelper = createColumnHelper<Position>();
 
@@ -358,19 +358,23 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
     if (showSell) {
         const sellCol = columnHelper.display({
             id: 'sell',
-            size: 40,
-            header: () => <MdRemoveCircleOutline size={14} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />,
+            size: 60,
+            header: () => null,
             cell: props => {
                 const onSell = props.table.options.meta?.onSellRow;
                 return (
                     <button
                         onClick={e => { e.stopPropagation(); onSell?.(props.row.original); }}
-                        className="flex items-center justify-center p-1 rounded-md transition-all opacity-30 hover:opacity-100"
-                        style={{ color: 'var(--pnl-red)' }}
+                        className="flex items-center justify-center px-2 py-1 rounded text-xs font-medium transition-all"
+                        style={{
+                            background: 'var(--accent-dim)',
+                            color: 'var(--accent)',
+                            border: '1px solid var(--accent-glow)',
+                        }}
                         aria-label="Sell position"
-                        title="Sell position"
+                        title="Record a sell transaction"
                     >
-                        <MdRemoveCircleOutline size={15} />
+                        Sell
                     </button>
                 );
             },
@@ -382,18 +386,19 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
     if (showDelete) {
         const deleteCol = columnHelper.display({
             id: 'delete',
-            size: 40,
-            header: () => <MdDeleteOutline size={14} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />,
+            size: 44,
+            header: () => null,
             cell: props => {
                 const onDelete = props.table.options.meta?.onDeleteRow;
                 return (
                     <button
                         onClick={e => { e.stopPropagation(); onDelete?.(props.row.original); }}
-                        className="flex items-center justify-center p-1 rounded-md transition-all opacity-30 hover:opacity-100"
+                        className="flex items-center justify-center p-2 rounded transition-all hover:opacity-70"
                         style={{ color: 'var(--pnl-red)' }}
                         aria-label="Delete position"
+                        title="Delete position"
                     >
-                        <MdDeleteOutline size={15} />
+                        <MdDelete size={18} />
                     </button>
                 );
             },

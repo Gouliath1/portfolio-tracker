@@ -2,10 +2,8 @@
  * Unit tests for currency utilities
  */
 
-import { 
-  SUPPORTED_CURRENCIES, 
-  DEFAULT_FX_RATES,
-  getDefaultFxRate,
+import {
+  SUPPORTED_CURRENCIES,
   getCurrencySymbol,
   formatCurrencyValue,
   getCurrencyPair

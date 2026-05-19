@@ -83,20 +83,26 @@ function getPositionsAtDate(positions: Position[], targetDate: Date): PositionAt
 
 // Get the closest historical price on or before a target date (binary search, O(log N)).
 // Falls back to the earliest available price if target predates all data.
-function getClosestHistoricalPrice(historicalPrices: {[date: string]: number}, targetDate: Date): number | null {
+// Pass `sortedKeys` (ascending) to avoid re-sorting on every call when the
+// same price map is queried many times (e.g. once per date in the history loop).
+function getClosestHistoricalPrice(
+    historicalPrices: {[date: string]: number},
+    targetDate: Date,
+    sortedKeys?: string[],
+): number | null {
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
     if (historicalPrices[targetDateStr] !== undefined) {
         return historicalPrices[targetDateStr];
     }
 
-    const sortedDates = Object.keys(historicalPrices).sort();
-    if (sortedDates.length === 0) return null;
+    const keys = sortedKeys ?? Object.keys(historicalPrices).sort();
+    if (keys.length === 0) return null;
 
-    let lo = 0, hi = sortedDates.length - 1, best = -1;
+    let lo = 0, hi = keys.length - 1, best = -1;
     while (lo <= hi) {
         const mid = (lo + hi) >> 1;
-        if (sortedDates[mid] <= targetDateStr) {
+        if (keys[mid] <= targetDateStr) {
             best = mid;
             lo = mid + 1;
         } else {
@@ -105,7 +111,7 @@ function getClosestHistoricalPrice(historicalPrices: {[date: string]: number}, t
     }
 
     const idx = best !== -1 ? best : 0;
-    return historicalPrices[sortedDates[idx]];
+    return historicalPrices[keys[idx]];
 }
 
 // Calculate portfolio value at a specific historical date
@@ -116,7 +122,9 @@ export async function calculatePortfolioValueAtDate(
     includeDetails: boolean = false,
     baseCurrency: string = 'JPY',
     historicalFxCache?: Map<string, {[date: string]: number}>,
-    interval: '1mo' | '1d' = '1mo'
+    interval: '1mo' | '1d' = '1mo',
+    sortedPriceKeysCache?: Map<string, string[]>,
+    sortedFxKeysCache?: Map<string, string[]>,
 ): Promise<HistoricalSnapshot> {
     const positionsAtDate = getPositionsAtDate(positions, targetDate);
 
@@ -164,7 +172,8 @@ export async function calculatePortfolioValueAtDate(
         }
 
         const historicalPrices = pricesCache.get(position.ticker) || {};
-        const historicalPrice = getClosestHistoricalPrice(historicalPrices, targetDate);
+        const sortedPriceKeys = sortedPriceKeysCache?.get(position.ticker);
+        const historicalPrice = getClosestHistoricalPrice(historicalPrices, targetDate, sortedPriceKeys);
 
         // Resolve the stock currency for this ticker
         const originalPosition = positions.find(p => p.ticker.toString() === position.ticker);
@@ -187,7 +196,8 @@ export async function calculatePortfolioValueAtDate(
                     fxCache.set(fxPair, { ...existing, ...(fetched ?? {}) });
                 }
                 const fxRates = fxCache.get(fxPair) ?? {};
-                const fxRate = getClosestHistoricalPrice(fxRates, targetDate) ?? position.transactionFxRate;
+                const sortedFxKeys = sortedFxKeysCache?.get(fxPair);
+                const fxRate = getClosestHistoricalPrice(fxRates, targetDate, sortedFxKeys) ?? position.transactionFxRate;
                 positionValueJPY = valueInStockCcy * fxRate;
             }
             totalValueJPY += positionValueJPY;
@@ -284,6 +294,17 @@ export async function calculateHistoricalPortfolioValues(
         }
     }
 
+    // Pre-sort price and FX keys once per ticker/pair so the per-date binary
+    // search inside getClosestHistoricalPrice doesn't re-sort on every call.
+    const sortedPriceKeysCache = new Map<string, string[]>();
+    for (const [ticker, prices] of historicalPricesCache) {
+        sortedPriceKeysCache.set(ticker, Object.keys(prices).sort());
+    }
+    const sortedFxKeysCache = new Map<string, string[]>();
+    for (const [pair, rates] of historicalFxCache) {
+        sortedFxKeysCache.set(pair, Object.keys(rates).sort());
+    }
+
     // Sort dates to ensure chronological order
     const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
 
@@ -292,7 +313,8 @@ export async function calculateHistoricalPortfolioValues(
 
     for (const date of sortedDates) {
         const snapshot = await calculatePortfolioValueAtDate(
-            positions, date, historicalPricesCache, includeDetails, baseCurrency, historicalFxCache, interval
+            positions, date, historicalPricesCache, includeDetails, baseCurrency, historicalFxCache, interval,
+            sortedPriceKeysCache, sortedFxKeysCache,
         );
         results.push(snapshot);
     }

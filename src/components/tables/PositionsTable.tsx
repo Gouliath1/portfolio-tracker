@@ -85,6 +85,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
             sorting,
             columnVisibility,
             columnSizing,
+            columnPinning: { left: ['delete', 'sell', 'transactionDate', 'ticker'] },
         },
         meta: {
             showValues,
