@@ -328,7 +328,9 @@ export default function Home() {
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
           <DemoBanner refreshTrigger={demoBannerRefresh} />
           <PortfolioSummary summary={portfolioSummary} showValues={showValues} symbol={symbol} formatValue={formatValue} />
-          <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} currency={currency} symbol={symbol} />
+          <div className="hidden sm:block">
+            <PerformanceChart positions={portfolioSummary.positions} showValues={showValues} currency={currency} symbol={symbol} />
+          </div>
 
           {/* ── Data actions toolbar ─────────────────────────── */}
           <div className="flex items-center gap-2 flex-wrap">
