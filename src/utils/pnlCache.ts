@@ -14,7 +14,7 @@
 import { PortfolioSummary, RawPosition, Position } from '@portfolio/types';
 import type { HistoricalSnapshot } from '../lib/core/historicalPortfolioCalculations';
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const KEY_PREFIX = `pt_pnl_${VERSION}_`;
 const CHART_KEY_PREFIX = `pt_chart_${VERSION}_`;
 const DAILY_KEY_PREFIX = `pt_daily_${VERSION}_`;
