@@ -13,6 +13,7 @@ jest.mock('@portfolio/core/yahooFinanceApi', () => ({
   updateAllPositions: jest.fn(),
   fetchCurrentFxRate: jest.fn(),
   fetchHistoricalFxRates: jest.fn(),
+  fetchHistoricalDividends: jest.fn().mockResolvedValue(null),
   BASE_CURRENCY_CONSTANT: 'JPY',
 }))
 

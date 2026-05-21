@@ -85,6 +85,7 @@ export const ClosedPositionsTable = ({
                                 <th className="text-right font-medium py-2 pr-3">Proceeds</th>
                                 <th className="text-right font-medium py-2 pr-3">Realized P&amp;L</th>
                                 <th className="text-right font-medium py-2 pr-3">%</th>
+                                <th className="text-right font-medium py-2 pr-3">Total Dividends</th>
                                 <th className="text-left font-medium py-2 pr-3">Acquired</th>
                             </tr>
                         </thead>
@@ -116,6 +117,11 @@ export const ClosedPositionsTable = ({
                                         </td>
                                         <td className="py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                                             {showValues ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(2)}%` : getHiddenValue(realizedPct)}
+                                        </td>
+                                        <td className="py-2 pr-3 text-right">
+                                            {p.dividendIncomeJPY
+                                                ? formatCurrencyValue(p.dividendIncomeJPY, baseCurrency, showValues)
+                                                : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                                         </td>
                                         <td className="py-2 pr-3">{p.transactionDate}</td>
                                     </tr>

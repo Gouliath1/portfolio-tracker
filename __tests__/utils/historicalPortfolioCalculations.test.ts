@@ -33,6 +33,8 @@ const mkPosition = (overrides: Partial<Position> = {}): Position => ({
     pnlPercentage: 50,
     transactionFxRate: 100,
     currentFxRate: 100,
+    dividendIncomeJPY: 0,
+    totalReturnPercentage: 50,
     ...overrides,
 });
 

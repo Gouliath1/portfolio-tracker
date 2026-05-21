@@ -92,12 +92,15 @@ describe('portfolioService', () => {
           transactionFxRate: 1,
           currentFxRate: 1,
           status: 'open',
+          dividendIncomeJPY: 0,
+          totalReturnPercentage: 11.11,
         },
       ],
       closedPositions: [],
       realizedPnlJPY: 0,
       realizedCostJPY: 0,
       realizedPnlPercentage: 0,
+      totalDividendsJPY: 0,
     };
 
     mockedCalculatePortfolioSummary.mockResolvedValue(fakeSummary);
