@@ -173,7 +173,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 {/* 2 — Annualised Return */}
                 <StatCard
                     label="Annualised Return"
-                    info="Money-weighted annualised return (XIRR). Each purchase is treated as a cash outflow on its own transaction date, and today's open-position value is the terminal inflow — solving for the rate that makes the present value of those cash flows zero. Currently excludes closed lots and dividends; those will be folded in next."
+                    info="Money-weighted annualised return (XIRR). Each purchase is a cash outflow on its transaction date; each sale is a cash inflow on its sale date; today's open-position value is the terminal inflow — solving for the rate that makes the present value of those cash flows zero. Dividends will be folded in next."
                     value={
                         hasNullPrices
                             ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
