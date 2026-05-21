@@ -37,26 +37,43 @@ export const calculatePortfolioCagrSinceInception = (summary: PortfolioSummary):
     return { return: cagr, earliestDate: earliest.toISOString().split('T')[0] };
 };
 
-// Money-weighted return (XIRR). Kept for reference/alternative metric.
+// Money-weighted return (XIRR). Builds a per-transaction cash-flow series
+// (buys as outflows on their dates, sells as inflows on their dates, today's
+// open-position value as the terminal inflow) and solves for the rate that
+// makes NPV = 0. Dividends are not yet included.
 export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): { return: number; earliestDate: string } | null => {
-    if (summary.positions.length === 0) return null;
+    if (summary.positions.length === 0 && summary.closedPositions.length === 0) return null;
 
-    // Build cash flows: negative outflows on each transaction date, positive inflow for current total value today
     type CF = { date: Date; amount: number };
     const cashflows: CF[] = [];
     let earliest: Date | null = null;
 
-    for (const p of summary.positions) {
+    const parseDate = (s: string) => new Date(s.replace(/\//g, '-'));
+    const noteEarliest = (d: Date) => { if (!earliest || d < earliest) earliest = d; };
+
+    // Buys: every lot (open or closed) starts with a negative cash flow on
+    // its transaction date.
+    for (const p of [...summary.positions, ...summary.closedPositions]) {
         if (!p.transactionDate || !isFinite(p.costInJPY)) continue;
-        const dt = new Date(p.transactionDate.replace(/\//g, '-'));
+        const dt = parseDate(p.transactionDate);
         if (!isFinite(dt.getTime())) continue;
         cashflows.push({ date: dt, amount: -p.costInJPY });
-        if (!earliest || dt < earliest) earliest = dt;
+        noteEarliest(dt);
+    }
+
+    // Sells: each closed lot has proceeds returned on its sale date. Without
+    // this, closed positions look like buys that vanished — XIRR would treat
+    // them as a 100% loss.
+    for (const p of summary.closedPositions) {
+        if (!p.saleDate || p.proceedsJPY === undefined || !isFinite(p.proceedsJPY)) continue;
+        const dt = parseDate(p.saleDate);
+        if (!isFinite(dt.getTime())) continue;
+        cashflows.push({ date: dt, amount: p.proceedsJPY });
     }
 
     if (!earliest) return null;
 
-    // Add terminal value as a positive cash flow today
+    // Add terminal value (open positions only — closed lots already settled)
     const today = new Date();
     cashflows.push({ date: today, amount: summary.totalValueJPY });
 
