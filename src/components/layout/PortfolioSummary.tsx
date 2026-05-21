@@ -99,141 +99,124 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
     const dailyPositive = dailyPnl === null ? null : dailyPnl.absoluteChange >= 0;
     const dailySign = dailyPnl && dailyPnl.absoluteChange >= 0 ? '+' : '';
 
+    // Total P&L = unrealized (open lots, price-only) + all dividends
+    //             + realized sales (closed lots, price-only).
+    // realizedPnlJPY already folds in closed-lot dividends, so subtract them
+    // so the "Realized" component is sales-only and "Dividends" owns *all*
+    // dividend income. Headline % uses deployed cost (open + closed) so the
+    // realized cost basis isn't dropped after a sale.
+    const closedLotDividends = summary.closedPositions
+        .reduce((s, p) => s + (p.dividendIncomeJPY ?? 0), 0);
+    const unrealized    = summary.totalPnlJPY;
+    const dividends     = summary.totalDividendsJPY;
+    const realizedSales = summary.realizedPnlJPY - closedLotDividends;
+    const totalPnlAbsolute  = unrealized + dividends + realizedSales;
+    const totalCostDeployed = summary.totalCostJPY + summary.realizedCostJPY;
+    const totalPnlPct = totalCostDeployed === 0
+        ? 0
+        : (totalPnlAbsolute / totalCostDeployed) * 100;
+    const totalPnlPositive = hasNullPrices ? null : totalPnlAbsolute >= 0;
+
+    // Breakdown chips show only when there's more than just unrealized to
+    // report — otherwise the headline already says everything.
+    const breakdown: { label: string; amount: number }[] = [
+        { label: 'Unrealized', amount: unrealized },
+    ];
+    if (dividends !== 0) breakdown.push({ label: 'Dividends', amount: dividends });
+    if (summary.closedPositions.length > 0) breakdown.push({ label: 'Realized (sales)', amount: realizedSales });
+    const showBreakdown = !hasNullPrices && breakdown.length > 1;
+
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-            {/* 1 — Total Value (with cost as footnote) */}
-            <StatCard
-                label="Total Value"
-                value={hasNullPrices
-                    ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
-                    : formatValue(summary.totalValueJPY, showValues)}
-                positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY}
-                flash={valueChanged}
-                footnote={
-                    <span>Cost: {formatValue(summary.totalCostJPY, showValues)}</span>
-                }
-            />
-
-            {/* 2 — Annualised Return */}
-            <StatCard
-                label="Annualised Return"
-                value={
-                    hasNullPrices
+                {/* 1 — Total Value (with cost as footnote) */}
+                <StatCard
+                    label="Total Value"
+                    value={hasNullPrices
                         ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
-                        : annualizedReturn === null
-                            ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
-                            : `${annualizedReturn.return >= 0 ? '+' : ''}${annualizedReturn.return.toFixed(2)}%`
-                }
-                sub={!hasNullPrices && annualizedReturn ? sinceLabel ?? undefined : undefined}
-                positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0}
-                flash={valueChanged}
-            />
+                        : formatValue(summary.totalValueJPY, showValues)}
+                    positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY}
+                    flash={valueChanged}
+                    footnote={
+                        <span>Cost: {formatValue(summary.totalCostJPY, showValues)}</span>
+                    }
+                />
 
-            {/* 3 — Total P&L card.
-                Headline = unrealized (open lots, price-only) + all dividends
-                           + realized sales (closed lots, price-only).
-                Breakdown rows split that sum into three components, each
-                stated as an amount only — no per-component %, which is what
-                made the prior "realized %" misleading when open-lot dividends
-                were divided by closed-lot cost. The headline % is the only %
-                and uses deployed cost (open + closed) as denominator. */}
-            {(() => {
-                // realizedPnlJPY = closed-lot proceeds + closed-lot divs − cost.
-                // Subtract closed-lot divs so the "Realized" row is sales-only
-                // and the "Dividends" row owns *all* dividend income.
-                const closedLotDividends = summary.closedPositions
-                    .reduce((s, p) => s + (p.dividendIncomeJPY ?? 0), 0);
+                {/* 2 — Annualised Return */}
+                <StatCard
+                    label="Annualised Return"
+                    value={
+                        hasNullPrices
+                            ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                            : annualizedReturn === null
+                                ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
+                                : `${annualizedReturn.return >= 0 ? '+' : ''}${annualizedReturn.return.toFixed(2)}%`
+                    }
+                    sub={!hasNullPrices && annualizedReturn ? sinceLabel ?? undefined : undefined}
+                    positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0}
+                    flash={valueChanged}
+                />
 
-                const unrealized    = summary.totalPnlJPY;
-                const dividends     = summary.totalDividendsJPY;
-                const realizedSales = summary.realizedPnlJPY - closedLotDividends;
+                {/* 3 — Total P&L headline.
+                    Amount is the primary stat; "% · since X" sits on the
+                    sub-line so the headline never wraps. Component
+                    breakdown lives in the secondary row below. */}
+                <StatCard
+                    label="Total P&L"
+                    value={hasNullPrices
+                        ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                        : <>{totalPnlAbsolute >= 0 ? '+' : ''}{formatValue(totalPnlAbsolute, showValues)}</>}
+                    sub={!hasNullPrices
+                        ? <>
+                            {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%
+                            {sinceLabel && <span style={{ opacity: 0.7 }}> · {sinceLabel}</span>}
+                        </>
+                        : undefined}
+                    positive={totalPnlPositive}
+                    flash={valueChanged}
+                />
 
-                const totalPnlAbsolute  = unrealized + dividends + realizedSales;
-                const totalCostDeployed = summary.totalCostJPY + summary.realizedCostJPY;
-                const totalPnlPct = totalCostDeployed === 0
-                    ? 0
-                    : (totalPnlAbsolute / totalCostDeployed) * 100;
+                {/* 4 — Daily P&L */}
+                <StatCard
+                    label="Today's P&L"
+                    value={
+                        hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                        : dailyPnl === null ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
+                        : `${dailySign}${dailyPnl.percentageChange.toFixed(2)}%`
+                    }
+                    sub={dailyPnl && !hasNullPrices
+                        ? `${dailySign}${formatValue(dailyPnl.absoluteChange, showValues)}`
+                        : undefined}
+                    positive={hasNullPrices ? null : dailyPositive}
+                    flash={valueChanged}
+                />
+            </div>
 
-                const rows: { label: string; amount: number }[] = [
-                    { label: 'Unrealized', amount: unrealized },
-                ];
-                if (dividends !== 0) rows.push({ label: 'Dividends', amount: dividends });
-                if (summary.closedPositions.length > 0) rows.push({ label: 'Realized (sales)', amount: realizedSales });
-
-                const positive = hasNullPrices ? null : totalPnlAbsolute >= 0;
-                const borderColor = positive === true ? 'var(--pnl-green)'
-                    : positive === false ? 'var(--pnl-red)'
-                    : 'var(--accent-glow)';
-                const valueColor = positive === true ? 'var(--pnl-green)'
-                    : positive === false ? 'var(--pnl-red)'
-                    : 'var(--text-primary)';
-                const glowBg = positive === true ? 'var(--pnl-green-dim)'
-                    : positive === false ? 'var(--pnl-red-dim)'
-                    : undefined;
-
-                return (
-                    <div
-                        className="glass rounded-2xl p-4 sm:p-6 relative overflow-hidden transition-all duration-300 flex flex-col min-h-[100px] sm:min-h-[120px]"
-                        style={{ border: `1px solid ${borderColor}` }}
-                    >
-                        {valueChanged && glowBg && (
-                            <div className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-500"
-                                style={{ background: glowBg, opacity: 0.4 }} />
-                        )}
-                        <div className="relative">
-                            <p className="text-xs font-medium uppercase tracking-widest mb-3"
-                                style={{ color: 'var(--text-muted)' }}>
-                                Total P&L
-                            </p>
-                            <div className="text-2xl sm:text-3xl font-semibold tabular-nums leading-none"
-                                style={{ color: valueColor }}>
-                                {hasNullPrices
-                                    ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
-                                    : <>
-                                        {totalPnlAbsolute >= 0 ? '+' : ''}{formatValue(totalPnlAbsolute, showValues)}
-                                        <span className="text-base sm:text-lg ml-2 font-medium" style={{ opacity: 0.7 }}>
-                                            {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%
-                                        </span>
-                                    </>
-                                }
+            {/* Total P&L breakdown — subordinate row, only shown when the
+                headline is composed of more than one component. Lighter
+                visual weight (smaller text, dim border) makes the
+                hierarchy clear: top row = KPIs, bottom row = explainer. */}
+            {showBreakdown && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {breakdown.map(r => {
+                        const color = r.amount >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)';
+                        return (
+                            <div key={r.label}
+                                className="glass rounded-xl px-4 py-3 flex items-baseline justify-between"
+                                style={{ border: '1px solid var(--border)' }}
+                            >
+                                <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                                    {r.label}
+                                </span>
+                                <span className="text-base sm:text-lg font-semibold tabular-nums" style={{ color }}>
+                                    {r.amount >= 0 ? '+' : ''}{formatValue(r.amount, showValues)}
+                                </span>
                             </div>
-                            {!hasNullPrices && sinceLabel && (
-                                <div className="mt-1.5 text-sm" style={{ color: valueColor, opacity: 0.75 }}>
-                                    {sinceLabel}
-                                </div>
-                            )}
-                            {!hasNullPrices && rows.length > 1 && (
-                                <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: '1px solid var(--border)' }}>
-                                    {rows.map(r => (
-                                        <div key={r.label} className="flex justify-between items-baseline text-sm tabular-nums">
-                                            <span style={{ color: 'var(--text-muted)' }}>{r.label}</span>
-                                            <span style={{ color: r.amount >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
-                                                {r.amount >= 0 ? '+' : ''}{formatValue(r.amount, showValues)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* 4 — Daily P&L */}
-            <StatCard
-                label="Today's P&L"
-                value={
-                    hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
-                    : dailyPnl === null ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
-                    : `${dailySign}${dailyPnl.percentageChange.toFixed(2)}%`
-                }
-                sub={dailyPnl && !hasNullPrices
-                    ? `${dailySign}${formatValue(dailyPnl.absoluteChange, showValues)}`
-                    : undefined}
-                positive={hasNullPrices ? null : dailyPositive}
-                flash={valueChanged}
-            />
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };
