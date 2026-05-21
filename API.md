@@ -131,6 +131,39 @@ Refreshes historical price data for all positions from Yahoo Finance.
 curl -X POST http://localhost:3000/api/historical-data
 ```
 
+### GET /api/dividends
+
+Returns historical dividend events for a symbol. Cache-first: cached events are
+served when present and the series was refreshed within the last week. Events
+are sourced from Yahoo Finance with `&events=div`. Amounts are per-share, in
+the security's listing currency — convert to base currency at read time using
+`/api/historical-fx-rates`.
+
+**Parameters:**
+- `symbol` (required): Yahoo ticker (e.g. `AAPL`, `7203.T`).
+- `range` (optional, default `5y`): Yahoo range string (`1y`, `2y`, `5y`, `10y`, `max`).
+- `fresh` (optional): Set to `1` to bypass the cache and refetch from Yahoo.
+
+**Response:**
+```json
+{
+  "symbol": "AAPL",
+  "dividends": {
+    "2024-02-09": { "amount": 0.24, "currency": "USD" },
+    "2024-05-10": { "amount": 0.25, "currency": "USD" }
+  },
+  "source": "cache"
+}
+```
+
+`source` is `cache` for a cache hit, `fresh` after refetching from Yahoo, or
+`error` when upstream failed (cached events still returned if any).
+
+**Usage:**
+```bash
+curl "http://localhost:3000/api/dividends?symbol=AAPL&range=5y"
+```
+
 ## Data Structure
 
 ### Position Types

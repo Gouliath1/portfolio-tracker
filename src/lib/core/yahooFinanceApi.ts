@@ -122,6 +122,79 @@ export async function fetchHistoricalPrices(symbol: string, positions: PositionL
     }
 }
 
+// Dividend event from Yahoo, keyed by ISO ex-date.
+// Currency comes from chart.result[0].meta.currency — Yahoo returns the
+// dividend in the security's listing currency. Conversion to base currency
+// is done by callers at read time via fx_rates.
+export interface DividendEventRow {
+    amount: number;
+    currency: string;
+}
+
+// Fetch historical dividend events for a symbol. Mirrors fetchHistoricalPrices
+// but hits the Yahoo chart endpoint with &events=div, returning per-share
+// dividend amounts on each ex-date.
+export async function fetchHistoricalDividends(symbol: string, positions: PositionLike[]): Promise<{[date: string]: DividendEventRow} | null> {
+    try {
+        const symbolPositions = positions.filter(pos => pos.ticker === symbol);
+        if (symbolPositions.length === 0) {
+            return null;
+        }
+
+        const earliestDate = symbolPositions.reduce((earliest, pos) => {
+            const posDate = new Date(pos.transactionDate);
+            return posDate < earliest ? posDate : earliest;
+        }, new Date(symbolPositions[0].transactionDate));
+
+        const monthsSincePurchase = getMonthsSincePurchase(earliestDate.toISOString().split('T')[0]);
+        const range = getYahooRange(monthsSincePurchase);
+
+        const isServerSide = typeof window === 'undefined';
+
+        // Client-side: hit our cached API endpoint.
+        if (!isServerSide) {
+            const apiUrl = `/api/dividends?symbol=${encodeURIComponent(symbol)}&range=${range}`;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const json = await fetchJson(apiUrl) as any;
+            const events: {[date: string]: DividendEventRow} = json?.dividends ?? {};
+            const filtered: {[date: string]: DividendEventRow} = {};
+            for (const [dateStr, ev] of Object.entries(events)) {
+                if (new Date(dateStr) >= earliestDate) {
+                    filtered[dateStr] = ev;
+                }
+            }
+            return Object.keys(filtered).length > 0 ? filtered : null;
+        }
+
+        // Server-side: hit Yahoo directly. &events=div instructs Yahoo to
+        // return chart.result[0].events.dividends alongside the price series.
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=${range}&events=div`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
+
+        const result = data.chart?.result?.[0];
+        if (!result) return null;
+
+        const currency: string = result.meta?.currency ?? '';
+        const dividends = result.events?.dividends ?? {};
+        const out: {[date: string]: DividendEventRow} = {};
+
+        for (const ev of Object.values(dividends) as Array<{amount?: number; date?: number}>) {
+            if (typeof ev.amount !== 'number' || typeof ev.date !== 'number') continue;
+            const exDate = new Date(ev.date * 1000);
+            if (exDate < earliestDate) continue;
+            const dateStr = exDate.toISOString().split('T')[0];
+            out[dateStr] = { amount: ev.amount, currency };
+        }
+
+        return Object.keys(out).length > 0 ? out : null;
+
+    } catch (error) {
+        console.error(`Error fetching historical dividends for ${symbol}:`, error);
+        return null;
+    }
+}
+
 export async function fetchStockPrice(symbol: string, forceRefresh: boolean = false): Promise<number | null> {
     try {
         const isServerSide = typeof window === 'undefined';
