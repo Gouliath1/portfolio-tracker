@@ -87,3 +87,18 @@ export interface HistoricalPortfolioSnapshot {
     pnlJPY: number;
     pnlPercentage: number;
 }
+
+/**
+ * Per-share dividend issued by a security. Sourced from Yahoo Finance and
+ * cached in the shared market-data store. Currency is the security's listing
+ * currency — convert at read time using fx_rates.
+ *
+ * Reconciling against actual cash received (withholding tax, FX at payment,
+ * fractional rounding) is a separate concern and lives outside this type.
+ */
+export interface DividendEvent {
+    ticker: string;
+    exDate: string;       // YYYY-MM-DD
+    amountPerShare: number;
+    currency: Currency;
+}

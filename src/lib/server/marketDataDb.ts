@@ -89,6 +89,27 @@ async function ensureInit(): Promise<boolean> {
                     PRIMARY KEY (pair, rate_date)
                 )
             `);
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS dividend_events (
+                    ticker TEXT NOT NULL,
+                    ex_date TEXT NOT NULL,
+                    amount_per_share REAL NOT NULL,
+                    currency TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (ticker, ex_date)
+                )
+            `);
+            // Tracks when we last refreshed the dividend series for a ticker.
+            // Needed because dividends are sparse (often quarterly), so the
+            // most recent ex_date isn't a reliable freshness signal — a
+            // ticker that hasn't paid in 6 months would otherwise never get
+            // re-checked.
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS dividend_refresh (
+                    ticker TEXT PRIMARY KEY,
+                    refreshed_at TEXT NOT NULL
+                )
+            `);
         } catch (err) {
             console.warn('[marketDataDb] Schema init failed:', err);
             _storageUnavailable = true;
@@ -104,10 +125,14 @@ async function ensureInit(): Promise<boolean> {
 // The DB is still the source of truth — this just avoids round-trips inside a
 // single function instance.
 
+type DividendRow = { amount: number; currency: string };
+
 const _memPrices = new Map<string, Map<DateString, number>>();
 const _memFx = new Map<string, Map<DateString, number>>();
+const _memDividends = new Map<string, Map<DateString, DividendRow>>();
 const _loadedPriceKeys = new Set<string>();
 const _loadedFxKeys = new Set<string>();
+const _loadedDividendKeys = new Set<string>();
 
 async function loadPricesForTicker(ticker: string): Promise<void> {
     if (_loadedPriceKeys.has(ticker)) return;
@@ -131,6 +156,34 @@ async function loadPricesForTicker(ticker: string): Promise<void> {
     } catch (err) {
         console.warn(`[marketDataDb] Read prices failed for ${ticker}:`, err);
         _loadedPriceKeys.add(ticker);
+    }
+}
+
+async function loadDividendsForTicker(ticker: string): Promise<void> {
+    if (_loadedDividendKeys.has(ticker)) return;
+    if (!(await ensureInit())) {
+        _loadedDividendKeys.add(ticker);
+        return;
+    }
+    const c = getClient();
+    if (!c) return;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT ex_date, amount_per_share, currency FROM dividend_events WHERE ticker = ?',
+            args: [ticker],
+        });
+        const map = _memDividends.get(ticker) ?? new Map<DateString, DividendRow>();
+        for (const row of rows.rows) {
+            map.set(row.ex_date as string, {
+                amount: Number(row.amount_per_share),
+                currency: row.currency as string,
+            });
+        }
+        _memDividends.set(ticker, map);
+        _loadedDividendKeys.add(ticker);
+    } catch (err) {
+        console.warn(`[marketDataDb] Read dividends failed for ${ticker}:`, err);
+        _loadedDividendKeys.add(ticker);
     }
 }
 
@@ -239,4 +292,69 @@ export async function getCachedFxRateOnOrBefore(pair: string, date: DateString):
     const map = _memFx.get(pair);
     if (!map || map.size === 0) return null;
     return forwardFillLookup(map, date);
+}
+
+/** Return all cached dividend events for a ticker as { exDate: { amount, currency } }. */
+export async function getCachedDividendEvents(ticker: string): Promise<Record<DateString, DividendRow>> {
+    await loadDividendsForTicker(ticker);
+    const map = _memDividends.get(ticker);
+    return map ? Object.fromEntries(map) : {};
+}
+
+/** When the dividend series for a ticker was last refreshed from upstream. */
+export async function getDividendRefreshedAt(ticker: string): Promise<Date | null> {
+    if (!(await ensureInit())) return null;
+    const c = getClient();
+    if (!c) return null;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT refreshed_at FROM dividend_refresh WHERE ticker = ?',
+            args: [ticker],
+        });
+        const ts = rows.rows[0]?.refreshed_at as string | undefined;
+        return ts ? new Date(ts) : null;
+    } catch (err) {
+        console.warn(`[marketDataDb] Read dividend_refresh failed for ${ticker}:`, err);
+        return null;
+    }
+}
+
+/**
+ * Bulk-insert (or update) dividend events for a ticker. Dates use YYYY-MM-DD.
+ * Always stamps `dividend_refresh` for the ticker — even when `events` is
+ * empty — so a "this ticker pays no dividends" answer doesn't trigger a
+ * refetch on every request.
+ */
+export async function setCachedDividendEvents(ticker: string, events: Record<DateString, DividendRow>): Promise<void> {
+    const entries = Object.entries(events);
+
+    if (entries.length > 0) {
+        const map = _memDividends.get(ticker) ?? new Map<DateString, DividendRow>();
+        for (const [date, ev] of entries) map.set(date, ev);
+        _memDividends.set(ticker, map);
+        _loadedDividendKeys.add(ticker);
+    }
+
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        const stmts: { sql: string; args: (string | number)[] }[] = entries.map(([date, ev]) => ({
+            sql: `INSERT INTO dividend_events (ticker, ex_date, amount_per_share, currency)
+                  VALUES (?, ?, ?, ?)
+                  ON CONFLICT (ticker, ex_date) DO UPDATE SET
+                    amount_per_share = excluded.amount_per_share,
+                    currency = excluded.currency`,
+            args: [ticker, date, ev.amount, ev.currency],
+        }));
+        stmts.push({
+            sql: `INSERT INTO dividend_refresh (ticker, refreshed_at)
+                  VALUES (?, ?)
+                  ON CONFLICT (ticker) DO UPDATE SET refreshed_at = excluded.refreshed_at`,
+            args: [ticker, new Date().toISOString()],
+        });
+        await c.batch(stmts, 'write');
+    } catch (err) {
+        console.warn(`[marketDataDb] Write dividends failed for ${ticker}:`, err);
+    }
 }
