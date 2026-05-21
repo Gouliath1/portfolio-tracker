@@ -61,6 +61,15 @@ export interface Position extends RawPosition {
     pnlPercentage: number;   // potential % for open, 0 for closed
     transactionFxRate: number; // FX rate used for cost calculation (historical or transaction)
     currentFxRate: number;     // Current FX rate used for value calculation
+    // Cumulative dividend income (in base currency) for ex-dates in
+    // (transactionDate, saleDate ?? now]. Sourced from the dividend_events
+    // cache; FX-converted at each ex-date.
+    dividendIncomeJPY: number;
+    // Total return % including dividends:
+    //   open:   (currentValue + dividends − cost) / cost × 100
+    //   closed: (proceeds      + dividends − cost) / cost × 100
+    // Falls back to pnlPercentage when prices are still loading.
+    totalReturnPercentage: number;
     // Realized fields — only populated for closed lots.
     proceedsJPY?: number;
     realizedPnlJPY?: number;
@@ -78,6 +87,8 @@ export interface PortfolioSummary {
     realizedPnlJPY: number;       // sum across closed lots
     realizedCostJPY: number;      // cost basis of closed lots (for %)
     realizedPnlPercentage: number;
+    // Dividend income across all lots (open + closed), base currency.
+    totalDividendsJPY: number;
 }
 
 export interface HistoricalPortfolioSnapshot {

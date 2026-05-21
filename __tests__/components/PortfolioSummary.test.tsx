@@ -55,6 +55,7 @@ describe('PortfolioSummary Component', () => {
     realizedPnlJPY: 0,
     realizedCostJPY: 0,
     realizedPnlPercentage: 0,
+    totalDividendsJPY: 0,
   }
 
   it('should render portfolio summary data correctly', () => {
@@ -87,6 +88,7 @@ describe('PortfolioSummary Component', () => {
       realizedPnlJPY: 0,
       realizedCostJPY: 0,
       realizedPnlPercentage: 0,
+      totalDividendsJPY: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={lossySummary} />)
@@ -106,6 +108,7 @@ describe('PortfolioSummary Component', () => {
       realizedPnlJPY: 0,
       realizedCostJPY: 0,
       realizedPnlPercentage: 0,
+      totalDividendsJPY: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={largeSummary} />)
@@ -126,6 +129,7 @@ describe('PortfolioSummary Component', () => {
       realizedPnlJPY: 0,
       realizedCostJPY: 0,
       realizedPnlPercentage: 0,
+      totalDividendsJPY: 0,
     }
 
     render(<MockPortfolioSummaryComponent summary={zeroSummary} />)
@@ -148,6 +152,7 @@ describe('PortfolioSummary Component', () => {
         realizedPnlJPY: 0,
         realizedCostJPY: 0,
         realizedPnlPercentage: 0,
+        totalDividendsJPY: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)
@@ -170,6 +175,7 @@ describe('PortfolioSummary Component', () => {
         realizedPnlJPY: 0,
         realizedCostJPY: 0,
         realizedPnlPercentage: 0,
+        totalDividendsJPY: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)
@@ -188,6 +194,7 @@ describe('PortfolioSummary Component', () => {
         realizedPnlJPY: 0,
         realizedCostJPY: 0,
         realizedPnlPercentage: 0,
+        totalDividendsJPY: 0,
       }
 
       render(<MockPortfolioSummaryComponent summary={summary} />)

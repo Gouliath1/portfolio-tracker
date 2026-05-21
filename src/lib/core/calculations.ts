@@ -1,5 +1,5 @@
-import { Position, RawPosition, PortfolioSummary } from '@portfolio/types';
-import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates } from './yahooFinanceApi';
+import { Position, RawPosition, PortfolioSummary, Currency } from '@portfolio/types';
+import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates, fetchHistoricalDividends, type DividendEventRow } from './yahooFinanceApi';
 
 // Preloaded FX rates for a whole portfolio. When present, calculatePosition uses
 // these instead of making its own network calls — collapses N positions × ~2
@@ -8,6 +8,10 @@ export type FxLookup = {
     historical: Map<string, Map<string, number>>; // pair → date (YYYY-MM-DD) → rate
     current: Map<string, number>;                 // pair → rate
 };
+
+// Preloaded dividend events for a whole portfolio. ticker → ex-date → row.
+// Same batching motivation as FxLookup: one fetch per ticker, not per lot.
+export type DividendLookup = Map<string, Map<string, DividendEventRow>>;
 
 // Forward-fill: latest cached date <= target. Mirrors the server-side fallback
 // in /api/historical-fx-rates so a transaction on a weekend/holiday still maps
@@ -81,6 +85,121 @@ async function convertCurrency(
     };
 }
 
+// Sum dividend income for a single lot, in base currency.
+//
+// Window: ex-dates strictly after `transactionDate` (you only earn the
+// dividend if you held on the ex-date) and on/before `saleDate ?? today`.
+// Each event is FX-converted at its ex-date using the preloaded historical
+// lookup; missing ex-dates fall through to forward-fill, matching the same
+// behavior used for cost-basis FX.
+function sumDividendsForLot(
+    rawPosition: RawPosition,
+    baseCurrency: string,
+    dividendLookup: DividendLookup | undefined,
+    fxLookup: FxLookup | undefined,
+): number {
+    if (!dividendLookup) return 0;
+    const events = dividendLookup.get(String(rawPosition.ticker));
+    if (!events || events.size === 0) return 0;
+
+    const startExclusive = rawPosition.transactionDate.replace(/\//g, '-');
+    const endInclusive = (rawPosition.saleDate ?? new Date().toISOString().split('T')[0]).replace(/\//g, '-');
+
+    let total = 0;
+    for (const [exDate, ev] of events) {
+        if (exDate <= startExclusive) continue;
+        if (exDate > endInclusive) continue;
+
+        const grossInDivCcy = ev.amount * rawPosition.quantity;
+        if (ev.currency === baseCurrency) {
+            total += grossInDivCcy;
+            continue;
+        }
+        const fxPair = `${ev.currency}${baseCurrency}`;
+        const histMap = fxLookup?.historical.get(fxPair);
+        const fxRate = histMap ? lookupHistorical(histMap, exDate) : null;
+        if (fxRate !== null && fxRate !== undefined) {
+            total += grossInDivCcy * fxRate;
+        } else {
+            // Last-resort: try the current rate, otherwise drop the event with a
+            // warning rather than poisoning the total with a 1:1 fallback.
+            const cur = fxLookup?.current.get(fxPair);
+            if (cur !== undefined) {
+                total += grossInDivCcy * cur;
+            } else {
+                console.warn(`[dividend] no FX rate for ${fxPair} on ${exDate}; skipping ${rawPosition.ticker} dividend`);
+            }
+        }
+    }
+    return total;
+}
+
+// Build one dividend lookup for the whole portfolio: one fetch per unique
+// ticker, run in parallel. Mirrors preloadFxRates so calculatePosition can
+// stay synchronous on the dividend path.
+export async function preloadDividendEvents(rawPositions: RawPosition[]): Promise<DividendLookup> {
+    const lookup: DividendLookup = new Map();
+    const tickers = [...new Set(rawPositions.map(p => String(p.ticker)))];
+    if (tickers.length === 0) return lookup;
+
+    // fetchHistoricalDividends takes the position list to derive the date
+    // range, so pass the full set for each ticker.
+    await Promise.all(tickers.map(async ticker => {
+        const events = await fetchHistoricalDividends(ticker, rawPositions);
+        if (events && Object.keys(events).length > 0) {
+            const map = new Map<string, DividendEventRow>();
+            for (const [date, ev] of Object.entries(events)) map.set(date, ev);
+            lookup.set(ticker, map);
+        } else {
+            lookup.set(ticker, new Map());
+        }
+    }));
+
+    return lookup;
+}
+
+// Add ex-dates that aren't on the existing FX preload. Dividends pay on
+// arbitrary calendar days unrelated to transaction or sale dates, so the
+// FX preload built from transactions alone won't cover them. Backfilling
+// via the historical FX route fills any gap.
+async function ensureFxForDividendDates(
+    fxLookup: FxLookup,
+    dividendLookup: DividendLookup,
+    rawPositions: RawPosition[],
+    baseCurrency: string,
+): Promise<void> {
+    const tickerCcy = new Map<string, Currency>();
+    for (const p of rawPositions) {
+        if (!tickerCcy.has(String(p.ticker))) tickerCcy.set(String(p.ticker), p.stockCcy);
+    }
+
+    const missingByPair = new Map<string, Set<string>>();
+    for (const [ticker, events] of dividendLookup) {
+        if (events.size === 0) continue;
+        const ccy = tickerCcy.get(ticker);
+        if (!ccy || ccy === baseCurrency) continue;
+        const pair = `${ccy}${baseCurrency}`;
+        const existing = fxLookup.historical.get(pair);
+        const missing = missingByPair.get(pair) ?? new Set<string>();
+        for (const exDate of events.keys()) {
+            if (!existing || lookupHistorical(existing, exDate) === null) {
+                missing.add(exDate);
+            }
+        }
+        if (missing.size > 0) missingByPair.set(pair, missing);
+    }
+
+    if (missingByPair.size === 0) return;
+
+    await Promise.all([...missingByPair.entries()].map(async ([pair, dates]) => {
+        const rates = await fetchHistoricalFxRates(pair, [...dates]);
+        if (!rates) return;
+        const map = fxLookup.historical.get(pair) ?? new Map<string, number>();
+        for (const [d, r] of Object.entries(rates)) map.set(d, r);
+        fxLookup.historical.set(pair, map);
+    }));
+}
+
 // Build one FX lookup for the whole portfolio: one historical fetch per pair
 // (covers every transaction/sale date) and one current fetch per pair (covers
 // every open lot). Parallelized across pairs.
@@ -127,7 +246,7 @@ export async function preloadFxRates(rawPositions: RawPosition[], baseCurrency: 
     return { historical, current };
 }
 
-export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null, baseCurrency: string = 'JPY', fxLookup?: FxLookup): Promise<Position> => {
+export const calculatePosition = async (rawPosition: RawPosition, currentPrice: number | null, baseCurrency: string = 'JPY', fxLookup?: FxLookup, dividendLookup?: DividendLookup): Promise<Position> => {
     const isClosed = !!rawPosition.saleDate;
 
     // 1. Calculate original FX rate (only if transaction was not in base currency)
@@ -169,8 +288,16 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             saleFxRate = conversion.fxRate;
         }
         const proceedsInBase = salePricePerUnitInBase * rawPosition.quantity;
-        const realizedPnl = proceedsInBase - costInBase;
+        const dividendIncomeBase = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
+
+        // Realized P&L includes dividends earned while the lot was held —
+        // for a closed position the cash you actually pocketed is proceeds
+        // plus dividends, minus original cost.
+        const realizedPnl = proceedsInBase + dividendIncomeBase - costInBase;
         const realizedPnlPercentage = costInBase === 0 ? 0 : (realizedPnl / costInBase) * 100;
+        // Total return % is the same number for closed lots — kept here so
+        // the field is populated consistently across open + closed.
+        const totalReturnPercentage = realizedPnlPercentage;
 
         return {
             ...rawPosition,
@@ -182,6 +309,8 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             pnlPercentage: 0,
             transactionFxRate: origFxRate,
             currentFxRate: 1,
+            dividendIncomeJPY: dividendIncomeBase,
+            totalReturnPercentage,
             proceedsJPY: proceedsInBase,
             realizedPnlJPY: realizedPnl,
             realizedPnlPercentage,
@@ -216,6 +345,11 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         ? (pnlInBase / costInBase) * 100
         : 0;
 
+    const dividendIncomeBase = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
+    const totalReturnPercentage = currentPrice !== null && costInBase !== 0
+        ? ((currentValueInBase + dividendIncomeBase - costInBase) / costInBase) * 100
+        : pnlPercentage;
+
     return {
         ...rawPosition,
         status: 'open',
@@ -225,7 +359,9 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         pnlJPY: pnlInBase,
         pnlPercentage,
         transactionFxRate: origFxRate,
-        currentFxRate
+        currentFxRate,
+        dividendIncomeJPY: dividendIncomeBase,
+        totalReturnPercentage,
     };
 };
 
@@ -275,13 +411,28 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         return lookup;
     })();
 
-    const [resolvedPrices, fxLookup] = await Promise.all([pricesPromise, fxPromise]);
+    const dividendPromise = (async () => {
+        const td = performance.now();
+        const lookup = await preloadDividendEvents(rawPositions);
+        const totalEvents = [...lookup.values()].reduce((s, m) => s + m.size, 0);
+        log(`dividend preload (tickers=${lookup.size}, events=${totalEvents})`, td);
+        return lookup;
+    })();
+
+    const [resolvedPrices, fxLookup, dividendLookup] = await Promise.all([pricesPromise, fxPromise, dividendPromise]);
     currentPrices = resolvedPrices;
-    log('prices+fx (parallel)');
+    log('prices+fx+dividends (parallel)');
+
+    // Dividend ex-dates rarely line up with transaction dates, so the FX
+    // preload (built from positions) won't have rates for them. Backfill
+    // before per-position calc so sumDividendsForLot can convert in-process.
+    const tef = performance.now();
+    await ensureFxForDividendDates(fxLookup, dividendLookup, rawPositions, baseCurrency);
+    log('fx backfill for dividend dates', tef);
 
     const tpos = performance.now();
     const positionPromises = rawPositions.map(pos =>
-        calculatePosition(pos, pos.saleDate ? null : currentPrices[pos.ticker.toString()] ?? null, baseCurrency, fxLookup)
+        calculatePosition(pos, pos.saleDate ? null : currentPrices[pos.ticker.toString()] ?? null, baseCurrency, fxLookup, dividendLookup)
     );
     const allPositions = await Promise.all(positionPromises);
     log('per-position calc', tpos);
@@ -303,6 +454,8 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         ? 0
         : (realizedPnlInBase / realizedCostInBase) * 100;
 
+    const totalDividendsInBase = allPositions.reduce((sum, pos) => sum + pos.dividendIncomeJPY, 0);
+
     return {
         totalValueJPY: totalValueInBase,
         totalCostJPY: totalCostInBase,
@@ -313,5 +466,6 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         realizedPnlJPY: realizedPnlInBase,
         realizedCostJPY: realizedCostInBase,
         realizedPnlPercentage,
+        totalDividendsJPY: totalDividendsInBase,
     };
 };

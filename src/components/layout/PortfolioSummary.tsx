@@ -24,6 +24,76 @@ interface StatCardProps {
     flash?: boolean;
 }
 
+// A two-half card. Visually parallel to StatCard but shows two distinct
+// stats (e.g. unrealized + realized P&L) with their own labels, headlines
+// and signs. Border color derives from the *top* half — the headline most
+// users glance at first.
+interface SplitHalfProps {
+    label: string;
+    headline: React.ReactNode;
+    sub?: React.ReactNode;
+    positive?: boolean | null;
+}
+interface SplitStatCardProps {
+    top: SplitHalfProps;
+    bottom?: SplitHalfProps;   // when undefined, falls back to single-half rendering
+    flash?: boolean;
+}
+
+const halfValueColor = (positive?: boolean | null) =>
+    positive === true ? 'var(--pnl-green)'
+    : positive === false ? 'var(--pnl-red)'
+    : 'var(--text-primary)';
+
+const SplitStatCard = ({ top, bottom, flash }: SplitStatCardProps) => {
+    // Border + glow follow the top headline since it's the primary stat.
+    const borderColor = top.positive === true ? 'var(--pnl-green)'
+        : top.positive === false ? 'var(--pnl-red)'
+        : 'var(--accent-glow)';
+    const glowBg = top.positive === true ? 'var(--pnl-green-dim)'
+        : top.positive === false ? 'var(--pnl-red-dim)'
+        : undefined;
+
+    const renderHalf = (h: SplitHalfProps, isBottom = false) => {
+        const valueColor = halfValueColor(h.positive);
+        return (
+            <div className={isBottom ? 'pt-3 mt-3' : ''}
+                style={isBottom ? { borderTop: '1px solid var(--border)' } : undefined}
+            >
+                <p className="text-xs font-medium uppercase tracking-widest mb-2"
+                    style={{ color: 'var(--text-muted)' }}>
+                    {h.label}
+                </p>
+                <div className="text-xl sm:text-2xl font-semibold tabular-nums leading-none"
+                    style={{ color: valueColor }}>
+                    {h.headline}
+                </div>
+                {h.sub && (
+                    <div className="mt-1.5 text-sm tabular-nums" style={{ color: valueColor, opacity: 0.75 }}>
+                        {h.sub}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div
+            className="glass rounded-2xl p-4 sm:p-6 relative overflow-hidden transition-all duration-300 flex flex-col min-h-[100px] sm:min-h-[120px]"
+            style={{ border: `1px solid ${borderColor}` }}
+        >
+            {flash && glowBg && (
+                <div className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-500"
+                    style={{ background: glowBg, opacity: 0.4 }} />
+            )}
+            <div className="relative">
+                {renderHalf(top)}
+                {bottom && renderHalf(bottom, true)}
+            </div>
+        </div>
+    );
+};
+
 const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProps) => {
     const borderColor = positive === true
         ? 'var(--pnl-green)'
@@ -130,30 +200,75 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 flash={valueChanged}
             />
 
-            {/* 3 — Total P&L (% headline, absolute + since as sub, realized as footnote) */}
-            <StatCard
-                label="Total P&L"
-                value={hasNullPrices
-                    ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
-                    : `${summary.totalPnlPercentage >= 0 ? '+' : ''}${summary.totalPnlPercentage.toFixed(2)}%`}
-                sub={!hasNullPrices
-                    ? <>{formatValue(summary.totalPnlJPY, showValues)}{sinceLabel ? <span style={{ opacity: 0.6 }}> · {sinceLabel}</span> : null}</>
-                    : undefined}
-                positive={hasNullPrices ? null : summary.totalPnlJPY >= 0}
-                flash={valueChanged}
-                footnote={summary.closedPositions.length > 0
-                    ? (
-                        <span>
-                            Realized:{' '}
-                            <span style={{ color: summary.realizedPnlJPY >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
-                                {summary.realizedPnlJPY >= 0 ? '+' : ''}{formatValue(summary.realizedPnlJPY, showValues)}
-                                {' · '}
-                                {summary.realizedPnlPercentage >= 0 ? '+' : ''}{summary.realizedPnlPercentage.toFixed(2)}%
-                            </span>
-                        </span>
-                    )
-                    : undefined}
-            />
+            {/* 3 — Total P&L card.
+                Top: Total P&L = unrealized (open lots, capital gains)
+                                 + realized (closed lots, proceeds + their dividends − cost)
+                                 + dividends earned on still-open lots.
+                     Denominator for % is total capital ever deployed
+                     (open cost + closed cost) so realized cost basis isn't
+                     dropped after a sale.
+                Bottom: Realized-only breakdown so the user can see how much
+                        of the total is locked in vs still on paper. Marked
+                        as including dividends and sales when both apply. */}
+            {(() => {
+                // Closed-lot dividends are already inside realizedPnlJPY.
+                // Subtracting them from totalDividendsJPY gives the income
+                // earned on still-open positions, which isn't in any P&L
+                // figure yet but is real money.
+                const closedLotDividends = summary.closedPositions
+                    .reduce((s, p) => s + (p.dividendIncomeJPY ?? 0), 0);
+                const openLotDividends = summary.totalDividendsJPY - closedLotDividends;
+
+                const totalPnlAbsolute = summary.totalPnlJPY + summary.realizedPnlJPY + openLotDividends;
+                const totalCostDeployed = summary.totalCostJPY + summary.realizedCostJPY;
+                const totalPnlPct = totalCostDeployed === 0
+                    ? 0
+                    : (totalPnlAbsolute / totalCostDeployed) * 100;
+
+                const hasRealizedSection = summary.closedPositions.length > 0 || summary.totalDividendsJPY > 0;
+
+                // Label the realized breakdown by what's actually in it.
+                let realizedLabel = 'Realized';
+                if (summary.closedPositions.length > 0 && summary.totalDividendsJPY > 0) {
+                    realizedLabel = 'Realized (sales + dividends)';
+                } else if (summary.totalDividendsJPY > 0 && summary.closedPositions.length === 0) {
+                    realizedLabel = 'Realized (dividends only)';
+                }
+
+                // The realized half blends two numbers we already track:
+                // realizedPnlJPY (closed lots: proceeds + closed-lot divs − cost)
+                // and openLotDividends (income on still-held lots). They're
+                // both "money in pocket", so we surface their sum here.
+                const realizedTotal = summary.realizedPnlJPY + openLotDividends;
+                const realizedDenominator = summary.realizedCostJPY > 0
+                    ? summary.realizedCostJPY
+                    : (summary.totalCostJPY > 0 ? summary.totalCostJPY : 0);
+                const realizedPct = realizedDenominator === 0
+                    ? 0
+                    : (realizedTotal / realizedDenominator) * 100;
+
+                return (
+                    <SplitStatCard
+                        flash={valueChanged}
+                        top={{
+                            label: 'Total P&L',
+                            headline: hasNullPrices
+                                ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                                : `${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%`,
+                            sub: !hasNullPrices
+                                ? <>{totalPnlAbsolute >= 0 ? '+' : ''}{formatValue(totalPnlAbsolute, showValues)}{sinceLabel ? <span style={{ opacity: 0.6 }}> · {sinceLabel}</span> : null}</>
+                                : undefined,
+                            positive: hasNullPrices ? null : totalPnlAbsolute >= 0,
+                        }}
+                        bottom={hasRealizedSection ? {
+                            label: realizedLabel,
+                            headline: `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(2)}%`,
+                            sub: <>{realizedTotal >= 0 ? '+' : ''}{formatValue(realizedTotal, showValues)}</>,
+                            positive: realizedTotal >= 0,
+                        } : undefined}
+                    />
+                );
+            })()}
 
             {/* 4 — Daily P&L */}
             <StatCard

@@ -22,6 +22,7 @@ const calculatePortfolioSummary = (positions: Position[]): PortfolioSummary => {
     realizedPnlJPY: 0,
     realizedCostJPY: 0,
     realizedPnlPercentage: 0,
+    totalDividendsJPY: 0,
   }
 }
 
@@ -45,6 +46,8 @@ describe('Portfolio Summary Calculations', () => {
       transactionFxRate: 130,
       currentFxRate: 130,
       status: 'open',
+      dividendIncomeJPY: 0,
+      totalReturnPercentage: 6.67,
     },
     {
       transactionDate: '2023-02-01',
@@ -64,6 +67,8 @@ describe('Portfolio Summary Calculations', () => {
       transactionFxRate: 1,
       currentFxRate: 1,
       status: 'open',
+      dividendIncomeJPY: 0,
+      totalReturnPercentage: 5.88,
     },
   ]
 

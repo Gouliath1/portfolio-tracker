@@ -256,11 +256,13 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
         }),
 
         /**
-         * Profit and Loss in base currency
+         * Unrealized P&L (price move only, dividends excluded). For the
+         * dividend-inclusive view see the Total Return % column. Closed
+         * lots roll dividends into realized P&L; see ClosedPositionsTable.
          */
         columnHelper.accessor('pnlJPY', {
-            header: 'P&L',
-            size: 130,
+            header: 'Unrealized P&L',
+            size: 140,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
@@ -277,12 +279,11 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
         }),
 
         /**
-         * Profit and Loss percentage
-         * Shows the percentage gain or loss on the position
+         * Unrealized P&L %, mirroring the column above.
          */
         columnHelper.accessor('pnlPercentage', {
-            header: 'P&L %',
-            size: 100,
+            header: 'Unrealized P&L %',
+            size: 130,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
@@ -296,6 +297,30 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 return (
                     <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
                         {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                    </span>
+                );
+            },
+        }),
+
+        /**
+         * Total return % including dividends.
+         *   open:   (currentValue + dividends − cost) / cost × 100
+         *   closed: (proceeds      + dividends − cost) / cost × 100
+         */
+        columnHelper.accessor('totalReturnPercentage', {
+            header: 'Total Return %',
+            size: 110,
+            cell: props => {
+                const value = props.getValue();
+                if (props.row.original.currentPrice === null && props.row.original.status === 'open') {
+                    return <span className="text-gray-400">Loading...</span>;
+                }
+                if (!props.table.options.meta?.showValues) {
+                    return getHiddenValue(value);
+                }
+                return (
+                    <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {value >= 0 ? '+' : ''}{value.toFixed(2)}%
                     </span>
                 );
             },
@@ -344,13 +369,31 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 }
                 
                 return (
-                    <span 
+                    <span
                         className={value.return >= 0 ? 'text-green-600' : 'text-red-600'}
                         title={`Annualized based on ${value.days} days holding period (${(value.days / 365).toFixed(1)} years)`}
                     >
                         {value.return.toFixed(2)}%
                     </span>
                 );
+            },
+        }),
+
+        /**
+         * Cumulative dividend income (in base currency) from ex-dates while
+         * the lot was held. Sat at the far right of the table to keep it
+         * visually separate from price-only P&L numbers.
+         */
+        columnHelper.accessor('dividendIncomeJPY', {
+            header: 'Total Dividends',
+            size: 130,
+            cell: props => {
+                const value = props.getValue();
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                if (!value) {
+                    return <span className="text-gray-400">—</span>;
+                }
+                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
     ];
