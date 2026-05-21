@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { calculatePortfolioCagrSinceInception } from '@portfolio/core';
 import { useDailyPnl } from '../../hooks/useDailyPnl';
@@ -15,8 +16,30 @@ interface PortfolioSummaryProps {
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 
+// Reveals tooltip text on hover (desktop) and focus (mobile tap, since
+// the trigger is a button). Same styling pattern as the stale-price
+// warning icon in the header so the language of the UI stays consistent.
+const InfoTooltip = ({ text }: { text: string }) => (
+    <span className="relative group inline-flex items-center">
+        <button type="button"
+            className="p-0.5 rounded transition-colors hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-[var(--accent-glow)]"
+            style={{ color: 'var(--text-muted)', opacity: 0.6 }}
+            aria-label="What is this?"
+        >
+            <MdInfoOutline size={14} />
+        </button>
+        <span
+            className="absolute right-0 top-full mt-2 w-64 glass rounded-xl px-3 py-2 text-xs leading-relaxed pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50 normal-case tracking-normal font-normal"
+            style={{ color: 'var(--text-secondary)' }}
+        >
+            {text}
+        </span>
+    </span>
+);
+
 interface StatCardProps {
     label: string;
+    info?: string;
     value: React.ReactNode;
     sub?: React.ReactNode;
     footnote?: React.ReactNode;
@@ -24,7 +47,7 @@ interface StatCardProps {
     flash?: boolean;
 }
 
-const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProps) => {
+const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCardProps) => {
     const borderColor = positive === true
         ? 'var(--pnl-green)'
         : positive === false
@@ -45,7 +68,7 @@ const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProp
 
     return (
         <div
-            className="glass rounded-2xl p-4 sm:p-6 relative overflow-hidden transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[120px]"
+            className="glass rounded-2xl p-4 sm:p-6 relative transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[120px]"
             style={{ border: `1px solid ${borderColor}` }}
         >
             {flash && glowBg && (
@@ -53,10 +76,13 @@ const StatCard = ({ label, value, sub, footnote, positive, flash }: StatCardProp
                     style={{ background: glowBg, opacity: 0.4 }} />
             )}
             <div className="relative flex-1">
-                <p className="text-xs font-medium uppercase tracking-widest mb-3"
-                    style={{ color: 'var(--text-muted)' }}>
-                    {label}
-                </p>
+                <div className="flex items-start justify-between gap-2 mb-3">
+                    <p className="text-xs font-medium uppercase tracking-widest"
+                        style={{ color: 'var(--text-muted)' }}>
+                        {label}
+                    </p>
+                    {info && <InfoTooltip text={info} />}
+                </div>
                 <div className="text-2xl sm:text-3xl font-semibold tabular-nums leading-none"
                     style={{ color: valueColor }}>
                     {value}
@@ -133,6 +159,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 {/* 1 — Total Value (with cost as footnote) */}
                 <StatCard
                     label="Total Value"
+                    info="Current market value of all open positions, converted into your base currency at today's FX rate. The 'Cost' line shows what you originally paid for those same positions (excludes closed lots)."
                     value={hasNullPrices
                         ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
                         : formatValue(summary.totalValueJPY, showValues)}
@@ -146,6 +173,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 {/* 2 — Annualised Return */}
                 <StatCard
                     label="Annualised Return"
+                    info="Compound annual growth rate (CAGR) of open positions: (Value ÷ Cost)^(1 ÷ years) − 1, where years runs from your earliest transaction to today. Excludes dividends and closed lots, and treats your portfolio as a single lump-sum invested at that earliest date — so it understates returns if you've been adding capital over time."
                     value={
                         hasNullPrices
                             ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
@@ -164,6 +192,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                     breakdown lives in the secondary row below. */}
                 <StatCard
                     label="Total P&L"
+                    info="Lifetime profit/loss across everything you've owned: unrealised mark-to-market on open lots + all dividends received + realised gains from past sales. The percentage divides this by your total deployed cost (open cost + closed cost)."
                     value={hasNullPrices
                         ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
                         : <>{totalPnlAbsolute >= 0 ? '+' : ''}{formatValue(totalPnlAbsolute, showValues)}</>}
@@ -180,6 +209,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 {/* 4 — Daily P&L */}
                 <StatCard
                     label="Today's P&L"
+                    info="Change in total portfolio value since the previous trading-day's close, in your base currency. Percentage is that change divided by yesterday's closing value."
                     value={
                         hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
                         : dailyPnl === null ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
