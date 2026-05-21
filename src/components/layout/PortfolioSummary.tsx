@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
-import { calculatePortfolioCagrSinceInception } from '@portfolio/core';
+import { calculatePortfolioAnnualizedReturn } from '@portfolio/core';
 import { useDailyPnl } from '../../hooks/useDailyPnl';
 
 interface PortfolioSummaryProps {
@@ -109,7 +109,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
     useEffect(() => { prevSummary.current = summary; }, [summary]);
 
     const hasNullPrices = summary.positions.some(p => p.currentPrice === null);
-    const annualizedReturn = calculatePortfolioCagrSinceInception(summary);
+    const annualizedReturn = calculatePortfolioAnnualizedReturn(summary);
     const dailyPnl = useDailyPnl(summary.positions, summary.totalValueJPY);
 
     // Earliest transaction date (shared by P&L and CAGR "since" label)
@@ -173,7 +173,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                 {/* 2 — Annualised Return */}
                 <StatCard
                     label="Annualised Return"
-                    info="Compound annual growth rate (CAGR) of open positions: (Value ÷ Cost)^(1 ÷ years) − 1, where years runs from your earliest transaction to today. Excludes dividends and closed lots, and treats your portfolio as a single lump-sum invested at that earliest date — so it understates returns if you've been adding capital over time."
+                    info="Money-weighted annualised return (XIRR). Each purchase is treated as a cash outflow on its own transaction date, and today's open-position value is the terminal inflow — solving for the rate that makes the present value of those cash flows zero. Currently excludes closed lots and dividends; those will be folded in next."
                     value={
                         hasNullPrices
                             ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
