@@ -61,6 +61,14 @@ function buildKey(positions: RawPosition[], baseCurrency: string): string {
     return `${KEY_PREFIX}${baseCurrency}_${hash(JSON.stringify(sig))}`;
 }
 
+// A null currentPrice on any open lot means we have a partial snapshot —
+// the dashboard would render "Updating…" cards if it paints from it. We
+// never want to serve those: discard them on read and refuse to write them
+// on save. The next compute will overwrite with a complete snapshot.
+function isCompleteSummary(summary: PortfolioSummary): boolean {
+    return !summary.positions.some(p => p.currentPrice === null);
+}
+
 export function readCachedSummary(positions: RawPosition[], baseCurrency: string): CachedRead | null {
     if (typeof window === 'undefined') return null;
     try {
@@ -69,6 +77,7 @@ export function readCachedSummary(positions: RawPosition[], baseCurrency: string
         const parsed = JSON.parse(raw) as Stored;
         if (!parsed.summary || typeof parsed.storedAt !== 'number') return null;
         if (Date.now() - parsed.storedAt > MAX_AGE_MS) return null;
+        if (!isCompleteSummary(parsed.summary)) return null;
         return { summary: parsed.summary, fromToday: parsed.storedDate === localDateStr() };
     } catch {
         return null;
@@ -77,6 +86,7 @@ export function readCachedSummary(positions: RawPosition[], baseCurrency: string
 
 export function writeCachedSummary(positions: RawPosition[], baseCurrency: string, summary: PortfolioSummary): void {
     if (typeof window === 'undefined') return;
+    if (!isCompleteSummary(summary)) return;
     try {
         const stored: Stored = { summary, storedAt: Date.now(), storedDate: localDateStr() };
         localStorage.setItem(buildKey(positions, baseCurrency), JSON.stringify(stored));
