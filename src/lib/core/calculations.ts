@@ -85,53 +85,64 @@ async function convertCurrency(
     };
 }
 
-// Sum dividend income for a single lot, in base currency.
+// Sum dividend income for a single lot, in base currency, and return the
+// per-event breakdown sorted by ex-date.
 //
 // Window: ex-dates strictly after `transactionDate` (you only earn the
 // dividend if you held on the ex-date) and on/before `saleDate ?? today`.
 // Each event is FX-converted at its ex-date using the preloaded historical
 // lookup; missing ex-dates fall through to forward-fill, matching the same
 // behavior used for cost-basis FX.
+//
+// The per-event list lets XIRR place each dividend as a cash inflow on its
+// actual ex-date rather than a single lumped amount.
 function sumDividendsForLot(
     rawPosition: RawPosition,
     baseCurrency: string,
     dividendLookup: DividendLookup | undefined,
     fxLookup: FxLookup | undefined,
-): number {
-    if (!dividendLookup) return 0;
-    const events = dividendLookup.get(String(rawPosition.ticker));
-    if (!events || events.size === 0) return 0;
+): { total: number; events: { exDate: string; amountInBase: number }[] } {
+    if (!dividendLookup) return { total: 0, events: [] };
+    const dividends = dividendLookup.get(String(rawPosition.ticker));
+    if (!dividends || dividends.size === 0) return { total: 0, events: [] };
 
     const startExclusive = rawPosition.transactionDate.replace(/\//g, '-');
     const endInclusive = (rawPosition.saleDate ?? new Date().toISOString().split('T')[0]).replace(/\//g, '-');
 
     let total = 0;
-    for (const [exDate, ev] of events) {
+    const events: { exDate: string; amountInBase: number }[] = [];
+    for (const [exDate, ev] of dividends) {
         if (exDate <= startExclusive) continue;
         if (exDate > endInclusive) continue;
 
         const grossInDivCcy = ev.amount * rawPosition.quantity;
+        let amountInBase: number | null = null;
         if (ev.currency === baseCurrency) {
-            total += grossInDivCcy;
-            continue;
-        }
-        const fxPair = `${ev.currency}${baseCurrency}`;
-        const histMap = fxLookup?.historical.get(fxPair);
-        const fxRate = histMap ? lookupHistorical(histMap, exDate) : null;
-        if (fxRate !== null && fxRate !== undefined) {
-            total += grossInDivCcy * fxRate;
+            amountInBase = grossInDivCcy;
         } else {
-            // Last-resort: try the current rate, otherwise drop the event with a
-            // warning rather than poisoning the total with a 1:1 fallback.
-            const cur = fxLookup?.current.get(fxPair);
-            if (cur !== undefined) {
-                total += grossInDivCcy * cur;
+            const fxPair = `${ev.currency}${baseCurrency}`;
+            const histMap = fxLookup?.historical.get(fxPair);
+            const fxRate = histMap ? lookupHistorical(histMap, exDate) : null;
+            if (fxRate !== null && fxRate !== undefined) {
+                amountInBase = grossInDivCcy * fxRate;
             } else {
-                console.warn(`[dividend] no FX rate for ${fxPair} on ${exDate}; skipping ${rawPosition.ticker} dividend`);
+                // Last-resort: try the current rate, otherwise drop the event with a
+                // warning rather than poisoning the total with a 1:1 fallback.
+                const cur = fxLookup?.current.get(fxPair);
+                if (cur !== undefined) {
+                    amountInBase = grossInDivCcy * cur;
+                } else {
+                    console.warn(`[dividend] no FX rate for ${fxPair} on ${exDate}; skipping ${rawPosition.ticker} dividend`);
+                }
             }
         }
+        if (amountInBase !== null) {
+            total += amountInBase;
+            events.push({ exDate, amountInBase });
+        }
     }
-    return total;
+    events.sort((a, b) => a.exDate.localeCompare(b.exDate));
+    return { total, events };
 }
 
 // Build one dividend lookup for the whole portfolio: one fetch per unique
@@ -288,7 +299,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             saleFxRate = conversion.fxRate;
         }
         const proceedsInBase = salePricePerUnitInBase * rawPosition.quantity;
-        const dividendIncomeBase = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
+        const { total: dividendIncomeBase, events: dividendEvents } = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
 
         // Realized P&L includes dividends earned while the lot was held —
         // for a closed position the cash you actually pocketed is proceeds
@@ -310,6 +321,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
             transactionFxRate: origFxRate,
             currentFxRate: 1,
             dividendIncomeJPY: dividendIncomeBase,
+            dividendEvents,
             totalReturnPercentage,
             proceedsJPY: proceedsInBase,
             realizedPnlJPY: realizedPnl,
@@ -345,7 +357,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         ? (pnlInBase / costInBase) * 100
         : 0;
 
-    const dividendIncomeBase = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
+    const { total: dividendIncomeBase, events: dividendEvents } = sumDividendsForLot(rawPosition, baseCurrency, dividendLookup, fxLookup);
     const totalReturnPercentage = currentPrice !== null && costInBase !== 0
         ? ((currentValueInBase + dividendIncomeBase - costInBase) / costInBase) * 100
         : pnlPercentage;
@@ -361,6 +373,7 @@ export const calculatePosition = async (rawPosition: RawPosition, currentPrice: 
         transactionFxRate: origFxRate,
         currentFxRate,
         dividendIncomeJPY: dividendIncomeBase,
+        dividendEvents,
         totalReturnPercentage,
     };
 };

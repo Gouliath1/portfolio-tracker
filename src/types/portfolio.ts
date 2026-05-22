@@ -65,6 +65,12 @@ export interface Position extends RawPosition {
     // (transactionDate, saleDate ?? now]. Sourced from the dividend_events
     // cache; FX-converted at each ex-date.
     dividendIncomeJPY: number;
+    // Per-event dividend breakdown for this lot, in base currency, sorted by
+    // ex-date. Sums to `dividendIncomeJPY`. Used by the XIRR calculation so
+    // each dividend becomes a cash inflow on its actual ex-date rather than
+    // a single lumped amount. Optional so cached summaries from before this
+    // field was introduced still deserialize.
+    dividendEvents?: { exDate: string; amountInBase: number }[];
     // Total return % including dividends:
     //   open:   (currentValue + dividends − cost) / cost × 100
     //   closed: (proceeds      + dividends − cost) / cost × 100

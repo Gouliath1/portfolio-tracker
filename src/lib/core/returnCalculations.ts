@@ -38,9 +38,9 @@ export const calculatePortfolioCagrSinceInception = (summary: PortfolioSummary):
 };
 
 // Money-weighted return (XIRR). Builds a per-transaction cash-flow series
-// (buys as outflows on their dates, sells as inflows on their dates, today's
-// open-position value as the terminal inflow) and solves for the rate that
-// makes NPV = 0. Dividends are not yet included.
+// (buys as outflows on their dates, sells and dividends as inflows on their
+// dates, today's open-position value as the terminal inflow) and solves for
+// the rate that makes NPV = 0.
 export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): { return: number; earliestDate: string } | null => {
     if (summary.positions.length === 0 && summary.closedPositions.length === 0) return null;
 
@@ -69,6 +69,20 @@ export const calculatePortfolioAnnualizedReturn = (summary: PortfolioSummary): {
         const dt = parseDate(p.saleDate);
         if (!isFinite(dt.getTime())) continue;
         cashflows.push({ date: dt, amount: p.proceedsJPY });
+    }
+
+    // Dividends: each per-event amount lands as a positive cash flow on its
+    // own ex-date — placing them at the right time matters for a long-held
+    // dividend-payer, since lumping them at one date understates how soon
+    // the income arrived.
+    for (const p of [...summary.positions, ...summary.closedPositions]) {
+        if (!p.dividendEvents) continue;
+        for (const ev of p.dividendEvents) {
+            if (!isFinite(ev.amountInBase) || ev.amountInBase === 0) continue;
+            const dt = parseDate(ev.exDate);
+            if (!isFinite(dt.getTime())) continue;
+            cashflows.push({ date: dt, amount: ev.amountInBase });
+        }
     }
 
     if (!earliest) return null;
