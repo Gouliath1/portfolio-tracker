@@ -17,8 +17,9 @@ const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 
 // Reveals tooltip text on hover (desktop) and focus (mobile tap, since
-// the trigger is a button). Same styling pattern as the stale-price
-// warning icon in the header so the language of the UI stays consistent.
+// the trigger is a button). Solid popover background (not the translucent
+// "glass" we use on cards) so the body text remains readable on top of the
+// card's headline numbers.
 const InfoTooltip = ({ text }: { text: string }) => (
     <span className="relative group inline-flex items-center">
         <button type="button"
@@ -29,8 +30,12 @@ const InfoTooltip = ({ text }: { text: string }) => (
             <MdInfoOutline size={14} />
         </button>
         <span
-            className="absolute right-0 top-full mt-2 w-64 glass rounded-xl px-3 py-2 text-xs leading-relaxed pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50 normal-case tracking-normal font-normal"
-            style={{ color: 'var(--text-secondary)' }}
+            className="absolute right-0 top-full mt-2 w-72 rounded-xl px-3 py-2 text-xs leading-relaxed pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50 normal-case tracking-normal font-normal shadow-lg"
+            style={{
+                color: 'var(--text-primary)',
+                background: 'var(--surface-popover)',
+                border: '1px solid var(--border)',
+            }}
         >
             {text}
         </span>
