@@ -1,4 +1,4 @@
-import { PortfolioSummary } from '@portfolio/types';
+import { PortfolioSummary, Position } from '@portfolio/types';
 
 /**
  * Calculate annualized return for a position
@@ -158,3 +158,74 @@ function calculateWeightedAverageFallback(summary: PortfolioSummary): number {
     }
     return totalValidCost > 0 ? totalWeightedReturn / totalValidCost : 0;
 }
+
+// Per-position XIRR: buy as outflow, dividends at their dates, then terminal value
+// (current price for open lots, sale proceeds for closed lots).
+export const calculatePositionXirr = (position: Position): number | null => {
+    if (!position.transactionDate || !isFinite(position.costInJPY) || position.costInJPY <= 0) return null;
+
+    type CF = { date: Date; amount: number };
+    const parseDate = (s: string) => new Date(s.replace(/\//g, '-'));
+    const cashflows: CF[] = [];
+
+    const buyDate = parseDate(position.transactionDate);
+    if (!isFinite(buyDate.getTime())) return null;
+    cashflows.push({ date: buyDate, amount: -position.costInJPY });
+
+    if (position.dividendEvents) {
+        for (const ev of position.dividendEvents) {
+            if (!isFinite(ev.amountInBase) || ev.amountInBase === 0) continue;
+            const dt = parseDate(ev.exDate);
+            if (!isFinite(dt.getTime())) continue;
+            cashflows.push({ date: dt, amount: ev.amountInBase });
+        }
+    }
+
+    if (position.status === 'closed') {
+        if (!position.saleDate || position.proceedsJPY === undefined || !isFinite(position.proceedsJPY)) return null;
+        const saleDate = parseDate(position.saleDate);
+        if (!isFinite(saleDate.getTime())) return null;
+        cashflows.push({ date: saleDate, amount: position.proceedsJPY });
+    } else {
+        if (position.currentPrice === null || !isFinite(position.currentValueJPY) || position.currentValueJPY <= 0) return null;
+        cashflows.push({ date: new Date(), amount: position.currentValueJPY });
+    }
+
+    if (cashflows.length < 2) return null;
+
+    const earliest = cashflows.reduce((min, cf) => cf.date < min ? cf.date : min, cashflows[0].date);
+    const toYears = (d: Date) => (d.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    const xs = cashflows.map(cf => ({ t: toYears(cf.date), a: cf.amount }));
+
+    const npv = (r: number) => xs.reduce((s, x) => s + x.a / Math.pow(1 + r, x.t), 0);
+    const dnpv = (r: number) => xs.reduce((s, x) => s - (x.t * x.a) / Math.pow(1 + r, x.t + 1), 0);
+
+    let rate = 0.1;
+    let ok = false;
+    for (let i = 0; i < 50; i++) {
+        const f = npv(rate);
+        const fp = dnpv(rate);
+        if (!isFinite(fp) || Math.abs(fp) < 1e-12) break;
+        const next = rate - f / fp;
+        if (!isFinite(next)) break;
+        if (Math.abs(next - rate) < 1e-8) { rate = next; ok = true; break; }
+        rate = next;
+    }
+
+    if (!ok || rate <= -0.9999 || !isFinite(rate)) {
+        let lo = -0.99, hi = 10.0;
+        const fLo = npv(lo), fHi = npv(hi);
+        if (Math.sign(fLo) === Math.sign(fHi)) return null;
+        let fLoM = fLo; let fHiM = fHi;
+        for (let i = 0; i < 80; i++) {
+            const mid = (lo + hi) / 2;
+            const fMid = npv(mid);
+            if (Math.abs(fMid) < 1e-9) { rate = mid; ok = true; break; }
+            if (Math.sign(fMid) === Math.sign(fLoM)) { lo = mid; fLoM = fMid; } else { hi = mid; fHiM = fMid; }
+        }
+        void fHiM;
+        if (!ok) rate = (lo + hi) / 2;
+    }
+
+    return isFinite(rate) && rate > -0.9999 ? rate * 100 : null;
+};
