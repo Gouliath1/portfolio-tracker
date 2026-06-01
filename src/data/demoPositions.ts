@@ -62,6 +62,19 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
         ccy: 'JPY',
         stockCcy: 'JPY',
     },
+    {
+        way: 'sell',
+        date: '2024/02/15',
+        ticker: 'NVDA',
+        fullName: 'NVIDIA Corp.',
+        broker: 'Demo Broker',
+        account: 'US Account',
+        quantity: 10,
+        pricePerUnit: 720.0,
+        fees: 1.5,
+        ccy: 'USD',
+        stockCcy: 'USD',
+    },
 ];
 
 // Derived lot view kept for any legacy consumers.
