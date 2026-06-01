@@ -1,4 +1,4 @@
-import { ChartOptions, Chart as ChartJS } from 'chart.js';
+import { ChartOptions } from 'chart.js';
 
 const cssVar = (name: string): string => {
     if (typeof window === 'undefined') return '';
@@ -9,49 +9,21 @@ export const createChartOptions = (
     showValues: boolean,
     selectedTimeline: string,
     currencySymbol: string = '¥',
-    currency: string = 'JPY'
+    currency: string = 'JPY',
+    yBounds?: { min: number; max: number }
 ): ChartOptions<'line'> => ({
     responsive: true,
     maintainAspectRatio: false,
+    // Right padding leaves room for the latest-value pill badges.
+    layout: { padding: { right: 64, top: 8 } },
     interaction: {
         mode: 'index',
         intersect: false,
     },
     plugins: {
-        legend: {
-            position: 'top',
-            labels: {
-                color: cssVar('--chart-legend'),
-                font: { size: 13 },
-                usePointStyle: true,
-                pointStyle: 'line',
-                generateLabels: function(chart) {
-                    const original = ChartJS.defaults.plugins.legend.labels.generateLabels;
-                    const labels = original.call(this, chart);
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    labels.forEach((label: any, index: number) => {
-                        const dataset = chart.data.datasets[index];
-                        if (dataset) {
-                            label.strokeStyle = dataset.borderColor as string;
-                            label.fillStyle = dataset.borderColor as string;
-                            const borderWidth = (dataset.borderWidth as number) || 1;
-                            label.lineWidth = borderWidth;
-                            if (borderWidth > 1) label.pointStyle = 'line';
-                        }
-                    });
-                    return labels;
-                },
-                filter: function() { return true; }
-            }
-        },
-        title: {
-            display: true,
-            text: showValues
-                ? `Portfolio P&L Over Time — ${currency} (${selectedTimeline})`
-                : `Portfolio Performance Over Time (${selectedTimeline})`,
-            color: cssVar('--chart-title'),
-            font: { size: 14 }
-        },
+        // Legend & title are rendered in React for full layout control.
+        legend: { display: false },
+        title: { display: false },
         tooltip: {
             enabled: false,
         }
@@ -61,9 +33,15 @@ export const createChartOptions = (
             type: 'linear',
             display: true,
             position: 'left',
-            beginAtZero: true,
+            // Frame the data tightly: edges sit at data min/max ± 10%.
+            min: yBounds?.min,
+            max: yBounds?.max,
+            border: { display: false },
             ticks: {
-                color: cssVar('--chart-line1'),
+                color: cssVar('--chart-tick'),
+                padding: 8,
+                maxTicksLimit: 11,
+                includeBounds: false,
                 callback: function(value) {
                     if (typeof value === 'number') {
                         if (!showValues) return `${value.toFixed(2)}%`;
@@ -73,36 +51,19 @@ export const createChartOptions = (
                     }
                     return value;
                 },
-                font: { size: 11 }
+                font: { size: 12, weight: 500 }
             },
-            grid: { color: cssVar('--chart-grid') }
-        },
-        y1: {
-            type: 'linear',
-            display: showValues,
-            position: 'right',
-            beginAtZero: false,
-            suggestedMin: 0,
-            ticks: {
-                color: cssVar('--chart-line3'),
-                callback: function(value) {
-                    if (typeof value === 'number') {
-                        const sign = value >= 0 ? '+' : '';
-                        return currency === 'JPY'
-                            ? `${sign}${currencySymbol}${Math.round(value).toLocaleString()}`
-                            : `${sign}${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                    }
-                    return value;
-                },
-                font: { size: 11 }
-            },
-            grid: { drawOnChartArea: false }
+            grid: { color: cssVar('--chart-grid'), lineWidth: 1 }
         },
         x: {
-            grid: { color: cssVar('--chart-grid') },
+            border: { display: false },
+            grid: { display: false },
             ticks: {
                 color: cssVar('--chart-tick'),
-                font: { size: 11 }
+                maxRotation: 0,
+                autoSkipPadding: 16,
+                padding: 8,
+                font: { size: 12, weight: 500 }
             }
         }
     }

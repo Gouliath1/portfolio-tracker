@@ -26,7 +26,7 @@ export const createCustomTooltip = (
         if (!tooltipEl) {
             tooltipEl = document.createElement('div');
             tooltipEl.id = 'chartjs-tooltip';
-            tooltipEl.style.borderRadius = '8px';
+            tooltipEl.style.borderRadius = '12px';
             tooltipEl.style.padding = '12px 16px';
             tooltipEl.style.pointerEvents = 'none';
             tooltipEl.style.position = 'fixed';
@@ -41,8 +41,8 @@ export const createCustomTooltip = (
         // Re-apply theme-sensitive styles each render so light/dark changes take effect
         tooltipEl.style.background = cssVar('--surface-popover');
         tooltipEl.style.color = cssVar('--text-primary');
-        tooltipEl.style.border = `1px solid ${cssVar('--border-strong')}`;
-        tooltipEl.style.boxShadow = '0 4px 24px rgba(0,0,0,0.18)';
+        tooltipEl.style.border = `1px solid ${cssVar('--border')}`;
+        tooltipEl.style.boxShadow = '0 4px 12px rgba(16,24,40,0.08), 0 12px 32px rgba(16,24,40,0.12)';
         
         // Hide if no tooltip
         if (tooltip.opacity === 0) {
