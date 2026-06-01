@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppSidebar } from '../../../components/layout/AppSidebar';
 import { MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp, MdSettings } from 'react-icons/md';
-import { loadPositions } from '../../../utils/positions';
-import { calculatePortfolioSummary, calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
-import { readCachedSummary, writeCachedSummary } from '../../../utils/pnlCache';
+import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
-import type { PortfolioSummary } from '@portfolio/types';
+import { usePortfolioSummaryData } from '../../../hooks/usePortfolioSummaryData';
 
 // ── Date helpers ─────────────────────────────────────────────
 const parseDate = (s: string) => new Date(s.replace(/\//g, '-'));
@@ -71,41 +69,16 @@ function MiniTable({
 // ── Page ─────────────────────────────────────────────────────
 export default function DeepDivePage() {
     const [mounted, setMounted] = useState(false);
-    const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
     const [priceHistory, setPriceHistory] = useState<Map<string, Record<string, number>>>(new Map());
     const [loadingPrices, setLoadingPrices] = useState(false);
     const [activeTab, setActiveTab] = useState<'lifetime' | 'annual'>('lifetime');
     const [xirrExpanded, setXirrExpanded] = useState(false);
-    const { currency, setCurrency, formatValue } = useBaseCurrency();
+    const { currency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
+    const { summary, loading, error } = usePortfolioSummaryData(currency, currencyHydrated);
     const router = useRouter();
 
     useEffect(() => { setMounted(true); }, []);
-
-    const loadData = useCallback(async (baseCurrency = currency) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const positions = await loadPositions();
-            const cached = readCachedSummary(positions, baseCurrency);
-            if (cached) {
-                setSummary(cached.summary);
-                setLoading(false);
-                return;
-            }
-            const s = await calculatePortfolioSummary(positions, false, baseCurrency);
-            writeCachedSummary(positions, baseCurrency, s);
-            setSummary(s);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
-        } finally {
-            setLoading(false);
-        }
-    }, [currency]);
-
-    useEffect(() => { loadData(); }, [loadData]);
 
     // Fetch historical prices for all tickers once summary is ready
     useEffect(() => {
@@ -486,7 +459,7 @@ export default function DeepDivePage() {
                                                                                     />
                                                                                 )}
                                                                                 <MiniTable
-                                                                                    title={p.status === 'closed' ? 'Sale' : 'Current Value'}
+                                                                                    title={p.status === 'closed' ? 'Sale' : 'Still held'}
                                                                                     rows={[{
                                                                                         date: p.status === 'closed' && p.saleDate
                                                                                             ? parseDate(p.saleDate)
@@ -503,6 +476,28 @@ export default function DeepDivePage() {
                                                         );
                                                     })}
                                                 </tbody>
+                                                <tfoot className="sticky bottom-0"
+                                                    style={{ background: 'var(--table-header-bg)', borderTop: '1px solid var(--border)' }}>
+                                                    <tr>
+                                                        <td className="px-4 py-3 text-xs font-semibold uppercase tracking-widest"
+                                                            style={{ color: 'var(--text-muted)' }}>Total</td>
+                                                        <td />{/* Status */}
+                                                        <td />{/* Held */}
+                                                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                                                            style={{ color: 'var(--text-primary)' }}>
+                                                            {formatValue(totalInvested, true)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                                                            style={{ color: 'var(--text-primary)' }}>
+                                                            {formatValue(openValue + proceeds, true)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                                                            style={{ color: 'var(--text-primary)' }}>
+                                                            {formatValue(totalDividends, true)}
+                                                        </td>
+                                                        <td />{/* XIRR — not summable */}
+                                                    </tr>
+                                                </tfoot>
                                             </table>
                                         </div>
                                     </div>

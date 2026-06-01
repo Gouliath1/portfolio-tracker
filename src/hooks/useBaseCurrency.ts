@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getCurrencySymbol } from '@portfolio/core';
 
 export type BaseCurrency = 'JPY' | 'USD' | 'EUR' | 'GBP';
@@ -53,7 +53,13 @@ function readStored(): BaseCurrency {
 }
 
 export function useBaseCurrency() {
-    const [currency, setCurrencyState] = useState<BaseCurrency>(readStored);
+    const [currency, setCurrencyState] = useState<BaseCurrency>(FALLBACK);
+    const [hydrated, setHydrated] = useState(false);
+
+    useEffect(() => {
+        setCurrencyState(readStored());
+        setHydrated(true);
+    }, []);
 
     const setCurrency = useCallback((next: BaseCurrency) => {
         localStorage.setItem(STORAGE_KEY, next);
@@ -72,5 +78,5 @@ export function useBaseCurrency() {
         return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }, [currency, symbol]);
 
-    return { currency, setCurrency, symbol, formatValue };
+    return { currency, setCurrency, symbol, formatValue, hydrated };
 }

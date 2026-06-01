@@ -6,7 +6,7 @@
   /* Light (default) — soft indigo tint */
   --bg-base:          oklch(97% 0.006 275);
   --surface:          oklch(100% 0.003 275);
-  --surface-sidebar:  oklch(94% 0.012 275);
+  --surface-sidebar:  oklch(88% 0.020 275);
   --surface-header:   oklch(97% 0.006 275);
   --surface-popover:  oklch(100% 0.003 275);
 
