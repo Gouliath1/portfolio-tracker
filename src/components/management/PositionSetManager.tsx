@@ -144,7 +144,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                     )}
                                     {set.info_type === 'warning' && (
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                            style={{ background: 'rgba(255,180,0,0.12)', color: '#ffb400', border: '1px solid rgba(255,180,0,0.3)' }}>
+                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
                                             <MdWarning className="w-3 h-3" /> Demo
                                         </span>
                                     )}
@@ -172,7 +172,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                         <button
                                             onClick={() => handleDelete(set.id, set.display_name)}
                                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid rgba(255,68,102,0.3)' }}
+                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red-dim)' }}
                                         >
                                             <MdDelete className="w-3 h-3" />
                                             Delete

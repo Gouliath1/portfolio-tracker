@@ -38,7 +38,7 @@ interface PerformanceChartProps {
 
 export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symbol = '¥' }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
-    useTheme(); // triggers re-render on theme change so cssVar() picks up new tokens
+    useTheme();
 
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
@@ -58,19 +58,22 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
     };
 
     return (
-        <div className="glass rounded-2xl p-6">
-            <TimelineFilterButtons
-                selectedTimeline={selectedTimeline}
-                onTimelineChange={setSelectedTimeline}
-            />
-            <div style={{ height: '420px' }}>
+        <div className="rounded-xl" style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '20px 20px 16px' }}>
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Portfolio P&L Over Time
+                </h2>
+                <TimelineFilterButtons
+                    selectedTimeline={selectedTimeline}
+                    onTimelineChange={setSelectedTimeline}
+                />
+            </div>
+            <div style={{ height: 'clamp(260px, 45vw, 420px)' }}>
                 {renderChart()}
             </div>
             {showValues && (
-                <div
-                    className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm mt-2"
-                    style={{ color: 'var(--text-muted)' }}
-                >
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm mt-3"
+                    style={{ color: 'var(--text-muted)' }}>
                     <span>
                         <span style={{ color: 'var(--chart-line1)', fontWeight: 600 }}>Left axis</span>
                         {' · '}

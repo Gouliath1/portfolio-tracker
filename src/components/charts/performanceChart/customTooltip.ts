@@ -19,27 +19,30 @@ export const createCustomTooltip = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (context: any) => {
         const { chart, tooltip } = context;
-        
+        const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
         // Get or create tooltip element
         let tooltipEl = document.getElementById('chartjs-tooltip');
         if (!tooltipEl) {
             tooltipEl = document.createElement('div');
             tooltipEl.id = 'chartjs-tooltip';
-            tooltipEl.style.background = 'rgba(0, 0, 0, 0.9)';
             tooltipEl.style.borderRadius = '8px';
-            tooltipEl.style.color = 'white';
             tooltipEl.style.padding = '12px 16px';
             tooltipEl.style.pointerEvents = 'none';
             tooltipEl.style.position = 'fixed';
             tooltipEl.style.fontSize = '12px';
             tooltipEl.style.fontFamily = 'Inter, system-ui, sans-serif';
             tooltipEl.style.lineHeight = '1.4';
-            tooltipEl.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
             tooltipEl.style.maxWidth = '400px';
             tooltipEl.style.zIndex = '9999';
             tooltipEl.style.transition = 'opacity 0.2s ease';
             document.body.appendChild(tooltipEl);
         }
+        // Re-apply theme-sensitive styles each render so light/dark changes take effect
+        tooltipEl.style.background = cssVar('--surface-popover');
+        tooltipEl.style.color = cssVar('--text-primary');
+        tooltipEl.style.border = `1px solid ${cssVar('--border-strong')}`;
+        tooltipEl.style.boxShadow = '0 4px 24px rgba(0,0,0,0.18)';
         
         // Hide if no tooltip
         if (tooltip.opacity === 0) {
@@ -65,8 +68,10 @@ export const createCustomTooltip = (
     };
 };
 
+const cssVarStr = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
 const createTooltipHeader = (date: Date): string => {
-    return `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+    return `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid ${cssVarStr('--border')}; padding-bottom: 4px;">
         ${date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
     </div>`;
 };
@@ -86,7 +91,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
         if (snapshot) {
             const pnlAbs = Math.abs(snapshot.pnlJPY);
             const isPositive = snapshot.pnlJPY >= 0;
-            const pnlColor = isPositive ? '#22c55e' : '#ef4444';
+            const pnlColor = isPositive ? cssVarStr('--pnl-green') : cssVarStr('--pnl-red');
             const pnlSign = isPositive ? '+' : '-';
 
             innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
@@ -103,7 +108,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
         
         if (snapshot) {
             const isPositive = snapshot.pnlPercentage >= 0;
-            const pnlColor = isPositive ? '#22c55e' : '#ef4444';
+            const pnlColor = isPositive ? cssVarStr('--pnl-green') : cssVarStr('--pnl-red');
             const pnlSign = snapshot.pnlPercentage >= 0 ? '+' : '';
             
             innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
@@ -171,7 +176,7 @@ const createTooltipTransactions = (
         return '';
     }
     
-    let innerHTML = '<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">';
+    let innerHTML = `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid ${cssVarStr('--border')};">`;
     innerHTML += '<div style="margin-bottom: 6px; font-weight: 500;">Transactions on this date:</div>';
     
     transactions.forEach((transaction: Position) => {

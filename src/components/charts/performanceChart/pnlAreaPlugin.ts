@@ -1,3 +1,5 @@
+const cssVar = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
 // Chart plugin for drawing colored P&L areas
 export const pnlAreaPlugin = {
     id: 'pnlArea',
@@ -46,17 +48,19 @@ export const pnlAreaPlugin = {
             const isPositive = currentValue >= 0 && nextValue >= 0;
             const isNegative = currentValue <= 0 && nextValue <= 0;
             
+            const greenFill = cssVar('--pnl-green-dim');
+            const redFill   = cssVar('--pnl-red-dim');
+
             if (isPositive) {
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)'; // Green for positive
+                ctx.fillStyle = greenFill;
             } else if (isNegative) {
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)'; // Red for negative
+                ctx.fillStyle = redFill;
             } else {
-                // Mixed segment - draw two parts
+                // Mixed segment — draw two parts
                 const intersectionX = x1 + (x2 - x1) * (Math.abs(currentValue) / (Math.abs(currentValue) + Math.abs(nextValue)));
-                
-                // Draw positive part
+
                 if (currentValue > 0) {
-                    ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+                    ctx.fillStyle = greenFill;
                     ctx.beginPath();
                     ctx.moveTo(x1, zeroY);
                     ctx.lineTo(x1, y1);
@@ -64,10 +68,9 @@ export const pnlAreaPlugin = {
                     ctx.closePath();
                     ctx.fill();
                 }
-                
-                // Draw negative part
+
                 if (nextValue < 0) {
-                    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                    ctx.fillStyle = redFill;
                     ctx.beginPath();
                     ctx.moveTo(intersectionX, zeroY);
                     ctx.lineTo(x2, y2);

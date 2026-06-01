@@ -148,6 +148,13 @@ export function writeCachedChart(positions: Position[], baseCurrency: string, ti
     }
 }
 
+export function clearChartCache(): void {
+    if (typeof window === 'undefined') return;
+    for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(CHART_KEY_PREFIX)) localStorage.removeItem(key);
+    }
+}
+
 // ── Daily PnL cache (yesterday's-close snapshot) ────────────────────────────
 //
 // useDailyPnl computes a single snapshot at yesterday's business-day close.

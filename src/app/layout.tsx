@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 // Safari and Chrome Android can switch to their desktop viewport width without
 // the meta tag fighting them back to the physical device width.
 export const viewport: Viewport = {
+  width: 'device-width',
   initialScale: 1,
   minimumScale: 0.25,
   userScalable: true,

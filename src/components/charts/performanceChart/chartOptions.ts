@@ -1,6 +1,5 @@
 import { ChartOptions, Chart as ChartJS } from 'chart.js';
 
-// Read a CSS variable from the document root at call time (theme-aware)
 const cssVar = (name: string): string => {
     if (typeof window === 'undefined') return '';
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -63,9 +62,6 @@ export const createChartOptions = (
             display: true,
             position: 'left',
             beginAtZero: true,
-            // Axis names live in the horizontal caption strip above the chart
-            // (rendered in PerformanceChart.tsx) — keeps them readable instead
-            // of rotated 90° in a corner.
             ticks: {
                 color: cssVar('--chart-line1'),
                 callback: function(value) {
@@ -86,6 +82,7 @@ export const createChartOptions = (
             display: showValues,
             position: 'right',
             beginAtZero: false,
+            suggestedMin: 0,
             ticks: {
                 color: cssVar('--chart-line3'),
                 callback: function(value) {
