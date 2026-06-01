@@ -27,8 +27,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                 <th
                                     key={header.id}
                                     className={isAction
-                                        ? 'relative px-1 py-3 text-left text-xs font-medium uppercase tracking-widest select-none'
-                                        : 'relative px-4 py-3 text-left text-xs font-medium uppercase tracking-widest cursor-pointer select-none'}
+                                        ? 'relative px-1 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium uppercase tracking-widest select-none'
+                                        : 'relative px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium uppercase tracking-widest cursor-pointer select-none'}
                                     style={{
                                         color: 'var(--text-muted)',
                                         width: header.getSize(),
@@ -83,8 +83,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                     <td
                                         key={cell.id}
                                         className={isAction
-                                            ? 'px-1 py-2 text-sm'
-                                            : 'px-4 py-3 text-sm truncate'}
+                                            ? 'px-1 py-1.5 sm:py-2 text-xs sm:text-sm'
+                                            : 'px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm truncate'}
                                         style={{
                                             color: 'var(--text-primary)',
                                             width: cell.column.getSize(),
@@ -119,8 +119,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                         <td
                                             key={header.id}
                                             className={isAction
-                                                ? 'px-1 py-3 text-sm font-semibold'
-                                                : 'px-4 py-3 text-sm font-semibold tabular-nums'}
+                                                ? 'px-1 py-2 sm:py-3 text-xs sm:text-sm font-semibold'
+                                                : 'px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold tabular-nums'}
                                             style={{
                                                 color: 'var(--text-primary)',
                                                 width: header.getSize(),

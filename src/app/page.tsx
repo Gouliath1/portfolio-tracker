@@ -66,9 +66,15 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        const v = new URLSearchParams(window.location.search).get('view');
+        const params = new URLSearchParams(window.location.search);
+        const v = params.get('view');
         if (v === 'holdings' || v === 'closed' || v === 'transactions' || v === 'overview') {
             setActiveView(v);
+        }
+        if (params.get('settings') === '1') {
+            setSettingsOpen(true);
+            // Drop the flag so a reload doesn't reopen it
+            history.replaceState(null, '', '/');
         }
     }, []);
 
@@ -256,7 +262,7 @@ export default function Home() {
                 />
 
                 {/* ── Content column ───────────────────────────────── */}
-                <div className="flex-1 md:ml-[200px] flex flex-col min-h-screen">
+                <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
 
                     {/* ── Header ───────────────────────────────────── */}
                     <header
@@ -277,6 +283,16 @@ export default function Home() {
                                     style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
                                     {currency}
                                 </span>
+
+                                {/* Settings — mobile only (sidebar shows it on desktop) */}
+                                <button
+                                    onClick={() => setSettingsOpen(true)}
+                                    className="md:hidden p-2 rounded-lg"
+                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                    aria-label="Open settings"
+                                >
+                                    <MdSettings size={18} />
+                                </button>
 
                                 {/* Stale price warning */}
                                 {hasStalePrice && (
@@ -470,16 +486,13 @@ export default function Home() {
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
-                {([...NAV_ITEMS, { id: 'settings' as const, label: 'Settings', icon: MdSettings }]).map(item => {
-                    const isActive = item.id !== 'settings' && activeView === item.id;
+                {NAV_ITEMS.map(item => {
+                    const isActive = activeView === item.id;
                     const Icon = item.icon;
                     return (
                         <button
                             key={item.id}
-                            onClick={() => {
-                                if (item.id === 'settings') setSettingsOpen(true);
-                                else setActiveView(item.id as ViewId);
-                            }}
+                            onClick={() => setActiveView(item.id as ViewId)}
                             className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
                             style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
                         >
