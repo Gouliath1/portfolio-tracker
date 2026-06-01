@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
@@ -12,36 +13,62 @@ interface PortfolioSummaryProps {
     showValues: boolean;
     symbol: string;
     formatValue: (amount: number, showValues: boolean) => string;
+    isLoading?: boolean;
 }
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 
-// Reveals tooltip text on hover (desktop) and focus (mobile tap, since
-// the trigger is a button). Solid popover background (not the translucent
-// "glass" we use on cards) so the body text remains readable on top of the
-// card's headline numbers.
-const InfoTooltip = ({ text }: { text: string }) => (
-    <span className="relative group inline-flex items-center">
-        <button type="button"
-            className="p-0.5 rounded transition-colors hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-[var(--accent-glow)]"
-            style={{ color: 'var(--text-muted)', opacity: 0.6 }}
-            aria-label="What is this?"
-        >
-            <MdInfoOutline size={14} />
-        </button>
-        <span
-            className="absolute right-0 top-full mt-2 w-72 rounded-xl px-3 py-2 text-xs leading-relaxed pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-50 normal-case tracking-normal font-normal shadow-lg"
-            style={{
-                color: 'var(--text-primary)',
-                background: 'var(--surface-popover)',
-                border: '1px solid var(--border)',
-            }}
-        >
-            {text}
+const InfoTooltip = ({ text }: { text: string }) => {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [tipRect, setTipRect] = useState<DOMRect | null>(null);
+
+    useEffect(() => {
+        if (!open || !btnRef.current) return;
+        setTipRect(btnRef.current.getBoundingClientRect());
+        const close = (e: MouseEvent) => {
+            if (btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [open]);
+
+    return (
+        <span className="relative inline-flex items-center">
+            <button
+                ref={btnRef}
+                type="button"
+                onClick={() => setOpen(prev => !prev)}
+                className="p-0.5 rounded transition-colors hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-[var(--accent-glow)]"
+                style={{ color: 'var(--text-muted)', opacity: 0.6 }}
+                aria-label="What is this?"
+            >
+                <MdInfoOutline size={14} />
+            </button>
+            {open && tipRect && createPortal(
+                <div style={{
+                    position: 'fixed',
+                    top: tipRect.bottom + 8,
+                    right: Math.max(8, window.innerWidth - tipRect.right),
+                    width: 288,
+                    zIndex: 9999,
+                    borderRadius: '0.75rem',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.75rem',
+                    lineHeight: '1.6',
+                    color: 'var(--text-primary)',
+                    background: 'var(--surface-popover)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+                }}>
+                    {text}
+                </div>,
+                document.body
+            )}
         </span>
-    </span>
-);
+    );
+};
 
 interface StatCardProps {
     label: string;
@@ -51,9 +78,10 @@ interface StatCardProps {
     footnote?: React.ReactNode;
     positive?: boolean | null;
     flash?: boolean;
+    instant?: boolean;
 }
 
-const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCardProps) => {
+const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant }: StatCardProps) => {
     const valueColor = positive === true
         ? 'var(--pnl-green)'
         : positive === false
@@ -68,7 +96,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCa
 
     return (
         <div
-            className="glass rounded-xl p-4 sm:p-5 relative transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[116px]"
+            className={`glass rounded-xl p-4 sm:p-5 relative ${instant ? '' : 'transition-all duration-300'} flex flex-col justify-between min-h-[100px] sm:min-h-[116px]`}
         >
             {flash && glowBg && (
                 <div className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-500"
@@ -102,12 +130,16 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCa
     );
 };
 
-export const PortfolioSummary = ({ summary, showValues, formatValue }: PortfolioSummaryProps) => {
+export const PortfolioSummary = ({ summary, showValues, formatValue, isLoading }: PortfolioSummaryProps) => {
     const prevSummary = useRef<PortfolioSummaryType>(summary);
     const valueChanged = summary.totalValueJPY !== prevSummary.current.totalValueJPY;
     useEffect(() => { prevSummary.current = summary; }, [summary]);
 
-    const hasNullPrices = summary.positions.some(p => p.currentPrice === null);
+    const wasLoadingRef = useRef(isLoading ?? false);
+    const isFirstDataRender = wasLoadingRef.current && !isLoading;
+    useEffect(() => { wasLoadingRef.current = isLoading ?? false; }, [isLoading]);
+
+    const hasNullPrices = isLoading || summary.positions.some(p => p.currentPrice === null);
     const annualizedReturn = calculatePortfolioAnnualizedReturn(summary);
     const dailyPnl = useDailyPnl(summary.positions, summary.totalValueJPY);
 
@@ -164,6 +196,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                         : formatValue(summary.totalValueJPY, showValues)}
                     positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY}
                     flash={valueChanged}
+                    instant={isFirstDataRender}
                     footnote={
                         <span>Cost: {formatValue(summary.totalCostJPY, showValues)}</span>
                     }
@@ -183,6 +216,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                     sub={!hasNullPrices && annualizedReturn ? sinceLabel ?? undefined : undefined}
                     positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0}
                     flash={valueChanged}
+                    instant={isFirstDataRender}
                     footnote={
                         <Link href="/returns/deep-dive"
                             className="transition-opacity hover:opacity-100"
@@ -210,6 +244,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                         : undefined}
                     positive={totalPnlPositive}
                     flash={valueChanged}
+                    instant={isFirstDataRender}
                 />
 
                 {/* 4 — Daily P&L */}
@@ -226,6 +261,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                         : undefined}
                     positive={hasNullPrices ? null : dailyPositive}
                     flash={valueChanged}
+                    instant={isFirstDataRender}
                 />
             </div>
 

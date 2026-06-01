@@ -44,7 +44,6 @@ interface UndoEntry {
 }
 
 export default function Home() {
-    const [mounted, setMounted] = useState(false);
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummaryType | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -78,8 +77,6 @@ export default function Home() {
     }, [activeView]);
 
     const { currency, setCurrency, symbol, formatValue } = useBaseCurrency();
-
-    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         localStorage.setItem('showValues', JSON.stringify(showValues));
@@ -236,9 +233,15 @@ export default function Home() {
 
     useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current); }, []);
 
-    const hasStalePrice = portfolioSummary?.positions.some(p => p.currentPrice === null) ?? false;
+    const placeholderSummary: PortfolioSummaryType = {
+        totalValueJPY: 0, totalCostJPY: 0, totalPnlJPY: 0, totalPnlPercentage: 0,
+        positions: [], closedPositions: [], realizedPnlJPY: 0,
+        realizedCostJPY: 0, realizedPnlPercentage: 0, totalDividendsJPY: 0,
+    };
+    const summary = portfolioSummary ?? placeholderSummary;
+    const isFirstLoad = loading && !portfolioSummary;
 
-    if (!mounted) return null;
+    const hasStalePrice = summary.positions.some(p => p.currentPrice === null);
 
     return (
         <>
@@ -322,8 +325,8 @@ export default function Home() {
                         <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
                             <DemoBanner refreshTrigger={demoBannerRefresh} />
 
-                            {/* Loading state */}
-                            {loading && (
+                            {/* Loading state (overview renders chrome immediately; other views show spinner) */}
+                            {loading && activeView !== 'overview' && (
                                 <div className="flex items-center justify-center py-24">
                                     <div className="text-center space-y-4">
                                         <div className="w-8 h-8 rounded-full border-2 border-t-transparent mx-auto animate-spin"
@@ -344,21 +347,24 @@ export default function Home() {
                                 </div>
                             )}
 
-                            {/* Overview: KPIs + chart */}
-                            {!loading && portfolioSummary && activeView === 'overview' && (
+                            {/* Overview: KPIs render immediately with placeholder; chart waits for data */}
+                            {activeView === 'overview' && (
                                 <>
                                     <PortfolioSummary
-                                        summary={portfolioSummary}
+                                        summary={summary}
+                                        isLoading={isFirstLoad}
                                         showValues={showValues}
                                         symbol={symbol}
                                         formatValue={formatValue}
                                     />
-                                    <PerformanceChart
-                                        positions={portfolioSummary.positions}
-                                        showValues={showValues}
-                                        currency={currency}
-                                        symbol={symbol}
-                                    />
+                                    {!loading && portfolioSummary && (
+                                        <PerformanceChart
+                                            positions={portfolioSummary.positions}
+                                            showValues={showValues}
+                                            currency={currency}
+                                            symbol={symbol}
+                                        />
+                                    )}
                                 </>
                             )}
 
