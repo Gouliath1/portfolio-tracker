@@ -63,5 +63,12 @@ export {
   getHistoricalDataStatus
 } from './operations/historicalDataOperations';
 
+// Security metadata (asset class) operations
+export {
+  ensureSecuritiesSchema,
+  getStoredAssetClasses,
+  setSecurityAssetClass
+} from './operations/securityMetadataOperations';
+
 // Re-export types for convenience
 export type { Client } from '@libsql/client';

@@ -7,6 +7,9 @@ import { readCachedSummary, writeCachedSummary, clearChartCache } from '../utils
 import { PortfolioSummary as PortfolioSummaryType, Position, Transaction } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
 import { PerformanceChart } from '../components/charts/PerformanceChart';
+import { AnalyticsPanel } from '../components/overview/AnalyticsPanel';
+import { BenchmarkCard } from '../components/overview/BenchmarkCard';
+import { PortfolioHealthCard } from '../components/overview/PortfolioHealthCard';
 import { PositionsTable } from '../components/tables/PositionsTable';
 import DemoBanner from '../components/layout/DemoBanner';
 import WelcomeModal from '../components/layout/WelcomeModal';
@@ -360,12 +363,33 @@ export default function Home() {
                                         formatValue={formatValue}
                                     />
                                     {!loading && portfolioSummary && (
-                                        <PerformanceChart
-                                            positions={portfolioSummary.positions}
-                                            showValues={showValues}
-                                            currency={currency}
-                                            symbol={symbol}
-                                        />
+                                        <>
+                                            <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 items-start">
+                                                <div className="lg:col-span-5 min-w-0">
+                                                    <PerformanceChart
+                                                        positions={portfolioSummary.positions}
+                                                        showValues={showValues}
+                                                        currency={currency}
+                                                        symbol={symbol}
+                                                    />
+                                                </div>
+                                                <div className="lg:col-span-2 min-w-0">
+                                                    <AnalyticsPanel
+                                                        summary={portfolioSummary}
+                                                        symbol={symbol}
+                                                        formatValue={formatValue}
+                                                        showValues={showValues}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <BenchmarkCard summary={portfolioSummary} />
+                                                <PortfolioHealthCard
+                                                    positions={portfolioSummary.positions}
+                                                    totalValueJPY={portfolioSummary.totalValueJPY}
+                                                />
+                                            </div>
+                                        </>
                                     )}
                                 </>
                             )}

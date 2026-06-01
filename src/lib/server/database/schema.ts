@@ -55,6 +55,7 @@ const SCHEMA_SQL = {
       ticker TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       security_type TEXT NOT NULL DEFAULT 'stock',
+      asset_class TEXT,
       currency TEXT NOT NULL DEFAULT 'USD',
       exchange TEXT,
       sector TEXT,
