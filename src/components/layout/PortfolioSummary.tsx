@@ -79,14 +79,17 @@ interface StatCardProps {
     positive?: boolean | null;
     flash?: boolean;
     instant?: boolean;
+    valueColorOverride?: string;
+    large?: boolean;
 }
 
-const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant }: StatCardProps) => {
-    const valueColor = positive === true
-        ? 'var(--pnl-green)'
-        : positive === false
-            ? 'var(--pnl-red)'
-            : 'var(--text-primary)';
+const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant, valueColorOverride, large }: StatCardProps) => {
+    const valueColor = valueColorOverride
+        ?? (positive === true
+            ? 'var(--pnl-green)'
+            : positive === false
+                ? 'var(--pnl-red)'
+                : 'var(--text-primary)');
 
     const glowBg = positive === true
         ? 'var(--pnl-green-dim)'
@@ -110,7 +113,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant 
                     </p>
                     {info && <InfoTooltip text={info} />}
                 </div>
-                <div className="text-2xl sm:text-3xl font-semibold tabular-nums leading-none"
+                <div className={`tabular-nums leading-none ${large ? 'text-3xl sm:text-4xl font-bold' : 'text-2xl sm:text-3xl font-semibold'}`}
                     style={{ color: valueColor }}>
                     {value}
                 </div>
@@ -194,7 +197,8 @@ export const PortfolioSummary = ({ summary, showValues, formatValue, isLoading }
                     value={hasNullPrices
                         ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
                         : formatValue(summary.totalValueJPY, showValues)}
-                    positive={hasNullPrices ? null : summary.totalValueJPY >= summary.totalCostJPY}
+                    valueColorOverride={hasNullPrices ? undefined : 'var(--accent)'}
+                    large
                     flash={valueChanged}
                     instant={isFirstDataRender}
                     footnote={

@@ -238,6 +238,38 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
     }
 }
 
+// Asset-class taxonomy derived from Yahoo's `meta.instrumentType`. Yahoo only
+// distinguishes by instrument structure (it can't tell a bond ETF from an
+// equity ETF), so this is as granular as the chart endpoint allows.
+export type AssetClass = 'Equity' | 'ETF' | 'Fund' | 'Crypto' | 'Cash' | 'Index' | 'Other';
+
+export function assetClassFromInstrumentType(instrumentType: string | null | undefined): AssetClass {
+    switch ((instrumentType ?? '').toUpperCase()) {
+        case 'EQUITY':         return 'Equity';
+        case 'ETF':            return 'ETF';
+        case 'MUTUALFUND':     return 'Fund';
+        case 'CRYPTOCURRENCY': return 'Crypto';
+        case 'CURRENCY':       return 'Cash';
+        case 'INDEX':          return 'Index';
+        default:               return 'Other';
+    }
+}
+
+// Server-side: fetch a security's instrument type from Yahoo's chart meta. The
+// same chart endpoint that backs prices already returns `meta.instrumentType`,
+// so this is a single lightweight request, deduped/cached by fetchJson.
+export async function fetchInstrumentType(symbol: string): Promise<string | null> {
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
+        return data.chart?.result?.[0]?.meta?.instrumentType ?? null;
+    } catch (error) {
+        console.error(`Error fetching instrument type for ${symbol}:`, error);
+        return null;
+    }
+}
+
 // Function to update all positions with current prices only (quick refresh)
 export async function updateAllPositions(symbols: string[]): Promise<{[key: string]: number | null}> {
     const results: {[key: string]: number | null} = {};
