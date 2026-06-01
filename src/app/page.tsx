@@ -13,9 +13,8 @@ import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
-import Link from 'next/link';
 import {
-    MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdDownload, MdUndo,
+    MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdUndo,
     MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
     MdVisibility, MdVisibilityOff,
 } from 'react-icons/md';
@@ -23,6 +22,7 @@ import {
 import ImportSetModal from '../components/management/ImportSetModal';
 import AddPositionModal from '../components/management/AddPositionModal';
 import SellPositionModal from '../components/management/SellPositionModal';
+import PositionSetManager from '../components/management/PositionSetManager';
 import { ClosedPositionsTable } from '../components/tables/ClosedPositionsTable';
 import { getActiveSetId, exportSetTransactions, removeTransactionFromSet, insertTransactionIntoSet } from '../utils/localPositions';
 
@@ -162,20 +162,6 @@ export default function Home() {
         setPortfolioSummary(null);
         setLoading(true);
         loadData(false, false, next);
-    };
-
-    const handleExportActive = () => {
-        const id = getActiveSetId();
-        const transactions = exportSetTransactions(id);
-        const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${id}-transactions.json`;
-        document.body.appendChild(a);
-        a.click();
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
     };
 
     const handleDeletePosition = useCallback((position: Position) => {
@@ -422,54 +408,28 @@ export default function Home() {
                             {/* Transactions: data management */}
                             {!loading && portfolioSummary && activeView === 'transactions' && (
                                 <div className="space-y-6">
-                                    <div>
-                                        <h2 className="text-base font-semibold mb-1"
-                                            style={{ color: 'var(--text-primary)' }}>Data management</h2>
-                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                            Import, manage, and export your position sets.
-                                        </p>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
+                                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                                        <div>
+                                            <h2 className="text-base font-semibold mb-1"
+                                                style={{ color: 'var(--text-primary)' }}>Data management</h2>
+                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                Import, switch, export, or remove your position sets.
+                                            </p>
+                                        </div>
                                         <button
                                             onClick={() => setImportModalOpen(true)}
-                                            className="flex flex-col items-start gap-3 p-5 rounded-xl text-left transition-all hover:opacity-90"
-                                            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
+                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                         >
-                                            <span className="p-2 rounded-lg" style={{ background: 'var(--accent-dim)' }}>
-                                                <MdUpload size={20} style={{ color: 'var(--accent)' }} />
-                                            </span>
-                                            <div>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Import set</p>
-                                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Load a JSON transaction file</p>
-                                            </div>
-                                        </button>
-                                        <button
-                                            onClick={() => setAddPositionOpen(true)}
-                                            className="flex flex-col items-start gap-3 p-5 rounded-xl text-left transition-all hover:opacity-90"
-                                            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-                                        >
-                                            <span className="p-2 rounded-lg" style={{ background: 'var(--surface-sidebar)' }}>
-                                                <MdAdd size={20} style={{ color: 'var(--text-secondary)' }} />
-                                            </span>
-                                            <div>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Add position</p>
-                                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Record a new buy transaction</p>
-                                            </div>
-                                        </button>
-                                        <button
-                                            onClick={handleExportActive}
-                                            className="flex flex-col items-start gap-3 p-5 rounded-xl text-left transition-all hover:opacity-90"
-                                            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-                                        >
-                                            <span className="p-2 rounded-lg" style={{ background: 'var(--surface-sidebar)' }}>
-                                                <MdDownload size={20} style={{ color: 'var(--text-secondary)' }} />
-                                            </span>
-                                            <div>
-                                                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Export</p>
-                                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Download active set as JSON</p>
-                                            </div>
+                                            <MdUpload size={15} />
+                                            Import set
                                         </button>
                                     </div>
+                                    <PositionSetManager
+                                        hideHeader
+                                        onPositionSetChanged={handlePositionSetChanged}
+                                        refreshTrigger={demoBannerRefresh}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -540,7 +500,7 @@ export default function Home() {
                             handlePositionSetChanged();
                         } else {
                             setDemoBannerRefresh(prev => prev + 1);
-                            setActionInfo(`Imported ${count} transactions — switch to the new set in Settings to view it.`);
+                            setActionInfo(`Imported ${count} transactions — activate the new set below to view it.`);
                             setTimeout(() => setActionInfo(null), 5000);
                         }
                     }}
@@ -606,10 +566,8 @@ export default function Home() {
             <SettingsPanel
                 open={settingsOpen}
                 onClose={() => setSettingsOpen(false)}
-                onPositionSetChanged={handlePositionSetChanged}
                 currency={currency}
                 onCurrencyChange={handleCurrencyChange}
-                refreshTrigger={demoBannerRefresh}
             />
         </>
     );

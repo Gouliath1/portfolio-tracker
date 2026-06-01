@@ -3,19 +3,16 @@
 import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { MdClose, MdLightMode, MdDarkMode } from 'react-icons/md';
-import PositionSetManager from '../management/PositionSetManager';
 import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
 
 interface SettingsPanelProps {
     open: boolean;
     onClose: () => void;
-    onPositionSetChanged: () => void;
     currency: BaseCurrency;
     onCurrencyChange: (currency: BaseCurrency) => void;
-    refreshTrigger?: number;
 }
 
-export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, onCurrencyChange, refreshTrigger }: SettingsPanelProps) => {
+export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const panelRef = useRef<HTMLDivElement>(null);
 
@@ -138,18 +135,6 @@ export const SettingsPanel = ({ open, onClose, onPositionSetChanged, currency, o
                                 ))}
                             </div>
                         </div>
-                    </section>
-
-                    {/* Position sets section */}
-                    <section className="space-y-3">
-                        <h3 className="text-xs font-semibold uppercase tracking-widest"
-                            style={{ color: 'var(--text-muted)' }}>
-                            Position Sets
-                        </h3>
-                        <PositionSetManager
-                            onPositionSetChanged={() => { onPositionSetChanged(); onClose(); }}
-                            refreshTrigger={refreshTrigger}
-                        />
                     </section>
 
                     {/* Build info — confirms which commit is live in the browser */}
