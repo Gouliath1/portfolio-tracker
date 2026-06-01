@@ -7,24 +7,26 @@ const cssVar = (name: string): string => {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 };
 
+export interface ChartDataset {
+    label: string;
+    data: number[];
+    borderColor: string;
+    backgroundColor: string;
+    tension: number;
+    fill: boolean;
+    hidden: boolean;
+    yAxisID?: string;
+    borderWidth?: number;
+    pointRadius: (context: { dataIndex: number }) => number;
+    pointHoverRadius: (context: { dataIndex: number }) => number;
+    pointBackgroundColor: string;
+    pointBorderColor: string;
+    pointBorderWidth: number;
+}
+
 export interface ChartData {
     labels: string[];
-    datasets: Array<{
-        label: string;
-        data: number[];
-        borderColor: string;
-        backgroundColor: string;
-        tension: number;
-        fill: boolean;
-        hidden: boolean;
-        yAxisID?: string;
-        borderWidth?: number;
-        pointRadius: (context: { dataIndex: number }) => number;
-        pointHoverRadius: (context: { dataIndex: number }) => number;
-        pointBackgroundColor: string;
-        pointBorderColor: string;
-        pointBorderWidth: number;
-    }>;
+    datasets: ChartDataset[];
 }
 
 export const createChartData = (
@@ -46,18 +48,18 @@ export const createChartData = (
         const snapshot = historicalData[index];
         const transactions = getTransactionsNearDate(positions, date, currentInterval);
         const hasTransactions = transactions.length > 0;
-        
+
         transactionDates.push(hasTransactions);
-        
+
         if (snapshot) {
             if (showValues) {
                 valueData.push(snapshot.totalValueJPY);
                 costData.push(snapshot.totalCostJPY);
                 pnlData.push(snapshot.pnlJPY);
             } else {
-                valueData.push(0); // Hide the value line
-                costData.push(0); // Hide the cost line  
-                pnlData.push(snapshot.pnlPercentage); // Show P&L percentage
+                valueData.push(0);
+                costData.push(0);
+                pnlData.push(snapshot.pnlPercentage);
             }
         } else {
             valueData.push(0);
@@ -98,7 +100,7 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
                 pointBackgroundColor: cssVar('--chart-line1'),
                 pointBorderColor: cssVar('--chart-line1'),
-                pointBorderWidth: 1
+                pointBorderWidth: 1,
             },
             {
                 label: `Total Cost (${currency})`,
@@ -112,7 +114,7 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
                 pointBackgroundColor: cssVar('--chart-line2'),
                 pointBorderColor: cssVar('--chart-line2'),
-                pointBorderWidth: 1
+                pointBorderWidth: 1,
             },
             {
                 label: showValues ? `P&L (${currency})` : 'P&L (%)',
@@ -128,8 +130,8 @@ export const createChartData = (
                 pointHoverRadius: (context: { dataIndex: number }) => transactionDates[context.dataIndex] ? 6 : 3,
                 pointBackgroundColor: cssVar('--chart-line3'),
                 pointBorderColor: cssVar('--chart-line3'),
-                pointBorderWidth: 1
-            }
-        ]
+                pointBorderWidth: 1,
+            },
+        ],
     };
 };

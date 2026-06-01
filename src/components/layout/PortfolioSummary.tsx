@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { calculatePortfolioAnnualizedReturn } from '@portfolio/core';
@@ -53,12 +54,6 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCardProps) => {
-    const borderColor = positive === true
-        ? 'var(--pnl-green)'
-        : positive === false
-            ? 'var(--pnl-red)'
-            : 'var(--accent-glow)';
-
     const valueColor = positive === true
         ? 'var(--pnl-green)'
         : positive === false
@@ -73,8 +68,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash }: StatCa
 
     return (
         <div
-            className="glass rounded-2xl p-4 sm:p-6 relative transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[120px]"
-            style={{ border: `1px solid ${borderColor}` }}
+            className="glass rounded-xl p-4 sm:p-5 relative transition-all duration-300 flex flex-col justify-between min-h-[100px] sm:min-h-[116px]"
         >
             {flash && glowBg && (
                 <div className="absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-500"
@@ -189,6 +183,13 @@ export const PortfolioSummary = ({ summary, showValues, formatValue }: Portfolio
                     sub={!hasNullPrices && annualizedReturn ? sinceLabel ?? undefined : undefined}
                     positive={hasNullPrices || annualizedReturn === null ? null : annualizedReturn.return >= 0}
                     flash={valueChanged}
+                    footnote={
+                        <Link href="/returns/deep-dive"
+                            className="transition-opacity hover:opacity-100"
+                            style={{ color: 'var(--accent)', opacity: 0.8 }}>
+                            Deep Dive →
+                        </Link>
+                    }
                 />
 
                 {/* 3 — Total P&L headline.

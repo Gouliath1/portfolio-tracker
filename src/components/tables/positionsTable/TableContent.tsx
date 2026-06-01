@@ -13,7 +13,7 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
             style={{ border: '1px solid var(--border)' }}
         >
             <table
-                className="min-w-full table-fixed"
+                className="min-w-full table-fixed data-table"
                 style={{ width: table.getCenterTotalSize() }}
             >
                 {/* Header */}
@@ -73,13 +73,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                     {table.getRowModel().rows.map((row, i) => (
                         <tr
                             key={row.id}
-                            className="transition-colors group"
-                            style={{
-                                borderBottom: '1px solid var(--border)',
-                                background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-hover)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)')}
+                            className="group"
+                            style={{ borderBottom: '1px solid var(--border)' }}
                         >
                             {row.getVisibleCells().map(cell => {
                                 const isAction = cell.column.id === 'sell' || cell.column.id === 'delete';
@@ -89,7 +84,7 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                         key={cell.id}
                                         className={isAction
                                             ? 'px-1 py-2 text-sm'
-                                            : 'px-4 py-3 text-sm truncate tabular-nums'}
+                                            : 'px-4 py-3 text-sm truncate'}
                                         style={{
                                             color: 'var(--text-primary)',
                                             width: cell.column.getSize(),
@@ -108,6 +103,45 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                         </tr>
                     ))}
                 </tbody>
+
+                {/* Footer with totals — sums reflect the active filter */}
+                {table.getRowModel().rows.length > 0 && (
+                    <tfoot
+                        className="sticky bottom-0 z-10"
+                        style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}
+                    >
+                        {table.getFooterGroups().map(footerGroup => (
+                            <tr key={footerGroup.id} style={{ borderTop: '1px solid var(--border)' }}>
+                                {footerGroup.headers.map(header => {
+                                    const isAction = header.id === 'sell' || header.id === 'delete';
+                                    const isPinned = header.column.getIsPinned() === 'left';
+                                    return (
+                                        <td
+                                            key={header.id}
+                                            className={isAction
+                                                ? 'px-1 py-3 text-sm font-semibold'
+                                                : 'px-4 py-3 text-sm font-semibold tabular-nums'}
+                                            style={{
+                                                color: 'var(--text-primary)',
+                                                width: header.getSize(),
+                                                ...(isPinned && {
+                                                    position: 'sticky',
+                                                    left: header.column.getStart('left'),
+                                                    zIndex: 12,
+                                                    background: 'var(--table-header-bg)',
+                                                }),
+                                            }}
+                                        >
+                                            {header.isPlaceholder
+                                                ? null
+                                                : flexRender(header.column.columnDef.footer, header.getContext())}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tfoot>
+                )}
             </table>
 
             {table.getRowModel().rows.length === 0 && (

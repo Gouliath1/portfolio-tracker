@@ -38,14 +38,23 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             cell: (props) => {
                 const ticker = props.getValue();
                 return (
-                    <a 
+                    <a
                         href={`https://finance.yahoo.com/quote/${ticker}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
+                        className="font-semibold hover:opacity-70 transition-opacity"
+                        style={{ color: 'var(--text-primary)' }}
                     >
                         {ticker}
                     </a>
+                );
+            },
+            footer: props => {
+                const count = props.table.getRowModel().rows.length;
+                return (
+                    <span style={{ color: 'var(--text-muted)' }}>
+                        Total ({count})
+                    </span>
                 );
             },
         }),
@@ -121,6 +130,11 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const value = props.row.original.costInJPY;
                 return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
             },
+            footer: props => {
+                const total = props.table.getRowModel().rows.reduce((sum, row) => sum + row.original.costInJPY, 0);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+            },
         }),
 
         /**
@@ -138,7 +152,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
 
                 // Show N/A when transaction currency matches base currency (no FX conversion)
                 if (row.transactionCcy === baseCcy) {
-                    return <span className="text-gray-400">N/A</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>N/A</span>;
                 }
 
                 // Create Yahoo Finance historical FX rate URL
@@ -185,14 +199,14 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const row = props.row.original;
                 
                 if (value === null) {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 
                 const currencyCode = row.stockCcy;
                 const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
                     
                 return (
-                    <span className={value >= row.costPerUnit ? 'text-green-600' : 'text-red-600'}>
+                    <span className="tabular-nums" style={{ color: value >= row.costPerUnit ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {displayValue}
                     </span>
                 );
@@ -212,7 +226,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
 
                 if (row.stockCcy === baseCcy) {
-                    return <span className="text-gray-400">N/A</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>N/A</span>;
                 }
 
                 if (!props.table.options.meta?.showValues) {
@@ -248,10 +262,17 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             size: 130,
             cell: props => {
                 if (props.row.original.currentPrice === null) {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 return formatCurrencyValue(props.getValue(), baseCcy, props.table.options.meta?.showValues ?? false);
+            },
+            footer: props => {
+                const rows = props.table.getRowModel().rows.filter(r => r.original.currentPrice !== null);
+                if (rows.length === 0) return null;
+                const total = rows.reduce((sum, row) => sum + row.original.currentValueJPY, 0);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
 
@@ -266,12 +287,24 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 const displayValue = formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
                 return (
-                    <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span className="tabular-nums" style={{ color: value >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
+                        {displayValue}
+                    </span>
+                );
+            },
+            footer: props => {
+                const rows = props.table.getRowModel().rows.filter(r => r.original.currentPrice !== null);
+                if (rows.length === 0) return null;
+                const total = rows.reduce((sum, row) => sum + row.original.pnlJPY, 0);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                const displayValue = formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+                return (
+                    <span className="tabular-nums" style={{ color: total >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {displayValue}
                     </span>
                 );
@@ -287,7 +320,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 
                 if (!props.table.options.meta?.showValues) {
@@ -295,7 +328,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 }
                 
                 return (
-                    <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span className="tabular-nums" style={{ color: value >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                     </span>
                 );
@@ -313,13 +346,13 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null && props.row.original.status === 'open') {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 if (!props.table.options.meta?.showValues) {
                     return getHiddenValue(value);
                 }
                 return (
-                    <span className={value >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span className="tabular-nums" style={{ color: value >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {value >= 0 ? '+' : ''}{value.toFixed(2)}%
                     </span>
                 );
@@ -352,7 +385,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             },
             cell: props => {
                 if (props.row.original.currentPrice === null) {
-                    return <span className="text-gray-400">Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
                 }
                 
                 const value = props.getValue();
@@ -360,7 +393,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                     const remainingDays = 365 - value.days;
                     return (
                         <span 
-                            className="text-gray-400" 
+                            style={{ color: 'var(--text-muted)' }} 
                             title={`Position held for ${value.days} days. Annual return will be calculated after 1 year (${remainingDays} days remaining).`}
                         >
                             -
@@ -370,7 +403,8 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 
                 return (
                     <span
-                        className={value.return >= 0 ? 'text-green-600' : 'text-red-600'}
+                        className="tabular-nums"
+                        style={{ color: value.return >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}
                         title={`Annualized based on ${value.days} days holding period (${(value.days / 365).toFixed(1)} years)`}
                     >
                         {value.return.toFixed(2)}%
@@ -391,9 +425,15 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const value = props.getValue();
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 if (!value) {
-                    return <span className="text-gray-400">—</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>—</span>;
                 }
                 return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
+            },
+            footer: props => {
+                const total = props.table.getRowModel().rows.reduce((sum, row) => sum + (row.original.dividendIncomeJPY ?? 0), 0);
+                const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
+                if (!total) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
             },
         }),
     ];
