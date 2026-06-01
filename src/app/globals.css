@@ -133,6 +133,30 @@ body {
 .data-table tbody tr:nth-child(even) { background: var(--table-row-alt); }
 .data-table tbody tr:hover { background: var(--glass-hover) !important; }
 
+/* Compact the XIRR deep-dive tables on narrow screens so more columns fit. */
+@media (max-width: 767px) {
+  .xirr-table th,
+  .xirr-table td {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* Annual Returns: Position column is 180px on desktop, narrower on mobile. */
+.xirr-annual thead th:first-child { min-width: 180px; }
+@media (max-width: 767px) {
+  .xirr-annual thead th:first-child,
+  .xirr-annual tbody td:first-child {
+    min-width: 96px;
+    max-width: 96px;
+    width: 96px;
+  }
+  /* Let long company names wrap inside the narrower column. */
+  .xirr-annual tbody td:first-child p { white-space: normal; overflow-wrap: anywhere; }
+}
+
 /* ── Number formatting ─────────────────────────────────────── */
 .tabular-nums {
   font-variant-numeric: tabular-nums;

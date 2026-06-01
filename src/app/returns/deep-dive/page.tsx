@@ -189,7 +189,7 @@ export default function DeepDivePage() {
             <AppSidebar activePage="deep-dive" currency={currency} />
 
             {/* ── Content column ───────────────────────────────── */}
-            <div className="flex-1 md:ml-[200px] flex flex-col min-h-screen">
+            <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
 
                 {/* ── Header ───────────────────────────────────── */}
                 <header className="sticky top-0 z-10 px-4 sm:px-6 h-[52px] flex items-center"
@@ -198,6 +198,15 @@ export default function DeepDivePage() {
                         style={{ color: 'var(--text-primary)' }}>
                         Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
                     </h1>
+                    {/* Settings — mobile only (sidebar shows it on desktop) */}
+                    <button
+                        onClick={() => router.push('/?settings=1')}
+                        className="md:hidden ml-auto p-2 rounded-lg"
+                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                        aria-label="Open settings"
+                    >
+                        <MdSettings size={18} />
+                    </button>
                 </header>
 
                 {/* ── Main content ─────────────────────────────── */}
@@ -343,16 +352,14 @@ export default function DeepDivePage() {
                                             </span>
                                         </p>
                                         <div className="glass rounded-xl overflow-auto">
-                                            <table className="min-w-full table-fixed data-table">
-                                                <thead className="sticky top-0"
+                                            <table className="min-w-full data-table xirr-table">
+                                                <thead className="sticky top-0 z-20"
                                                     style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                     <tr>
-                                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 180 }}>Position</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 110 }}>Status</th>
-                                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 110 }}>Held</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest sticky left-0 z-30"
+                                                            style={{ color: 'var(--text-muted)', width: 180, background: 'var(--table-header-bg)' }}>Position</th>
+                                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest whitespace-nowrap"
+                                                            style={{ color: 'var(--text-muted)', width: 140 }}>Held</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
                                                             style={{ color: 'var(--text-muted)', width: 110 }}>Invested</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
@@ -382,7 +389,8 @@ export default function DeepDivePage() {
                                                                     className="cursor-pointer"
                                                                     style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}
                                                                 >
-                                                                    <td className="px-4 py-3">
+                                                                    <td className="px-4 py-3 sticky left-0 z-10"
+                                                                        style={{ background: 'var(--surface-popover)' }}>
                                                                         <div className="flex items-center gap-2">
                                                                             <span className="text-xs flex-shrink-0"
                                                                                 style={{
@@ -394,9 +402,17 @@ export default function DeepDivePage() {
                                                                                 ›
                                                                             </span>
                                                                             <div>
-                                                                                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                                                                    {String(p.ticker)}
-                                                                                </p>
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                                                        {String(p.ticker)}
+                                                                                    </p>
+                                                                                    {p.status === 'closed' && (
+                                                                                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                                                                            style={{ background: 'var(--glass-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                                                                                            CLOSED
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
                                                                                 {p.fullName && (
                                                                                     <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>
                                                                                         {p.fullName}
@@ -406,18 +422,10 @@ export default function DeepDivePage() {
                                                                         </div>
                                                                     </td>
                                                                     <td className="px-4 py-3">
-                                                                        {p.status === 'closed' && (
-                                                                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium"
-                                                                                style={{ background: 'var(--glass-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                                                                                CLOSED
-                                                                            </span>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="px-4 py-3">
-                                                                        <p className="text-sm tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                                                                        <p className="text-sm tabular-nums whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
                                                                             {held.toFixed(1)} yr
                                                                         </p>
-                                                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                                                        <p className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                                                                             {fmtShort(buyDate)} → {p.status === 'closed' && p.saleDate ? fmtShort(parseDate(p.saleDate)) : 'now'}
                                                                         </p>
                                                                     </td>
@@ -439,7 +447,7 @@ export default function DeepDivePage() {
                                                                 {/* Expanded cash-flow drill-down */}
                                                                 {isExpanded && (
                                                                     <tr style={{ borderTop: '1px solid var(--border)' }}>
-                                                                        <td colSpan={7} className="px-4 py-4"
+                                                                        <td colSpan={6} className="px-4 py-4"
                                                                             style={{ background: 'var(--bg-base)' }}>
                                                                             <div className="flex gap-4 flex-wrap">
                                                                                 <MiniTable
@@ -476,12 +484,11 @@ export default function DeepDivePage() {
                                                         );
                                                     })}
                                                 </tbody>
-                                                <tfoot className="sticky bottom-0"
+                                                <tfoot className="sticky bottom-0 z-20"
                                                     style={{ background: 'var(--table-header-bg)', borderTop: '1px solid var(--border)' }}>
                                                     <tr>
-                                                        <td className="px-4 py-3 text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)' }}>Total</td>
-                                                        <td />{/* Status */}
+                                                        <td className="px-4 py-3 text-xs font-semibold uppercase tracking-widest sticky left-0 z-30"
+                                                            style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)' }}>Total</td>
                                                         <td />{/* Held */}
                                                         <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
                                                             style={{ color: 'var(--text-primary)' }}>
@@ -519,11 +526,11 @@ export default function DeepDivePage() {
                                             </p>
                                         ) : (
                                             <div className="glass rounded-xl overflow-auto">
-                                                <table className="min-w-full data-table">
+                                                <table className="min-w-full data-table xirr-table xirr-annual">
                                                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                         <tr>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest sticky left-0 z-10"
-                                                                style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)', minWidth: 180 }}>
+                                                                style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)' }}>
                                                                 Position
                                                             </th>
                                                             {allYears.map(yr => (
@@ -622,11 +629,10 @@ export default function DeepDivePage() {
                     { label: 'Holdings',  icon: MdAccountBalance, view: 'holdings' },
                     { label: 'Closed',    icon: MdHistory,        view: 'closed' },
                     { label: 'Manage',    icon: MdTune,           view: 'transactions' },
-                    { label: 'Settings',  icon: MdSettings,       view: 'settings' },
                 ] as const).map(({ label, icon: Icon, view }) => (
                     <button
                         key={label}
-                        onClick={() => router.push(view === 'settings' ? '/' : `/?view=${view}`)}
+                        onClick={() => router.push(`/?view=${view}`)}
                         className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
                         style={{ color: 'var(--text-muted)' }}
                     >

@@ -51,6 +51,18 @@ interface PositionsTableProps {
  * @returns JSX element containing the complete positions table interface
  */
 export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, onSellPosition, isDemoSet = false }: PositionsTableProps) => {
+    // Track narrow viewports so we can pin fewer columns and render compactly.
+    // On mobile, pinning the 4 default columns (~304px) exceeds the container
+    // width, leaving no room to scroll the rest of the data into view.
+    const [isMobile, setIsMobile] = React.useState(false);
+    React.useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)');
+        const update = () => setIsMobile(mq.matches);
+        update();
+        mq.addEventListener('change', update);
+        return () => mq.removeEventListener('change', update);
+    }, []);
+
     // Use custom hooks for state management
     const {
         sorting,
@@ -85,7 +97,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
             sorting,
             columnVisibility,
             columnSizing,
-            columnPinning: { left: ['delete', 'sell', 'transactionDate', 'ticker'] },
+            columnPinning: { left: isMobile ? ['ticker'] : ['delete', 'sell', 'transactionDate', 'ticker'] },
         },
         meta: {
             showValues,
@@ -103,7 +115,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
     });
 
     return (
-        <div className="glass rounded-2xl p-6 space-y-4 h-full">
+        <div className="glass rounded-2xl p-3 sm:p-6 space-y-4 h-full">
             {/* Table Controls */}
             <TableControls
                 table={table}
