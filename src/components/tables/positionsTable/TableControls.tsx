@@ -21,14 +21,29 @@ export const TableControls: React.FC<TableControlsProps> = ({
     handleColumnMenuKeyDown,
 }) => {
     return (
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-2">
+            {/* Filter */}
+            <input
+                type="text"
+                placeholder="Filter by ticker, name, account…"
+                className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm glass outline-none transition-all"
+                style={{
+                    color: 'var(--text-primary)',
+                    caretColor: 'var(--accent)',
+                }}
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent-glow)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            />
+
             {/* Column visibility */}
-            <div className="relative">
+            <div className="relative flex-shrink-0">
                 <button
                     id={ELEMENT_IDS.COLUMN_BUTTON}
                     onClick={() => setIsColumnMenuOpen(!isColumnMenuOpen)}
                     onKeyDown={handleColumnMenuKeyDown}
-                    className="px-3 py-2 rounded-lg text-sm glass glass-hover transition-all"
+                    className="px-3 py-2 rounded-lg text-sm glass glass-hover transition-all whitespace-nowrap"
                     style={{ color: 'var(--text-secondary)' }}
                     aria-expanded={isColumnMenuOpen}
                     aria-controls={ELEMENT_IDS.COLUMN_MENU}
@@ -39,7 +54,7 @@ export const TableControls: React.FC<TableControlsProps> = ({
                 {isColumnMenuOpen && (
                     <div
                         id={ELEMENT_IDS.COLUMN_MENU}
-                        className="absolute mt-2 w-48 surface-popover rounded-xl z-20 overflow-hidden shadow-lg"
+                        className="absolute right-0 mt-2 w-48 surface-popover rounded-xl z-20 overflow-hidden shadow-lg"
                         role="menu"
                         aria-labelledby={ELEMENT_IDS.COLUMN_BUTTON}
                     >
@@ -79,21 +94,6 @@ export const TableControls: React.FC<TableControlsProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Filter */}
-            <input
-                type="text"
-                placeholder="Filter by ticker, name, account…"
-                className="w-full sm:w-72 px-4 py-2 rounded-lg text-sm glass outline-none transition-all"
-                style={{
-                    color: 'var(--text-primary)',
-                    caretColor: 'var(--accent)',
-                }}
-                value={filterText}
-                onChange={e => setFilterText(e.target.value)}
-                onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent-glow)')}
-                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-            />
         </div>
     );
 };

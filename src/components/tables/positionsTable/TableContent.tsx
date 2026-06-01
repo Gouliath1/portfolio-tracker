@@ -8,10 +8,7 @@ interface TableContentProps {
 
 export const TableContent: React.FC<TableContentProps> = ({ table }) => {
     return (
-        <div
-            className="overflow-auto rounded-xl max-h-[calc(100vh-320px)]"
-            style={{ border: '1px solid var(--border)' }}
-        >
+        <div className="overflow-auto rounded-xl max-h-[calc(100vh-320px)]">
             <table
                 className="min-w-full table-fixed data-table"
                 style={{ width: table.getCenterTotalSize() }}
@@ -27,8 +24,8 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                 <th
                                     key={header.id}
                                     className={isAction
-                                        ? 'relative px-1 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium uppercase tracking-widest select-none'
-                                        : 'relative px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium uppercase tracking-widest cursor-pointer select-none'}
+                                        ? 'relative px-1 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none'
+                                        : 'relative px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest cursor-pointer select-none'}
                                     style={{
                                         color: 'var(--text-muted)',
                                         width: header.getSize(),

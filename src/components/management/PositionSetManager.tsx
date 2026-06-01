@@ -13,19 +13,18 @@ import {
     exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
-import AddPositionModal from './AddPositionModal';
 
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
     refreshTrigger?: number; // bump to force a re-read from localStorage
+    hideHeader?: boolean;    // suppress the built-in title when the host provides one
 }
 
-const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger }) => {
+const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger, hideHeader }) => {
     const [sets, setSets] = useState<PositionSetLocal[]>([]);
     const [activeId, setActiveId] = useState<string>('demo');
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-    const [showAddPosition, setShowAddPosition] = useState(false);
 
     const refresh = () => {
         setSets(getPositionSets());
@@ -91,14 +90,16 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     return (
         <div className="space-y-5">
             {/* Header */}
-            <div>
-                <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Position Sets
-                </h2>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                    Switch between, export, or delete portfolio datasets
-                </p>
-            </div>
+            {!hideHeader && (
+                <div>
+                    <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        Position Sets
+                    </h2>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Switch between, export, or delete portfolio datasets
+                    </p>
+                </div>
+            )}
 
             {/* Messages */}
             {error && (
@@ -191,19 +192,6 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     </div>
                 )}
             </div>
-
-            {showAddPosition && (
-                <AddPositionModal
-                    setId={activeId}
-                    onSaved={() => {
-                        setShowAddPosition(false);
-                        setSuccess('Position added');
-                        refresh();
-                        onPositionSetChanged?.();
-                    }}
-                    onClose={() => setShowAddPosition(false)}
-                />
-            )}
         </div>
     );
 };
