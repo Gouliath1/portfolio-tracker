@@ -107,14 +107,16 @@ describe('createChartData — value/cost/pnl invariants', () => {
         expect(pnl.data[0]).toBe(0);
     });
 
-    it('routes P&L to y1 axis only when showValues=true (dual-axis mode)', () => {
+    // The chart redesign collapsed the old dual-axis layout to a single 'y'
+    // axis shared by value/cost/pnl, so P&L stays on 'y' regardless of mode.
+    it('keeps P&L on the single y axis in both value and percent modes', () => {
         const dates = [new Date('2020-01-01')];
         const snapshots = [mkSnapshot(dates[0], 100, 80)];
 
-        const dual = createChartData(dates, snapshots, positions, '5Y', true);
-        const single = createChartData(dates, snapshots, positions, '5Y', false);
+        const values = createChartData(dates, snapshots, positions, '5Y', true);
+        const percent = createChartData(dates, snapshots, positions, '5Y', false);
 
-        expect(dual.datasets[2].yAxisID).toBe('y1');
-        expect(single.datasets[2].yAxisID).toBe('y');
+        expect(values.datasets[2].yAxisID).toBe('y');
+        expect(percent.datasets[2].yAxisID).toBe('y');
     });
 });

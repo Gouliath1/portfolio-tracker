@@ -40,45 +40,8 @@ describe('Currency Utils', () => {
     })
   })
 
-  describe('DEFAULT_FX_RATES', () => {
-    it('should have JPY as base currency with rate 1.0', () => {
-      expect(DEFAULT_FX_RATES.JPY).toBe(1.0)
-    })
-
-    it('should have rates for all supported currencies', () => {
-      SUPPORTED_CURRENCIES.forEach(currency => {
-        expect(DEFAULT_FX_RATES).toHaveProperty(currency.code)
-        expect(typeof DEFAULT_FX_RATES[currency.code]).toBe('number')
-        expect(DEFAULT_FX_RATES[currency.code]).toBeGreaterThan(0)
-      })
-    })
-
-    it('should have reasonable FX rates', () => {
-      // Basic sanity checks for FX rates
-      expect(DEFAULT_FX_RATES.USD).toBeGreaterThan(100) // USD/JPY typically > 100
-      expect(DEFAULT_FX_RATES.EUR).toBeGreaterThan(DEFAULT_FX_RATES.USD) // EUR typically stronger than USD
-      expect(DEFAULT_FX_RATES.KRW).toBeLessThan(1) // Korean Won is much smaller unit
-    })
-  })
-
-  describe('getDefaultFxRate', () => {
-    it('should return correct rate for supported currencies', () => {
-      expect(getDefaultFxRate('JPY')).toBe(1.0)
-      expect(getDefaultFxRate('USD')).toBe(DEFAULT_FX_RATES.USD)
-      expect(getDefaultFxRate('EUR')).toBe(DEFAULT_FX_RATES.EUR)
-    })
-
-    it('should return 1.0 for unsupported currencies', () => {
-      expect(getDefaultFxRate('XXX')).toBe(1.0)
-      expect(getDefaultFxRate('INVALID')).toBe(1.0)
-      expect(getDefaultFxRate('')).toBe(1.0)
-    })
-
-    it('should handle case sensitivity', () => {
-      expect(getDefaultFxRate('usd')).toBe(1.0) // lowercase not supported
-      expect(getDefaultFxRate('USD')).toBe(DEFAULT_FX_RATES.USD)
-    })
-  })
+  // NOTE: DEFAULT_FX_RATES / getDefaultFxRate were removed when the app moved
+  // to live Yahoo FX rates (no hardcoded defaults). Their tests were dropped.
 
   describe('getCurrencySymbol', () => {
     it('should return correct symbols for supported currencies', () => {

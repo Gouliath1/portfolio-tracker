@@ -2,21 +2,28 @@
  * Unit tests for positions utilities
  */
 
+import type { RawPosition } from '@portfolio/types'
 import { loadPositions, rawPositions } from '@/utils/positions'
+import { getActivePositions } from '@/utils/localPositions'
+import { DEMO_POSITIONS } from '@/data/demoPositions'
 
-// Mock global fetch
-const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>
+// loadPositions reads the active set from local storage (getActivePositions)
+// and falls back to the demo portfolio if that read fails.
+jest.mock('@/utils/localPositions', () => ({
+  getActivePositions: jest.fn(),
+}))
+
+const mockGetActivePositions = getActivePositions as jest.MockedFunction<typeof getActivePositions>
 
 describe('Positions Utils', () => {
   beforeEach(() => {
-    mockFetch.mockClear()
+    mockGetActivePositions.mockReset()
   })
 
   describe('loadPositions', () => {
-    it('should load positions successfully from API', async () => {
-      const mockPositions = [
+    it('should return the active positions from local storage', async () => {
+      const active: RawPosition[] = [
         {
-          id: 'pos-1',
           ticker: 'AAPL',
           transactionDate: '2023-01-01',
           quantity: 100,
@@ -28,7 +35,6 @@ describe('Positions Utils', () => {
           broker: 'Test Broker',
         },
         {
-          id: 'pos-2',
           ticker: '7203.T',
           transactionDate: '2023-01-01',
           quantity: 1000,
@@ -38,83 +44,34 @@ describe('Positions Utils', () => {
           stockCcy: 'JPY',
           account: 'JP Account',
           broker: 'JP Broker',
-        }
+        },
       ]
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ positions: mockPositions })
-      } as Response)
+      mockGetActivePositions.mockReturnValue(active)
 
       const result = await loadPositions()
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/positions')
-      expect(result).toEqual(mockPositions)
+      expect(mockGetActivePositions).toHaveBeenCalled()
+      expect(result).toEqual(active)
       expect(result).toHaveLength(2)
-      expect(result[0]).toMatchObject({
-        id: 'pos-1',
-        ticker: 'AAPL',
-        quantity: 100,
-        costPerUnit: 150.0
-      })
     })
 
-    it('should handle API errors gracefully', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error'
-      } as Response)
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
-
-      const result = await loadPositions()
-
-      expect(result).toEqual([])
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading positions:', expect.any(Error))
-      
-      consoleSpy.mockRestore()
-    })
-
-    it('should handle network errors gracefully', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
-
-      const result = await loadPositions()
-
-      expect(result).toEqual([])
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading positions:', expect.any(Error))
-      
-      consoleSpy.mockRestore()
-    })
-
-    it('should handle malformed JSON gracefully', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => { throw new Error('Invalid JSON') }
-      } as unknown as Response)
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
-
-      const result = await loadPositions()
-
-      expect(result).toEqual([])
-      expect(consoleSpy).toHaveBeenCalledWith('Error loading positions:', expect.any(Error))
-      
-      consoleSpy.mockRestore()
-    })
-
-    it('should handle empty response correctly', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ positions: [] })
-      } as Response)
+    it('should return an empty array when local storage has no active set', async () => {
+      mockGetActivePositions.mockReturnValue([])
 
       const result = await loadPositions()
 
       expect(result).toEqual([])
       expect(result).toHaveLength(0)
+    })
+
+    it('should fall back to the demo portfolio when the local read fails', async () => {
+      mockGetActivePositions.mockImplementation(() => {
+        throw new Error('local storage unavailable')
+      })
+
+      const result = await loadPositions()
+
+      expect(result).toEqual(DEMO_POSITIONS)
     })
   })
 
