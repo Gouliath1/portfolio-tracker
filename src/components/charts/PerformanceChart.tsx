@@ -43,7 +43,7 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
     useTheme();
 
-    const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline);
+    const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline, currency);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
     const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues, currency);
 
