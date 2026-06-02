@@ -2,14 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, generateDateIntervals } from './chartUtils';
-import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 import { readCachedChart, writeCachedChart } from '../../../utils/pnlCache';
 
-export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter) => {
+export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter, currency: string) => {
     const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { currency } = useBaseCurrency();
 
     const calculateHistoricalData = useCallback(async () => {
         if (positions.length === 0) {
