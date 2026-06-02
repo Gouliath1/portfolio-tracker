@@ -383,7 +383,7 @@ export default function Home() {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <BenchmarkCard summary={portfolioSummary} />
+                                                <BenchmarkCard summary={portfolioSummary} baseCurrency={currency} />
                                                 <PortfolioHealthCard
                                                     positions={portfolioSummary.positions}
                                                     totalValueJPY={portfolioSummary.totalValueJPY}
