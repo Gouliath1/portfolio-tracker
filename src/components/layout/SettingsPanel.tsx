@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { MdClose, MdLightMode, MdDarkMode } from 'react-icons/md';
 import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
+import { ExchangeRatesSection } from './ExchangeRatesSection';
 
 interface SettingsPanelProps {
     open: boolean;
@@ -137,8 +138,17 @@ export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: Set
                         </div>
                     </section>
 
-                    {/* Build info — confirms which commit is live in the browser */}
+                    {/* Exchange rates — read-only view of the FX rates used for valuation */}
+                    <ExchangeRatesSection open={open} currency={currency} />
+
+                    {/* Version + build info — confirms which commit is live in the browser */}
                     <section className="pt-2 text-xs space-y-1" style={{ color: 'var(--text-muted)' }}>
+                        <div>
+                            Version:{' '}
+                            <code style={{ color: 'var(--text-secondary)' }}>
+                                {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.1.0'}
+                            </code>
+                        </div>
                         <div>
                             Build:{' '}
                             <code style={{ color: 'var(--text-secondary)' }}>
