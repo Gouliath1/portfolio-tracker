@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import {
     Chart as ChartJS,
@@ -42,6 +42,14 @@ interface PerformanceChartProps {
 export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symbol = '¥' }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
     useTheme();
+
+    // The custom tooltip lives on document.body, so it can outlive the chart when
+    // the user switches menus. Remove it on unmount so it doesn't linger.
+    useEffect(() => {
+        return () => {
+            document.getElementById('chartjs-tooltip')?.remove();
+        };
+    }, []);
 
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline, currency);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
