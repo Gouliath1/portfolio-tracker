@@ -214,7 +214,7 @@ async function ensureFxForDividendDates(
 // Build one FX lookup for the whole portfolio: one historical fetch per pair
 // (covers every transaction/sale date) and one current fetch per pair (covers
 // every open lot). Parallelized across pairs.
-export async function preloadFxRates(rawPositions: RawPosition[], baseCurrency: string): Promise<FxLookup> {
+export async function preloadFxRates(rawPositions: RawPosition[], baseCurrency: string, forceRefresh: boolean = false): Promise<FxLookup> {
     const historicalDates = new Map<string, Set<string>>();
     const currentPairs = new Set<string>();
 
@@ -249,7 +249,7 @@ export async function preloadFxRates(rawPositions: RawPosition[], baseCurrency: 
             historical.set(pair, map);
         }),
         ...[...currentPairs].map(async pair => {
-            const rate = await fetchCurrentFxRate(pair);
+            const rate = await fetchCurrentFxRate(pair, forceRefresh);
             if (rate !== null) current.set(pair, rate);
         }),
     ]);
@@ -398,14 +398,9 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         ? (async () => {
             const tp = performance.now();
             const prices = await updateAllPositions(openTickers);
-            // Also refresh current FX rates so they don't stay stale on Refresh.
-            const openPairs = [...new Set(
-                rawPositions
-                    .filter(p => !p.saleDate && p.stockCcy !== baseCurrency)
-                    .map(p => `${p.stockCcy}${baseCurrency}`)
-            )];
-            await Promise.all(openPairs.map(pair => fetchCurrentFxRate(pair, true)));
-            log('prices+currentFx (refresh)', tp);
+            // Current FX is refreshed in parallel by preloadFxRates(forceRefresh)
+            // below, so no separate pre-warm is needed here.
+            log('prices (refresh)', tp);
             return prices;
         })()
         : (async () => {
@@ -419,7 +414,7 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
 
     const fxPromise = (async () => {
         const tf = performance.now();
-        const lookup = await preloadFxRates(rawPositions, baseCurrency);
+        const lookup = await preloadFxRates(rawPositions, baseCurrency, forceRefresh);
         log(`fx preload (hist pairs=${lookup.historical.size}, current pairs=${lookup.current.size})`, tf);
         return lookup;
     })();
