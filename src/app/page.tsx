@@ -360,6 +360,7 @@ export default function Home() {
                                         isLoading={isFirstLoad}
                                         showValues={showValues}
                                         symbol={symbol}
+                                        currency={currency}
                                         formatValue={formatValue}
                                     />
                                     {!loading && portfolioSummary && (

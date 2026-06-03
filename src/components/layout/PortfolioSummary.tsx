@@ -12,6 +12,7 @@ interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
     showValues: boolean;
     symbol: string;
+    currency: string;
     formatValue: (amount: number, showValues: boolean) => string;
     isLoading?: boolean;
 }
@@ -133,7 +134,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant,
     );
 };
 
-export const PortfolioSummary = ({ summary, showValues, formatValue, isLoading }: PortfolioSummaryProps) => {
+export const PortfolioSummary = ({ summary, showValues, currency, formatValue, isLoading }: PortfolioSummaryProps) => {
     const prevSummary = useRef<PortfolioSummaryType>(summary);
     const valueChanged = summary.totalValueJPY !== prevSummary.current.totalValueJPY;
     useEffect(() => { prevSummary.current = summary; }, [summary]);
@@ -144,7 +145,7 @@ export const PortfolioSummary = ({ summary, showValues, formatValue, isLoading }
 
     const hasNullPrices = isLoading || summary.positions.some(p => p.currentPrice === null);
     const annualizedReturn = calculatePortfolioAnnualizedReturn(summary);
-    const dailyPnl = useDailyPnl(summary.positions, summary.totalValueJPY);
+    const dailyPnl = useDailyPnl(summary.positions, summary.totalValueJPY, currency);
 
     // Earliest transaction date (shared by P&L and CAGR "since" label)
     const earliestDate = summary.positions.length > 0
