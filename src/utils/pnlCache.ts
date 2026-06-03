@@ -14,7 +14,11 @@
 import { PortfolioSummary, RawPosition, Position } from '@portfolio/types';
 import type { HistoricalSnapshot } from '../lib/core/historicalPortfolioCalculations';
 
-const VERSION = 'v2';
+// Bumped v2→v3 to invalidate caches written before the currency-desync fix:
+// pre-fix chart/daily snapshots stored a cost/value computed in a stale base
+// currency, and the same-day cache short-circuit would otherwise keep serving
+// them. A new prefix forces a clean recompute for all clients.
+const VERSION = 'v3';
 const KEY_PREFIX = `pt_pnl_${VERSION}_`;
 const CHART_KEY_PREFIX = `pt_chart_${VERSION}_`;
 const DAILY_KEY_PREFIX = `pt_daily_${VERSION}_`;
