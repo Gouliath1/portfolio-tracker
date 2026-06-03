@@ -127,11 +127,16 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
         return '';
     }
     
-    let innerHTML = '<div style="margin-bottom: 6px; font-weight: 500;">Portfolio Breakdown:</div>';
-    
     const sortedPositions = [...snapshot.positionDetails].sort((a, b) => b.valueInJPY - a.valueInJPY);
-    
-    sortedPositions.forEach((position) => {
+
+    const MAX_VISIBLE = 5;
+    const visiblePositions = sortedPositions.slice(0, MAX_VISIBLE);
+
+    let innerHTML = `<div style="margin-bottom: 6px; font-weight: 500;">Portfolio Breakdown${
+        sortedPositions.length > MAX_VISIBLE ? ` (top ${MAX_VISIBLE})` : ''
+    }:</div>`;
+
+    visiblePositions.forEach((position) => {
         const isPositive = position.pnlPercentage >= 0;
         const pnlColor = isPositive ? '#22c55e' : '#ef4444';
         const pnlPercentSign = position.pnlPercentage >= 0 ? '+' : '';
@@ -157,7 +162,7 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
             </div>`;
         }
     });
-    
+
     return innerHTML;
 };
 
