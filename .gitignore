@@ -49,6 +49,13 @@ data/marketCache.db
 data/marketCache.db-journal
 data/marketCache.db-wal
 data/marketCache.db-shm
+# Personal portfolio data + exports — private, never commit
+data/my-portfolio.json
+data/my-portfolio-new.json
+data/portfolio.csv
+/prod-portfolio.json
+/merged-portfolio.json
+*.xlsm
 # Local-only files
 /positions.json
 .claude/PROJECT_CONTEXT.md
