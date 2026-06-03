@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues } from '@portfolio/core';
-import { useBaseCurrency } from './useBaseCurrency';
 import { readCachedDailyValue, writeCachedDailyValue } from '../utils/pnlCache';
 
 export interface DailyPnl {
@@ -18,9 +17,13 @@ function computeDelta(currentValue: number, yesterdayValue: number): DailyPnl | 
     return { absoluteChange, percentageChange };
 }
 
-export function useDailyPnl(positions: Position[], currentValue: number): DailyPnl | null {
+// `currency` must match the base currency `currentValue` and `positions` were
+// computed in (passed down from the page). Reading it from a separate
+// useBaseCurrency() instance here would desync it: yesterday's value would be
+// computed in a stale currency and subtracted from a current value in the new
+// one, producing a nonsense daily delta after a currency switch.
+export function useDailyPnl(positions: Position[], currentValue: number, currency: string): DailyPnl | null {
     const [dailyPnl, setDailyPnl] = useState<DailyPnl | null>(null);
-    const { currency } = useBaseCurrency();
 
     useEffect(() => {
         if (positions.length === 0 || currentValue === 0) return;
