@@ -446,7 +446,15 @@ export async function fetchCurrentFxRate(fxPair: string, forceRefresh: boolean =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = await fetchJson(url) as any;
 
-        const rate = data.chart?.result?.[0]?.meta?.regularMarketPrice;
+        // Use the latest *completed* daily close (chartPreviousClose), not the
+        // live intraday spot (regularMarketPrice). FX trades ~24/5, so the spot
+        // moves every tick: two fetches seconds apart — or on dev vs prod —
+        // disagree, making portfolio values irreproducible. The latest close is
+        // a stable daily value, consistent with how equities report their last
+        // close when their market is shut, and with the /api/fx-rates route's
+        // "previous business day's rate is the right current value" behaviour.
+        const meta = data.chart?.result?.[0]?.meta;
+        const rate = meta?.chartPreviousClose ?? meta?.regularMarketPrice;
         if (rate) {
             const roundedRate = Math.round(rate * 10000) / 10000;
             return roundedRate;
