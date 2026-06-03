@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { loadPositions } from '../utils/positions';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { readCachedSummary, writeCachedSummary, clearChartCache } from '../utils/pnlCache';
@@ -10,12 +10,15 @@ import { PerformanceChart } from '../components/charts/PerformanceChart';
 import { AnalyticsPanel } from '../components/overview/AnalyticsPanel';
 import { BenchmarkCard } from '../components/overview/BenchmarkCard';
 import { PortfolioHealthCard } from '../components/overview/PortfolioHealthCard';
+import { AssetClassFilter } from '../components/overview/AssetClassFilter';
 import { PositionsTable } from '../components/tables/PositionsTable';
 import DemoBanner from '../components/layout/DemoBanner';
 import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
+import { useAssetClasses } from '../hooks/useAssetClasses';
+import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdUndo,
     MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
@@ -62,11 +65,19 @@ export default function Home() {
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showValues, setShowValues] = useState(true);
     const [activeView, setActiveView] = useState<ViewId>('overview');
+    // Overview asset-class filter. null = all classes; otherwise an explicit subset.
+    const [selectedClasses, setSelectedClasses] = useState<string[] | null>(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('showValues');
         if (saved !== null) setShowValues(JSON.parse(saved));
+        const savedClasses = localStorage.getItem('overviewAssetClasses');
+        if (savedClasses !== null) setSelectedClasses(JSON.parse(savedClasses));
     }, []);
+
+    useEffect(() => {
+        localStorage.setItem('overviewAssetClasses', JSON.stringify(selectedClasses));
+    }, [selectedClasses]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -238,6 +249,35 @@ export default function Home() {
 
     const hasStalePrice = summary.positions.some(p => p.currentPrice === null);
 
+    // ── Overview asset-class filter ───────────────────────────────────────
+    // Resolve the asset class for every ticker we hold (open + closed), then
+    // scope the whole overview — KPIs, chart, analytics, benchmark — to the
+    // selected classes. Other views (holdings/closed/manage) stay unfiltered.
+    const allTickers = useMemo(
+        () => [...summary.positions, ...summary.closedPositions].map(p => p.ticker),
+        [summary.positions, summary.closedPositions],
+    );
+    const { assetClasses } = useAssetClasses(allTickers);
+
+    const presentClasses = useMemo(
+        () => presentAssetClasses(summary, assetClasses),
+        [summary, assetClasses],
+    );
+
+    // Reconcile the persisted selection against what's actually held: drop
+    // stale classes, and collapse "empty" or "everything" back to null (= all).
+    const effectiveSelected = useMemo<Set<string> | null>(() => {
+        if (selectedClasses === null) return null;
+        const set = new Set(selectedClasses.filter(c => presentClasses.includes(c)));
+        if (set.size === 0 || set.size === presentClasses.length) return null;
+        return set;
+    }, [selectedClasses, presentClasses]);
+
+    const overviewSummary = useMemo(
+        () => deriveSummaryForClasses(summary, assetClasses, effectiveSelected),
+        [summary, assetClasses, effectiveSelected],
+    );
+
     return (
         <>
             <div className="flex min-h-screen" style={{ background: 'var(--bg-base)' }}>
@@ -355,8 +395,15 @@ export default function Home() {
                             {/* Overview: KPIs render immediately with placeholder; chart waits for data */}
                             {activeView === 'overview' && (
                                 <>
+                                    {!loading && portfolioSummary && (
+                                        <AssetClassFilter
+                                            present={presentClasses}
+                                            selected={selectedClasses}
+                                            onChange={setSelectedClasses}
+                                        />
+                                    )}
                                     <PortfolioSummary
-                                        summary={summary}
+                                        summary={overviewSummary}
                                         isLoading={isFirstLoad}
                                         showValues={showValues}
                                         symbol={symbol}
@@ -368,7 +415,7 @@ export default function Home() {
                                             <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 items-start">
                                                 <div className="lg:col-span-5 min-w-0">
                                                     <PerformanceChart
-                                                        positions={portfolioSummary.positions}
+                                                        positions={overviewSummary.positions}
                                                         showValues={showValues}
                                                         currency={currency}
                                                         symbol={symbol}
@@ -376,7 +423,7 @@ export default function Home() {
                                                 </div>
                                                 <div className="lg:col-span-2 min-w-0">
                                                     <AnalyticsPanel
-                                                        summary={portfolioSummary}
+                                                        summary={overviewSummary}
                                                         symbol={symbol}
                                                         formatValue={formatValue}
                                                         showValues={showValues}
@@ -384,10 +431,10 @@ export default function Home() {
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <BenchmarkCard summary={portfolioSummary} baseCurrency={currency} />
+                                                <BenchmarkCard summary={overviewSummary} baseCurrency={currency} />
                                                 <PortfolioHealthCard
-                                                    positions={portfolioSummary.positions}
-                                                    totalValueJPY={portfolioSummary.totalValueJPY}
+                                                    positions={overviewSummary.positions}
+                                                    totalValueJPY={overviewSummary.totalValueJPY}
                                                 />
                                             </div>
                                         </>
@@ -493,6 +540,15 @@ export default function Home() {
                 >
                     <MdTrendingUp size={20} />
                     <span>XIRR</span>
+                </button>
+                <button
+                    onClick={() => setSettingsOpen(true)}
+                    aria-label="Open settings"
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
+                >
+                    <MdSettings size={20} />
+                    <span>Settings</span>
                 </button>
             </nav>
 
