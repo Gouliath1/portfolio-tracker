@@ -218,7 +218,15 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Only shown for non-JPY stocks
          */
         columnHelper.accessor('currentFxRate', {
-            header: 'Curr FX Rate (Stock-Base)',
+            header: () => (
+                <span
+                    title="FX uses the previous settled daily close (≈ yesterday) so portfolio values stay reproducible. Prices are live."
+                    className="inline-flex items-center gap-1 cursor-help"
+                >
+                    Curr FX Rate (Stock-Base)
+                    <span style={{ color: 'var(--text-muted)' }}>· prev close</span>
+                </span>
+            ),
             size: 140,
             cell: props => {
                 const value = props.getValue();

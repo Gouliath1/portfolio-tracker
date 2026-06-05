@@ -82,8 +82,9 @@ export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionPro
 
             <div className="glass rounded-xl p-4 space-y-3">
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Rates used to convert your holdings into {currency} — the latest settled daily
-                    close. Updates when you press Refresh.
+                    Rates used to convert your holdings into {currency} — the previous settled daily
+                    close (≈ yesterday), not today&apos;s live spot, so values stay reproducible.
+                    Security prices are live. Updates when you press Refresh.
                 </p>
 
                 {rows === null && (
@@ -114,7 +115,7 @@ export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionPro
 
                 {asOf && rows && rows.length > 0 && (
                     <p className="text-xs pt-1" style={{ color: 'var(--text-muted)' }}>
-                        as of {asOf}
+                        previous settled close · fetched {asOf}
                     </p>
                 )}
             </div>
