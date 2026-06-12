@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Position } from '@portfolio/types';
-import { calculateHistoricalPortfolioValues, HistoricalSnapshot } from '@portfolio/core';
+import { calculateHistoricalPortfolioValues, createLiveSnapshot, HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, generateDateIntervals } from './chartUtils';
 import { readCachedChart, writeCachedChart } from '../../../utils/pnlCache';
 
@@ -15,6 +15,15 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // The last interval is "now", but historical series only have the last
+    // close (monthly/daily depending on timeline). Anchor the final point to
+    // the live position values so the chart endpoint matches the KPI cards.
+    const anchorToLive = useCallback((snapshots: HistoricalSnapshot[]): HistoricalSnapshot[] => {
+        if (snapshots.length === 0) return snapshots;
+        const last = snapshots[snapshots.length - 1];
+        return [...snapshots.slice(0, -1), createLiveSnapshot(positions, last.date)];
+    }, [positions]);
+
     const calculateHistoricalData = useCallback(async () => {
         if (positions.length === 0) {
             setHistoricalData([]);
@@ -28,7 +37,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         let cacheFromToday = false;
         const cached = readCachedChart(positions, currency, selectedTimeline);
         if (cached) {
-            setHistoricalData(cached.snapshots);
+            setHistoricalData(anchorToLive(cached.snapshots));
             cacheFromToday = cached.fromToday;
             if (isDev) console.log(`[chart-cache] HIT — fromToday=${cached.fromToday}, timeline=${selectedTimeline}, snapshots=${cached.snapshots.length}`);
         } else if (isDev) {
@@ -43,7 +52,9 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         try {
             const dateIntervals = generateDateIntervals(selectedTimeline, positions);
             const snapshots = await calculateHistoricalPortfolioValues(positions, dateIntervals, true, currency);
-            setHistoricalData(snapshots);
+            setHistoricalData(anchorToLive(snapshots));
+            // Cache the raw historical series; the live anchor is re-applied on
+            // every read so a later visit overlays that day's fresh prices.
             writeCachedChart(positions, currency, selectedTimeline, snapshots);
         } catch (err) {
             console.error('Error calculating historical data:', err);
@@ -52,7 +63,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         } finally {
             setIsLoading(false);
         }
-    }, [positions, selectedTimeline, currency]);
+    }, [positions, selectedTimeline, currency, anchorToLive]);
 
     useEffect(() => {
         calculateHistoricalData();

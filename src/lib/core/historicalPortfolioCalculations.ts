@@ -114,6 +114,60 @@ function getClosestHistoricalPrice(
     return historicalPrices[keys[idx]];
 }
 
+// Build a snapshot from the live values already on the positions (the same
+// numbers the KPI cards sum). Used to anchor the chart's final point so it
+// matches the headline Total Value / P&L instead of the last historical close.
+export function createLiveSnapshot(positions: Position[], date: Date): HistoricalSnapshot {
+    const grouped = new Map<string, PositionDetail>();
+
+    for (const pos of positions) {
+        const key = `${String(pos.ticker)}::${pos.account ?? ''}`;
+        const existing = grouped.get(key);
+
+        if (existing) {
+            const totalQuantity = existing.quantity + pos.quantity;
+            const totalCostNative = existing.quantity * existing.costPerUnit + pos.quantity * pos.costPerUnit;
+            existing.quantity = totalQuantity;
+            existing.costPerUnit = totalQuantity > 0 ? totalCostNative / totalQuantity : 0;
+            existing.costInJPY += pos.costInJPY;
+            existing.valueInJPY += pos.currentValueJPY;
+            existing.pnlJPY = existing.valueInJPY - existing.costInJPY;
+            existing.pnlPercentage = existing.costInJPY > 0 ? (existing.pnlJPY / existing.costInJPY) * 100 : 0;
+        } else {
+            grouped.set(key, {
+                ticker: pos.ticker.toString(),
+                fullName: pos.fullName || pos.ticker.toString(),
+                quantity: pos.quantity,
+                costPerUnit: pos.costPerUnit,
+                costInJPY: pos.costInJPY,
+                valueInJPY: pos.currentValueJPY,
+                pnlJPY: pos.currentValueJPY - pos.costInJPY,
+                pnlPercentage: pos.costInJPY > 0 ? ((pos.currentValueJPY - pos.costInJPY) / pos.costInJPY) * 100 : 0,
+                historicalPrice: pos.currentPrice,
+                transactionFxRate: pos.transactionFxRate,
+            });
+        }
+    }
+
+    const positionDetails = Array.from(grouped.values());
+    const totalValueJPY = positionDetails.reduce((s, d) => s + d.valueInJPY, 0);
+    const totalCostJPY = positionDetails.reduce((s, d) => s + d.costInJPY, 0);
+    const pnlJPY = totalValueJPY - totalCostJPY;
+    const pnlPercentage = totalCostJPY > 0 ? (pnlJPY / totalCostJPY) * 100 : 0;
+
+    return {
+        date,
+        totalValueJPY,
+        totalCostJPY,
+        pnlJPY,
+        pnlPercentage,
+        positionsCount: positionDetails.length,
+        positionDetails,
+        cumulativePnlJPY: pnlJPY,
+        cumulativePnlPercentage: pnlPercentage,
+    };
+}
+
 // Calculate portfolio value at a specific historical date
 export async function calculatePortfolioValueAtDate(
     positions: Position[],
