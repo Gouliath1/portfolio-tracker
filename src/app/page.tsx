@@ -18,11 +18,12 @@ import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
 import { useAssetClasses } from '../hooks/useAssetClasses';
+import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdUndo,
     MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
-    MdVisibility, MdVisibilityOff,
+    MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
 
 import ImportSetModal from '../components/management/ImportSetModal';
@@ -97,6 +98,7 @@ export default function Home() {
     }, [activeView]);
 
     const { currency, setCurrency, symbol, formatValue } = useBaseCurrency();
+    const activeSetName = useActiveSetName(demoBannerRefresh);
 
     useEffect(() => {
         localStorage.setItem('showValues', JSON.stringify(showValues));
@@ -288,6 +290,7 @@ export default function Home() {
                     onViewChange={setActiveView}
                     onSettingsClick={() => setSettingsOpen(true)}
                     currency={currency}
+                    activeSetName={activeSetName}
                 />
 
                 {/* ── Content column ───────────────────────────────── */}
@@ -299,14 +302,18 @@ export default function Home() {
                         style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)' }}
                     >
                         <div className="w-full flex items-center gap-4">
-                            {/* Mobile: show logo */}
-                            <h1 className="md:hidden text-base font-semibold tracking-tight flex-shrink-0"
-                                style={{ color: 'var(--text-primary)' }}>
-                                Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
-                            </h1>
+                            {/* Active portfolio — so it's always clear which one is loaded */}
+                            <div className="flex items-center gap-2 min-w-0">
+                                <MdAccountBalanceWallet size={18} className="flex-shrink-0"
+                                    style={{ color: 'var(--accent)' }} />
+                                <span className="text-sm font-medium truncate" title={activeSetName}
+                                    style={{ color: 'var(--text-primary)' }}>
+                                    {activeSetName || 'Portfolio'}
+                                </span>
+                            </div>
 
                             {/* Controls — push right */}
-                            <div className="flex items-center gap-2 ml-auto">
+                            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
                                 {/* Currency pill — mobile only (sidebar shows it on desktop) */}
                                 <span className="md:hidden px-2 py-0.5 rounded text-xs font-mono font-semibold"
                                     style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
@@ -483,9 +490,9 @@ export default function Home() {
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
                                             <h2 className="text-base font-semibold mb-1"
-                                                style={{ color: 'var(--text-primary)' }}>Data management</h2>
+                                                style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
                                             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                Import, switch, export, or remove your position sets.
+                                                Switch between your portfolios, save one to a file, or load a new one.
                                             </p>
                                         </div>
                                         <button
@@ -494,7 +501,7 @@ export default function Home() {
                                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                         >
                                             <MdUpload size={15} />
-                                            Import set
+                                            Load portfolio
                                         </button>
                                     </div>
                                     <PositionSetManager
@@ -581,7 +588,7 @@ export default function Home() {
                             handlePositionSetChanged();
                         } else {
                             setDemoBannerRefresh(prev => prev + 1);
-                            setActionInfo(`Imported ${count} transactions — activate the new set below to view it.`);
+                            setActionInfo(`Loaded ${count} transactions — switch to the new portfolio below to view it.`);
                             setTimeout(() => setActionInfo(null), 5000);
                         }
                     }}

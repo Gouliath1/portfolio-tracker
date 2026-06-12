@@ -29,6 +29,13 @@ const EMPTY = {
 
 type FormState = typeof EMPTY;
 
+// Today as YYYY-MM-DD (local), used to pre-fill the date field.
+function todayIso(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function toTransaction(f: FormState): Transaction {
     const qty = parseFloat(f.quantity);
     const cpu = parseFloat(f.costPerUnit);
@@ -36,7 +43,7 @@ function toTransaction(f: FormState): Transaction {
 
     return {
         way: 'buy',
-        date: f.transactionDate.replace(/-/g, '/'),
+        date: f.transactionDate.trim().replace(/-/g, '/'),
         ticker: f.ticker.trim().toUpperCase(),
         fullName: f.fullName.trim(),
         broker: f.broker.trim() || undefined,
@@ -61,7 +68,16 @@ function validate(f: FormState): string | null {
         const fees = parseFloat(f.fees);
         if (isNaN(fees) || fees < 0) return 'Fees must be a non-negative number';
     }
-    if (!f.transactionDate) return 'Transaction date is required';
+    if (!f.transactionDate.trim()) return 'Transaction date is required';
+    const norm = f.transactionDate.trim().replace(/\//g, '-');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(norm)) return 'Date must be in YYYY-MM-DD format';
+    // Reject impossible dates like 2023-02-31 (Date silently rolls them over).
+    const [y, m, day] = norm.split('-').map(Number);
+    const d = new Date(`${norm}T00:00:00`);
+    if (isNaN(d.getTime()) || d.getFullYear() !== y || d.getMonth() + 1 !== m || d.getDate() !== day) {
+        return 'That date does not exist';
+    }
+    if (d.getTime() > Date.now()) return 'Transaction date cannot be in the future';
     return null;
 }
 
@@ -73,7 +89,7 @@ function useKnownValues(setId: string) {
 }
 
 export default function AddPositionModal({ setId, onSaved, onClose }: AddPositionModalProps) {
-    const [form, setForm] = useState<FormState>(EMPTY);
+    const [form, setForm] = useState<FormState>({ ...EMPTY, transactionDate: todayIso() });
     const [error, setError] = useState<string | null>(null);
     const [nameLookupState, setNameLookupState] = useState<'idle' | 'loading' | 'found' | 'not-found'>('idle');
     const [nameOverridden, setNameOverridden] = useState(false);
@@ -148,17 +164,17 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div
-                className="relative w-full max-w-lg rounded-2xl flex flex-col"
+                className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl flex flex-col"
                 style={{
                     background: 'var(--surface-popover)',
                     border: '1px solid var(--border-strong)',
                     boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
-                    maxHeight: '90vh',
+                    maxHeight: '90dvh',
                 }}
             >
                 {/* Header */}
@@ -274,16 +290,19 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
                         </div>
                     </div>
 
-                    {/* Date */}
+                    {/* Date — typed manually, defaults to today */}
                     <div className="space-y-1">
                         <label className="text-xs" style={labelStyle}>Transaction date *</label>
                         <input
-                            type="date"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="YYYY-MM-DD"
                             className={inputClass} style={inputStyle}
                             value={form.transactionDate} onChange={set('transactionDate')}
                         />
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Used to look up the historical FX rate at time of purchase.
+                            Type the date as YYYY-MM-DD (defaults to today). Used to look up the historical FX rate at time of purchase.
                         </p>
                     </div>
 

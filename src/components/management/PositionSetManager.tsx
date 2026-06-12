@@ -47,20 +47,20 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
         try {
             activateSet(id);
             refresh();
-            setSuccess('Position set activated');
+            setSuccess('Now using this portfolio');
             onPositionSetChanged?.();
         } catch {
-            setError('Failed to activate position set');
+            setError('Failed to switch portfolio');
         }
     };
 
     const handleDelete = (id: string, name: string) => {
-        if (!confirm(`Delete "${name}"? This will permanently remove all positions in this set.`)) return;
+        if (!confirm(`Delete "${name}"? This will permanently remove this portfolio and all its positions.`)) return;
         try {
             const wasActive = getActiveSetId() === id;
             deleteSet(id);
             refresh();
-            setSuccess('Position set deleted');
+            setSuccess('Portfolio deleted');
             // If we just deleted the active set, storage falls back to demo (or
             // the first remaining set) — tell the parent to reload the table.
             if (wasActive) onPositionSetChanged?.();
@@ -81,9 +81,9 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             a.click();
             URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            setSuccess('Exported successfully');
+            setSuccess('Saved to file');
         } catch {
-            setError('Failed to export');
+            setError('Failed to save');
         }
     };
 
@@ -93,10 +93,10 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             {!hideHeader && (
                 <div>
                     <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        Position Sets
+                        Your portfolios
                     </h2>
                     <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Switch between, export, or delete portfolio datasets
+                        Switch between your portfolios, save one to a file, or remove it
                     </p>
                 </div>
             )}
@@ -125,14 +125,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <MdSettings className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                            No position sets — import a JSON file to get started
+                            No portfolios yet — load a file to get started
                         </p>
                     </div>
                 ) : (
                     <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                         {sets.map(set => (
-                            <div key={set.id} className="px-6 py-4 space-y-2 glass-hover transition-colors">
-                                {/* Row 1: name + badges + buttons */}
+                            <div key={set.id} className="px-4 sm:px-6 py-4 space-y-3 glass-hover transition-colors">
+                                {/* Name + badges */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                                         {set.display_name}
@@ -140,7 +140,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                     {set.id === activeId && (
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                                             style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)', border: '1px solid var(--pnl-green)' }}>
-                                            <MdCheckCircle className="w-3 h-3" /> Active
+                                            <MdCheckCircle className="w-3 h-3" /> In use
                                         </span>
                                     )}
                                     {set.info_type === 'warning' && (
@@ -149,44 +149,45 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             <MdWarning className="w-3 h-3" /> Demo
                                         </span>
                                     )}
-                                    {/* Buttons pushed to the right */}
-                                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                                    {set.id !== activeId && (
-                                        <button
-                                            onClick={() => handleActivate(set.id)}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                        >
-                                            <MdPlayArrow className="w-3 h-3" />
-                                            Activate
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleExport(set.id, set.name)}
-                                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium glass glass-hover transition-all"
-                                        style={{ color: 'var(--text-secondary)' }}
-                                    >
-                                        <MdDownload className="w-3 h-3" />
-                                        Export
-                                    </button>
-                                    {set.id !== 'demo' && (
-                                        <button
-                                            onClick={() => handleDelete(set.id, set.display_name)}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red-dim)' }}
-                                        >
-                                            <MdDelete className="w-3 h-3" />
-                                            Delete
-                                        </button>
-                                    )}
-                                </div>{/* end buttons */}
-                                </div>{/* end row 1 */}
+                                </div>
 
-                                {/* Row 2: description + date */}
+                                {/* Description + date */}
                                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                                     {set.description && <>{set.description} · </>}
                                     Created {new Date(set.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                 </p>
+
+                                {/* Actions — own row so they never run off a narrow screen */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {set.id !== activeId && (
+                                        <button
+                                            onClick={() => handleActivate(set.id)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                        >
+                                            <MdPlayArrow className="w-3.5 h-3.5" />
+                                            Use this
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleExport(set.id, set.name)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium glass glass-hover transition-all"
+                                        style={{ color: 'var(--text-secondary)' }}
+                                    >
+                                        <MdDownload className="w-3.5 h-3.5" />
+                                        Save to file
+                                    </button>
+                                    {set.id !== 'demo' && (
+                                        <button
+                                            onClick={() => handleDelete(set.id, set.display_name)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ml-auto"
+                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red-dim)' }}
+                                        >
+                                            <MdDelete className="w-3.5 h-3.5" />
+                                            Delete
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>

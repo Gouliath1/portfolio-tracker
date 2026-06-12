@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import {
     MdHome, MdAccountBalance, MdHistory, MdTune,
-    MdTrendingUp, MdSettings,
+    MdTrendingUp, MdSettings, MdAccountBalanceWallet,
 } from 'react-icons/md';
 
 export type SidebarViewId = 'overview' | 'holdings' | 'closed' | 'transactions';
@@ -17,6 +17,8 @@ interface AppSidebarProps {
     /** Home page only — opens the settings panel */
     onSettingsClick?: () => void;
     currency: string;
+    /** Display name of the active portfolio, shown under the logo */
+    activeSetName?: string;
 }
 
 const NAV_ITEMS: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
@@ -36,6 +38,7 @@ export function AppSidebar({
     onViewChange,
     onSettingsClick,
     currency,
+    activeSetName,
 }: AppSidebarProps) {
     const onHome = activePage === 'home';
     const router = useRouter();
@@ -55,6 +58,24 @@ export function AppSidebar({
                     Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
                 </button>
             </div>
+
+            {/* Active portfolio */}
+            {activeSetName && (
+                <div className="px-4 py-3 flex items-center gap-2.5 flex-shrink-0"
+                    style={{ borderBottom: '1px solid var(--border)' }}>
+                    <MdAccountBalanceWallet size={18} style={{ color: 'var(--accent)' }} className="flex-shrink-0" />
+                    <div className="min-w-0">
+                        <div className="text-[10px] font-semibold uppercase tracking-widest"
+                            style={{ color: 'var(--text-muted)' }}>
+                            Portfolio
+                        </div>
+                        <div className="text-sm font-medium truncate" title={activeSetName}
+                            style={{ color: 'var(--text-primary)' }}>
+                            {activeSetName}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Nav */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">

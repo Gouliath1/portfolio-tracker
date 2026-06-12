@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppSidebar } from '../../../components/layout/AppSidebar';
-import { MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp, MdSettings } from 'react-icons/md';
+import { MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp, MdSettings, MdAccountBalanceWallet } from 'react-icons/md';
 import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
+import { useActiveSetName } from '../../../hooks/useActiveSetName';
 import { usePortfolioSummaryData } from '../../../hooks/usePortfolioSummaryData';
 
 // ── Date helpers ─────────────────────────────────────────────
@@ -75,6 +76,7 @@ export default function DeepDivePage() {
     const [activeTab, setActiveTab] = useState<'lifetime' | 'annual'>('lifetime');
     const [xirrExpanded, setXirrExpanded] = useState(false);
     const { currency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
+    const activeSetName = useActiveSetName();
     const { summary, loading, error } = usePortfolioSummaryData(currency, currencyHydrated);
     const router = useRouter();
 
@@ -186,7 +188,7 @@ export default function DeepDivePage() {
     return (
         <div className="flex min-h-screen" style={{ background: 'var(--bg-base)' }}>
 
-            <AppSidebar activePage="deep-dive" currency={currency} />
+            <AppSidebar activePage="deep-dive" currency={currency} activeSetName={activeSetName} />
 
             {/* ── Content column ───────────────────────────────── */}
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
@@ -194,10 +196,15 @@ export default function DeepDivePage() {
                 {/* ── Header ───────────────────────────────────── */}
                 <header className="sticky top-0 z-10 px-4 sm:px-6 h-[52px] flex items-center"
                     style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)' }}>
-                    <h1 className="md:hidden text-base font-semibold tracking-tight"
-                        style={{ color: 'var(--text-primary)' }}>
-                        Portfolio<span style={{ color: 'var(--accent)' }}>Tracker</span>
-                    </h1>
+                    {/* Active portfolio — mobile (sidebar shows it on desktop) */}
+                    <div className="md:hidden flex items-center gap-2 min-w-0">
+                        <MdAccountBalanceWallet size={18} className="flex-shrink-0"
+                            style={{ color: 'var(--accent)' }} />
+                        <span className="text-sm font-medium truncate" title={activeSetName}
+                            style={{ color: 'var(--text-primary)' }}>
+                            {activeSetName || 'Portfolio'}
+                        </span>
+                    </div>
                     {/* Settings — mobile only (sidebar shows it on desktop) */}
                     <button
                         onClick={() => router.push('/?settings=1')}

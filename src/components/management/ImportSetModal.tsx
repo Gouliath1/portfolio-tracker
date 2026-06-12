@@ -135,22 +135,22 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div
-                className="relative w-full max-w-md rounded-2xl flex flex-col"
+                className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl flex flex-col"
                 style={{
                     background: 'var(--surface-popover)',
                     border: '1px solid var(--border-strong)',
                     boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
-                    maxHeight: '90vh',
+                    maxHeight: '90dvh',
                 }}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Import position set</h2>
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Load a portfolio</h2>
                     <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label="Close">
                         <MdClose size={18} />
                     </button>
@@ -197,7 +197,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             onChange={e => setFields(p => ({ ...p, set_as_active: e.target.checked }))}
                             style={{ accentColor: 'var(--accent)' }}
                         />
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Set as active after import</span>
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Switch to it after loading</span>
                     </label>
 
                     {/* Drop zone / staged file */}
@@ -282,7 +282,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             }}
                         >
                             {importing && <MdRefresh className="w-4 h-4 animate-spin" />}
-                            {importing ? 'Importing…' : 'Add'}
+                            {importing ? 'Loading…' : 'Load'}
                         </button>
                     </div>
                 </div>
