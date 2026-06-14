@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MdDownload, MdDelete, MdWarning, MdUpload, MdSwapHoriz, MdCheckCircle } from 'react-icons/md';
+import { MdDownload, MdDelete, MdWarning, MdSwapHoriz, MdCheckCircle } from 'react-icons/md';
 import {
     getPositionSets,
     getActiveSetId,
@@ -14,10 +14,9 @@ import {
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
     refreshTrigger?: number;
-    onImport?: () => void;
 }
 
-const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger, onImport }) => {
+const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger }) => {
     const [sets, setSets] = useState<PositionSetLocal[]>([]);
     const [activeId, setActiveId] = useState<string>('demo');
     // The highlighted row — a pending choice, not applied until the user confirms.
@@ -103,7 +102,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     const isActive = set.id === activeId;
                     const isSelected = set.id === selectedId;
                     const isDeleting = deletingId === set.id;
-                    const notLast = i < sets.length - 1 || !!onImport;
+                    const notLast = i < sets.length - 1;
                     const created = formatDate(set.created_at);
                     const updated = formatDate(set.updated_at);
 
@@ -207,24 +206,6 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                         </div>
                     );
                 })}
-
-                {onImport && (
-                    <button
-                        onClick={onImport}
-                        className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm font-medium transition-opacity"
-                        style={{
-                            borderTop: sets.length > 0 ? '1px solid var(--border)' : 'none',
-                            background: 'var(--surface)',
-                            color: 'var(--accent)',
-                            opacity: 0.75,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.75')}
-                    >
-                        <MdUpload className="w-4 h-4" />
-                        Load from file
-                    </button>
-                )}
             </div>
 
             {/* Confirm switch — selecting a row only highlights it; the user
