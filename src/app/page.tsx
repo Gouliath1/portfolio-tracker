@@ -21,7 +21,7 @@ import { useAssetClasses } from '../hooks/useAssetClasses';
 import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
-    MdCloudOff, MdRefresh, MdSettings, MdUpload, MdAdd, MdUndo,
+    MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo,
     MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
@@ -486,28 +486,18 @@ export default function Home() {
 
                             {/* Transactions: data management */}
                             {!loading && portfolioSummary && activeView === 'transactions' && (
-                                <div className="space-y-6">
-                                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                                        <div>
-                                            <h2 className="text-base font-semibold mb-1"
-                                                style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
-                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                Switch between your portfolios, save one to a file, or load a new one.
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => setImportModalOpen(true)}
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
-                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                        >
-                                            <MdUpload size={15} />
-                                            Load portfolio
-                                        </button>
+                                <div className="space-y-4">
+                                    <div>
+                                        <h2 className="text-base font-semibold mb-1"
+                                            style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
+                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                            Switch between your portfolios, save one to a file, or load a new one.
+                                        </p>
                                     </div>
                                     <PositionSetManager
-                                        hideHeader
                                         onPositionSetChanged={handlePositionSetChanged}
                                         refreshTrigger={demoBannerRefresh}
+                                        onImport={() => setImportModalOpen(true)}
                                     />
                                 </div>
                             )}
@@ -517,8 +507,10 @@ export default function Home() {
             </div>
 
             {/* ── Mobile bottom tab bar ────────────────────────────── */}
+            {/* z-[60] keeps the bar above the settings drawer/backdrop so it
+                stays tappable — settings behaves like any other tab. */}
             <nav
-                className="md:hidden fixed bottom-0 inset-x-0 z-30 flex"
+                className="md:hidden fixed bottom-0 inset-x-0 z-[60] flex"
                 style={{
                     background: 'var(--surface-sidebar)',
                     borderTop: '1px solid var(--border)',
@@ -526,12 +518,12 @@ export default function Home() {
                 }}
             >
                 {NAV_ITEMS.map(item => {
-                    const isActive = activeView === item.id;
+                    const isActive = !settingsOpen && activeView === item.id;
                     const Icon = item.icon;
                     return (
                         <button
                             key={item.id}
-                            onClick={() => setActiveView(item.id as ViewId)}
+                            onClick={() => { setSettingsOpen(false); setActiveView(item.id as ViewId); }}
                             className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
                             style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
                         >
@@ -549,10 +541,10 @@ export default function Home() {
                     <span>XIRR</span>
                 </button>
                 <button
-                    onClick={() => setSettingsOpen(true)}
-                    aria-label="Open settings"
+                    onClick={() => setSettingsOpen(o => !o)}
+                    aria-label="Settings"
                     className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
+                    style={{ color: settingsOpen ? 'var(--accent)' : 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
                 >
                     <MdSettings size={20} />
                     <span>Settings</span>

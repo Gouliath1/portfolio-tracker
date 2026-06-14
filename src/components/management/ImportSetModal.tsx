@@ -40,7 +40,7 @@ interface ImportSetModalProps {
 }
 
 export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
-    const [fields, setFields] = useState({ name: '', description: '', set_as_active: false });
+    const [fields, setFields] = useState({ name: '', set_as_active: false });
     const [stagedFile, setStagedFile] = useState<File | null>(null);
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -114,7 +114,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
             importPositionSet(
                 fields.name || `imported-${Date.now()}`,
                 fields.name || stagedFile.name.replace('.json', ''),
-                fields.description || `Imported from ${stagedFile.name}`,
+                `Imported from ${stagedFile.name}`,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 records as any,
                 fields.set_as_active,
@@ -164,30 +164,17 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
-                            <input
-                                type="text"
-                                value={fields.name}
-                                onChange={e => setFields(p => ({ ...p, name: e.target.value }))}
-                                placeholder="My Portfolio 2025"
-                                className={inputClass}
-                                style={inputStyle}
-                                autoFocus
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Description</label>
-                            <input
-                                type="text"
-                                value={fields.description}
-                                onChange={e => setFields(p => ({ ...p, description: e.target.value }))}
-                                placeholder="Optional description"
-                                className={inputClass}
-                                style={inputStyle}
-                            />
-                        </div>
+                    <div className="space-y-1">
+                        <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
+                        <input
+                            type="text"
+                            value={fields.name}
+                            onChange={e => setFields(p => ({ ...p, name: e.target.value }))}
+                            placeholder="My Portfolio 2025"
+                            className={inputClass}
+                            style={inputStyle}
+                            autoFocus
+                        />
                     </div>
 
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -258,7 +245,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                         )}
 
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Each record requires: way (buy/sell), date, ticker, fullName, account, quantity, pricePerUnit, ccy, stockCcy. Legacy position files are auto-migrated.
+                            Transactions JSON — download the template for the required fields. Legacy position files are auto-migrated.
                         </p>
                     </div>
 

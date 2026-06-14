@@ -49,7 +49,7 @@ export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: Set
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
-                className="fixed top-0 right-0 h-full z-50 flex flex-col"
+                className="fixed top-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 z-50 flex flex-col"
                 style={{
                     width: 'min(480px, 100vw)',
                     background: 'var(--surface-popover)',
