@@ -2,11 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import {
-    MdHome, MdAccountBalance, MdHistory, MdTune,
+    MdHome, MdAccountBalance, MdTune,
     MdTrendingUp, MdSettings, MdAccountBalanceWallet,
 } from 'react-icons/md';
 
-export type SidebarViewId = 'overview' | 'holdings' | 'closed' | 'transactions';
+export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
     activePage: 'home' | 'deep-dive';
@@ -21,11 +21,11 @@ interface AppSidebarProps {
     activeSetName?: string;
 }
 
-const NAV_ITEMS: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: 'overview',      label: 'Overview',  icon: MdHome },
-    { id: 'holdings',      label: 'Holdings',  icon: MdAccountBalance },
-    { id: 'closed',        label: 'Closed',    icon: MdHistory },
-    { id: 'transactions',  label: 'Manage',    icon: MdTune },
+const OVERVIEW_ITEM = { id: 'overview' as const, label: 'Overview', icon: MdHome };
+// Assets and Data sit after the Analysis link; Data is last as a utility view.
+const VIEW_ITEMS: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
+    { id: 'assets', label: 'Assets', icon: MdAccountBalance },
+    { id: 'data',   label: 'Data',   icon: MdTune },
 ];
 
 const activeStyle  = { background: 'var(--accent-dim)', color: 'var(--accent)' } as const;
@@ -77,49 +77,48 @@ export function AppSidebar({
                 </div>
             )}
 
-            {/* Nav */}
+            {/* Nav — Overview · Analysis · Assets · Data */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">
-                {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
-                    const isActive = onHome && activeView === id;
+                {(() => {
+                    const viewButton = ({ id, label, icon: Icon }: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }) => {
+                        const isActive = onHome && activeView === id;
+                        return (
+                            <button key={id}
+                                onClick={() => {
+                                    if (onHome && onViewChange) onViewChange(id);
+                                    else router.push(`/?view=${id}`);
+                                }}
+                                className={itemClass}
+                                style={isActive ? activeStyle : defaultStyle}>
+                                <Icon size={17} />
+                                {label}
+                            </button>
+                        );
+                    };
                     return (
-                        <button key={id}
-                            onClick={() => {
-                                if (onHome && onViewChange) {
-                                    onViewChange(id);
-                                } else {
-                                    router.push(`/?view=${id}`);
-                                }
-                            }}
-                            className={itemClass}
-                            style={isActive ? activeStyle : defaultStyle}>
-                            <Icon size={17} />
-                            {label}
-                        </button>
+                        <>
+                            {viewButton(OVERVIEW_ITEM)}
+
+                            {/* Analysis (deep-dive) — sits right after Overview */}
+                            {activePage === 'deep-dive' ? (
+                                <div className={itemClass} style={activeStyle}>
+                                    <MdTrendingUp size={17} />
+                                    Analysis
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => router.push('/returns/deep-dive')}
+                                    className={itemClass}
+                                    style={defaultStyle}>
+                                    <MdTrendingUp size={17} />
+                                    Analysis
+                                </button>
+                            )}
+
+                            {VIEW_ITEMS.map(viewButton)}
+                        </>
                     );
-                })}
-
-                {/* Analysis sub-section */}
-                <div className="pt-4 pb-1 px-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest"
-                        style={{ color: 'var(--text-muted)', opacity: 0.55 }}>
-                        Analysis
-                    </span>
-                </div>
-
-                {activePage === 'deep-dive' ? (
-                    <div className={itemClass} style={activeStyle}>
-                        <MdTrendingUp size={17} />
-                        XIRR Deep Dive
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => router.push('/returns/deep-dive')}
-                        className={itemClass}
-                        style={defaultStyle}>
-                        <MdTrendingUp size={17} />
-                        XIRR Deep Dive
-                    </button>
-                )}
+                })()}
             </nav>
 
             {/* Footer */}
