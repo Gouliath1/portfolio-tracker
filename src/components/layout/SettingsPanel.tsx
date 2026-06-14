@@ -141,15 +141,18 @@ export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: Set
                     {/* Exchange rates — read-only view of the FX rates used for valuation */}
                     <ExchangeRatesSection open={open} currency={currency} />
 
-                    {/* Version + build info — confirms which commit is live in the browser */}
+                    {/* Version + build info — confirms which commit is live in the browser.
+                        These are build-time stamps inlined at compile time; the server and
+                        client bundles can be compiled at different commit counts during dev
+                        recompiles, so suppress the resulting hydration text mismatch. */}
                     <section className="pt-2 text-xs space-y-1" style={{ color: 'var(--text-muted)' }}>
                         <div>
                             Version:{' '}
-                            <code style={{ color: 'var(--text-secondary)' }}>
+                            <code style={{ color: 'var(--text-secondary)' }} suppressHydrationWarning>
                                 {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.1.0'}
                             </code>
                         </div>
-                        <div>
+                        <div suppressHydrationWarning>
                             Build:{' '}
                             <code style={{ color: 'var(--text-secondary)' }}>
                                 {process.env.NEXT_PUBLIC_BUILD_SHA?.slice(0, 7) ?? 'dev'}
