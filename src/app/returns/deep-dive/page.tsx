@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppSidebar } from '../../../components/layout/AppSidebar';
-import { MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp, MdSettings, MdAccountBalanceWallet } from 'react-icons/md';
+import { SettingsPanel } from '../../../components/layout/SettingsPanel';
+import { MdHome, MdAccountBalance, MdTune, MdTrendingUp, MdSettings, MdAccountBalanceWallet } from 'react-icons/md';
 import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../../hooks/useActiveSetName';
@@ -75,7 +76,8 @@ export default function DeepDivePage() {
     const [loadingPrices, setLoadingPrices] = useState(false);
     const [activeTab, setActiveTab] = useState<'lifetime' | 'annual'>('lifetime');
     const [xirrExpanded, setXirrExpanded] = useState(false);
-    const { currency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const { currency, setCurrency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
     const activeSetName = useActiveSetName();
     const { summary, loading, error } = usePortfolioSummaryData(currency, currencyHydrated);
     const router = useRouter();
@@ -207,7 +209,7 @@ export default function DeepDivePage() {
                     </div>
                     {/* Settings — mobile only (sidebar shows it on desktop) */}
                     <button
-                        onClick={() => router.push('/?settings=1')}
+                        onClick={() => setSettingsOpen(true)}
                         className="md:hidden ml-auto p-2 rounded-lg"
                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                         aria-label="Open settings"
@@ -219,6 +221,19 @@ export default function DeepDivePage() {
                 {/* ── Main content ─────────────────────────────── */}
                 <main className="flex-1 pb-20 md:pb-0">
                     <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
+
+                        {/* Page header — scopes this page to returns so the broad
+                            "Analysis" tab doesn't imply a full analysis suite. */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-1"
+                                style={{ color: 'var(--text-muted)' }}>Analysis</p>
+                            <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                Returns
+                            </h1>
+                            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                                How your money has grown over time — annualised with XIRR, reconciled against every cash flow.
+                            </p>
+                        </div>
 
                         {loading && (
                             <div className="flex items-center justify-center py-24">
@@ -353,7 +368,7 @@ export default function DeepDivePage() {
                                     <div>
                                         <p className="text-xs font-semibold uppercase tracking-widest mb-3"
                                             style={{ color: 'var(--text-muted)' }}>
-                                            Per-Position Lifetime XIRR
+                                            Returns by position
                                             <span className="ml-2 normal-case font-normal" style={{ opacity: 0.6 }}>
                                                 — click a row to see its cash flows
                                             </span>
@@ -623,39 +638,70 @@ export default function DeepDivePage() {
             </div>
 
             {/* ── Mobile bottom tab bar ────────────────────────────── */}
+            {/* z-[60] keeps the bar above the settings drawer so it stays
+                tappable — matches the main page. */}
             <nav
-                className="md:hidden fixed bottom-0 inset-x-0 z-30 flex"
+                className="md:hidden fixed bottom-0 inset-x-0 z-[60] flex"
                 style={{
                     background: 'var(--surface-sidebar)',
                     borderTop: '1px solid var(--border)',
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
-                {([
-                    { label: 'Overview',  icon: MdHome,          view: 'overview' },
-                    { label: 'Holdings',  icon: MdAccountBalance, view: 'holdings' },
-                    { label: 'Closed',    icon: MdHistory,        view: 'closed' },
-                    { label: 'Manage',    icon: MdTune,           view: 'transactions' },
-                ] as const).map(({ label, icon: Icon, view }) => (
-                    <button
-                        key={label}
-                        onClick={() => router.push(`/?view=${view}`)}
-                        className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                        style={{ color: 'var(--text-muted)' }}
-                    >
-                        <Icon size={20} />
-                        <span>{label}</span>
-                    </button>
-                ))}
+                {/* Overview */}
                 <button
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium"
-                    style={{ color: 'var(--accent)' }}
-                    disabled
+                    onClick={() => router.push('/?view=overview')}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    <MdHome size={20} />
+                    <span>Overview</span>
+                </button>
+                {/* Analysis — current page; tapping it just closes settings */}
+                <button
+                    onClick={() => setSettingsOpen(false)}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: settingsOpen ? 'var(--text-muted)' : 'var(--accent)' }}
                 >
                     <MdTrendingUp size={20} />
-                    <span>XIRR</span>
+                    <span>Analysis</span>
+                </button>
+                {/* Assets */}
+                <button
+                    onClick={() => router.push('/?view=assets')}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    <MdAccountBalance size={20} />
+                    <span>Assets</span>
+                </button>
+                {/* Data */}
+                <button
+                    onClick={() => router.push('/?view=data')}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    <MdTune size={20} />
+                    <span>Data</span>
+                </button>
+                {/* Settings */}
+                <button
+                    onClick={() => setSettingsOpen(o => !o)}
+                    aria-label="Settings"
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: settingsOpen ? 'var(--accent)' : 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
+                >
+                    <MdSettings size={20} />
+                    <span>Settings</span>
                 </button>
             </nav>
+
+            <SettingsPanel
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                currency={currency}
+                onCurrencyChange={setCurrency}
+            />
         </div>
     );
 }

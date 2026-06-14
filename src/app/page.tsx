@@ -22,7 +22,7 @@ import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo, MdUpload,
-    MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
+    MdHome, MdAccountBalance, MdTune, MdTrendingUp,
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
 
@@ -35,13 +35,7 @@ import { getActiveSetId, exportSetTransactions, removeTransactionFromSet, insert
 
 import type { SidebarViewId } from '../components/layout/AppSidebar';
 type ViewId = SidebarViewId;
-
-const NAV_ITEMS = [
-    { id: 'overview'     as const, label: 'Overview',  icon: MdHome },
-    { id: 'holdings'     as const, label: 'Holdings',  icon: MdAccountBalance },
-    { id: 'closed'       as const, label: 'Closed',    icon: MdHistory },
-    { id: 'transactions' as const, label: 'Manage',    icon: MdTune },
-];
+type AssetsTab = 'open' | 'closed';
 
 interface UndoEntry {
     position: Position;
@@ -66,6 +60,7 @@ export default function Home() {
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showValues, setShowValues] = useState(true);
     const [activeView, setActiveView] = useState<ViewId>('overview');
+    const [assetsTab, setAssetsTab] = useState<AssetsTab>('open');
     // Overview asset-class filter. null = all classes; otherwise an explicit subset.
     const [selectedClasses, setSelectedClasses] = useState<string[] | null>(null);
 
@@ -83,8 +78,16 @@ export default function Home() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const v = params.get('view');
-        if (v === 'holdings' || v === 'closed' || v === 'transactions' || v === 'overview') {
+        // Current ids, plus backward-compat for the old holdings/closed/transactions links.
+        if (v === 'overview' || v === 'assets' || v === 'data') {
             setActiveView(v);
+        } else if (v === 'holdings') {
+            setActiveView('assets');
+        } else if (v === 'closed') {
+            setActiveView('assets');
+            setAssetsTab('closed');
+        } else if (v === 'transactions') {
+            setActiveView('data');
         }
         if (params.get('settings') === '1') {
             setSettingsOpen(true);
@@ -449,43 +452,63 @@ export default function Home() {
                                 </>
                             )}
 
-                            {/* Holdings: open positions */}
-                            {!loading && portfolioSummary && activeView === 'holdings' && (
+                            {/* Assets: open + closed positions in one place, toggled */}
+                            {!loading && portfolioSummary && activeView === 'assets' && (
                                 <>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => setAddPositionOpen(true)}
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                        >
-                                            <MdAdd size={15} />
-                                            Add position
-                                        </button>
+                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                        {/* Open / Closed toggle */}
+                                        <div className="inline-flex rounded-lg p-0.5 text-sm font-medium"
+                                            style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+                                            {([
+                                                { id: 'open' as const,   label: 'Open',   count: portfolioSummary.positions.length },
+                                                { id: 'closed' as const, label: 'Closed', count: portfolioSummary.closedPositions.length },
+                                            ]).map(t => (
+                                                <button
+                                                    key={t.id}
+                                                    onClick={() => setAssetsTab(t.id)}
+                                                    className="px-3 py-1.5 rounded-md transition-all"
+                                                    style={assetsTab === t.id
+                                                        ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
+                                                        : { color: 'var(--text-secondary)' }}
+                                                >
+                                                    {t.label} <span style={{ opacity: 0.6 }}>({t.count})</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {assetsTab === 'open' && (
+                                            <button
+                                                onClick={() => setAddPositionOpen(true)}
+                                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
+                                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                            >
+                                                <MdAdd size={15} />
+                                                Add position
+                                            </button>
+                                        )}
                                     </div>
-                                    <PositionsTable
-                                        positions={portfolioSummary.positions}
-                                        showValues={showValues}
-                                        baseCurrency={currency}
-                                        onDeletePosition={handleDeletePosition}
-                                        onSellPosition={handleSellPosition}
-                                    />
+                                    {assetsTab === 'open' ? (
+                                        <PositionsTable
+                                            positions={portfolioSummary.positions}
+                                            showValues={showValues}
+                                            baseCurrency={currency}
+                                            onDeletePosition={handleDeletePosition}
+                                            onSellPosition={handleSellPosition}
+                                        />
+                                    ) : (
+                                        <ClosedPositionsTable
+                                            positions={portfolioSummary.closedPositions}
+                                            showValues={showValues}
+                                            baseCurrency={currency}
+                                            realizedPnlJPY={portfolioSummary.realizedPnlJPY}
+                                            realizedCostJPY={portfolioSummary.realizedCostJPY}
+                                            realizedPnlPercentage={portfolioSummary.realizedPnlPercentage}
+                                        />
+                                    )}
                                 </>
                             )}
 
-                            {/* Closed positions */}
-                            {!loading && portfolioSummary && activeView === 'closed' && (
-                                <ClosedPositionsTable
-                                    positions={portfolioSummary.closedPositions}
-                                    showValues={showValues}
-                                    baseCurrency={currency}
-                                    realizedPnlJPY={portfolioSummary.realizedPnlJPY}
-                                    realizedCostJPY={portfolioSummary.realizedCostJPY}
-                                    realizedPnlPercentage={portfolioSummary.realizedPnlPercentage}
-                                />
-                            )}
-
-                            {/* Transactions: data management */}
-                            {!loading && portfolioSummary && activeView === 'transactions' && (
+                            {/* Data: portfolio management */}
+                            {!loading && portfolioSummary && activeView === 'data' && (
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
@@ -526,29 +549,43 @@ export default function Home() {
                     paddingBottom: 'env(safe-area-inset-bottom)',
                 }}
             >
-                {NAV_ITEMS.map(item => {
-                    const isActive = !settingsOpen && activeView === item.id;
-                    const Icon = item.icon;
-                    return (
-                        <button
-                            key={item.id}
-                            onClick={() => { setSettingsOpen(false); setActiveView(item.id as ViewId); }}
-                            className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                            style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
-                        >
-                            <Icon size={20} />
-                            <span>{item.label}</span>
-                        </button>
-                    );
-                })}
+                {/* Overview */}
+                <button
+                    onClick={() => { setSettingsOpen(false); setActiveView('overview'); }}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: !settingsOpen && activeView === 'overview' ? 'var(--accent)' : 'var(--text-muted)' }}
+                >
+                    <MdHome size={20} />
+                    <span>Overview</span>
+                </button>
+                {/* Analysis — separate page */}
                 <button
                     onClick={() => window.location.href = '/returns/deep-dive'}
                     className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                 >
                     <MdTrendingUp size={20} />
-                    <span>XIRR</span>
+                    <span>Analysis</span>
                 </button>
+                {/* Assets */}
+                <button
+                    onClick={() => { setSettingsOpen(false); setActiveView('assets'); }}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: !settingsOpen && activeView === 'assets' ? 'var(--accent)' : 'var(--text-muted)' }}
+                >
+                    <MdAccountBalance size={20} />
+                    <span>Assets</span>
+                </button>
+                {/* Data */}
+                <button
+                    onClick={() => { setSettingsOpen(false); setActiveView('data'); }}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: !settingsOpen && activeView === 'data' ? 'var(--accent)' : 'var(--text-muted)' }}
+                >
+                    <MdTune size={20} />
+                    <span>Data</span>
+                </button>
+                {/* Settings */}
                 <button
                     onClick={() => setSettingsOpen(o => !o)}
                     aria-label="Settings"
