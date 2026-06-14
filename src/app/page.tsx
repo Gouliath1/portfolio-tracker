@@ -21,7 +21,7 @@ import { useAssetClasses } from '../hooks/useAssetClasses';
 import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
-    MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo,
+    MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo, MdUpload,
     MdHome, MdAccountBalance, MdHistory, MdTune, MdTrendingUp,
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
@@ -487,17 +487,26 @@ export default function Home() {
                             {/* Transactions: data management */}
                             {!loading && portfolioSummary && activeView === 'transactions' && (
                                 <div className="space-y-4">
-                                    <div>
-                                        <h2 className="text-base font-semibold mb-1"
-                                            style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
-                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                            Switch between your portfolios, save one to a file, or load a new one.
-                                        </p>
+                                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                                        <div>
+                                            <h2 className="text-base font-semibold mb-1"
+                                                style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
+                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                Switch between your portfolios, save one to a file, or load a new one.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setImportModalOpen(true)}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
+                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                        >
+                                            <MdUpload size={15} />
+                                            Load from file
+                                        </button>
                                     </div>
                                     <PositionSetManager
                                         onPositionSetChanged={handlePositionSetChanged}
                                         refreshTrigger={demoBannerRefresh}
-                                        onImport={() => setImportModalOpen(true)}
                                     />
                                 </div>
                             )}
