@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-    MdPlayArrow, MdDownload, MdDelete, MdSettings,
-    MdCheckCircle, MdWarning,
-} from 'react-icons/md';
+import { MdDownload, MdDelete, MdWarning, MdUpload, MdSwapHoriz, MdCheckCircle } from 'react-icons/md';
 import {
     getPositionSets,
     getActiveSetId,
@@ -16,56 +13,47 @@ import {
 
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
-    refreshTrigger?: number; // bump to force a re-read from localStorage
-    hideHeader?: boolean;    // suppress the built-in title when the host provides one
+    refreshTrigger?: number;
+    onImport?: () => void;
 }
 
-const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger, hideHeader }) => {
+const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger, onImport }) => {
     const [sets, setSets] = useState<PositionSetLocal[]>([]);
     const [activeId, setActiveId] = useState<string>('demo');
+    // The highlighted row — a pending choice, not applied until the user confirms.
+    const [selectedId, setSelectedId] = useState<string>('demo');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
 
     const refresh = () => {
         setSets(getPositionSets());
-        setActiveId(getActiveSetId());
+        const active = getActiveSetId();
+        setActiveId(active);
+        setSelectedId(active);
     };
 
-    // Re-read on mount and whenever the parent signals a change (e.g. an import
-    // happened in a sibling modal). The Settings drawer stays mounted across
-    // open/close, so this trigger is how we stay in sync.
     useEffect(() => { refresh(); }, [refreshTrigger]);
 
-    useEffect(() => {
-        if (success) {
-            const timer = setTimeout(() => setSuccess(null), 4000);
-            return () => clearTimeout(timer);
-        }
-    }, [success]);
-
     const handleActivate = (id: string) => {
+        if (id === activeId) return;
         try {
             activateSet(id);
             refresh();
-            setSuccess('Now using this portfolio');
             onPositionSetChanged?.();
         } catch {
             setError('Failed to switch portfolio');
         }
     };
 
-    const handleDelete = (id: string, name: string) => {
-        if (!confirm(`Delete "${name}"? This will permanently remove this portfolio and all its positions.`)) return;
+    const handleDelete = (id: string) => {
         try {
             const wasActive = getActiveSetId() === id;
             deleteSet(id);
+            setDeletingId(null);
             refresh();
-            setSuccess('Portfolio deleted');
-            // If we just deleted the active set, storage falls back to demo (or
-            // the first remaining set) — tell the parent to reload the table.
             if (wasActive) onPositionSetChanged?.();
         } catch {
-            setError('Failed to delete position set');
+            setError('Failed to delete portfolio');
         }
     };
 
@@ -81,29 +69,21 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             a.click();
             URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            setSuccess('Saved to file');
         } catch {
             setError('Failed to save');
         }
     };
 
-    return (
-        <div className="space-y-5">
-            {/* Header */}
-            {!hideHeader && (
-                <div>
-                    <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        Your portfolios
-                    </h2>
-                    <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Switch between your portfolios, save one to a file, or remove it
-                    </p>
-                </div>
-            )}
+    const formatDate = (iso: string) =>
+        new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
-            {/* Messages */}
+    const selectedSet = sets.find(s => s.id === selectedId);
+    const showConfirm = selectedId !== activeId && !!selectedSet;
+
+    return (
+        <div className="space-y-3">
             {error && (
-                <div className="rounded-xl px-4 py-3 flex items-start gap-3"
+                <div className="rounded-lg px-4 py-3 flex items-start gap-3"
                     style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)' }}>
                     <MdWarning className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--pnl-red)' }} />
                     <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{error}</p>
@@ -111,88 +91,160 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                         style={{ color: 'var(--text-primary)' }}>✕</button>
                 </div>
             )}
-            {success && (
-                <div className="rounded-xl px-4 py-3 flex items-start gap-3"
-                    style={{ background: 'var(--pnl-green-dim)', border: '1px solid var(--pnl-green)' }}>
-                    <MdCheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--pnl-green)' }} />
-                    <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{success}</p>
-                </div>
-            )}
 
-            {/* Position sets list */}
-            <div className="glass rounded-2xl overflow-hidden">
-                {sets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <MdSettings className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                            No portfolios yet — load a file to get started
-                        </p>
-                    </div>
-                ) : (
-                    <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                        {sets.map(set => (
-                            <div key={set.id} className="px-4 sm:px-6 py-4 space-y-3 glass-hover transition-colors">
-                                {/* Name + badges */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                                        {set.display_name}
-                                    </span>
-                                    {set.id === activeId && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                            style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)', border: '1px solid var(--pnl-green)' }}>
-                                            <MdCheckCircle className="w-3 h-3" /> In use
-                                        </span>
-                                    )}
-                                    {set.info_type === 'warning' && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                                            <MdWarning className="w-3 h-3" /> Demo
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Description + date */}
-                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                    {set.description && <>{set.description} · </>}
-                                    Created {new Date(set.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                </p>
-
-                                {/* Actions — own row so they never run off a narrow screen */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    {set.id !== activeId && (
-                                        <button
-                                            onClick={() => handleActivate(set.id)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                        >
-                                            <MdPlayArrow className="w-3.5 h-3.5" />
-                                            Use this
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleExport(set.id, set.name)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium glass glass-hover transition-all"
-                                        style={{ color: 'var(--text-secondary)' }}
-                                    >
-                                        <MdDownload className="w-3.5 h-3.5" />
-                                        Save to file
-                                    </button>
-                                    {set.id !== 'demo' && (
-                                        <button
-                                            onClick={() => handleDelete(set.id, set.display_name)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ml-auto"
-                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red-dim)' }}
-                                        >
-                                            <MdDelete className="w-3.5 h-3.5" />
-                                            Delete
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                {sets.length === 0 && (
+                    <div className="py-10 text-center" style={{ background: 'var(--surface)' }}>
+                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No portfolios — load a file to start</p>
                     </div>
                 )}
+
+                {sets.map((set, i) => {
+                    const isActive = set.id === activeId;
+                    const isSelected = set.id === selectedId;
+                    const isDeleting = deletingId === set.id;
+                    const notLast = i < sets.length - 1 || !!onImport;
+                    const created = formatDate(set.created_at);
+                    const updated = formatDate(set.updated_at);
+
+                    return (
+                        <div
+                            key={set.id}
+                            style={{
+                                background: isSelected ? 'var(--accent-dim)' : 'var(--surface)',
+                                borderBottom: notLast ? '1px solid var(--border)' : 'none',
+                                transition: 'background 150ms',
+                            }}
+                        >
+                            {isDeleting ? (
+                                <div className="flex items-center gap-3 px-4 py-3.5">
+                                    <p className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+                                        Delete <strong>{set.display_name}</strong>?
+                                    </p>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => setDeletingId(null)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                                            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(set.id)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                                            style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red)' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 px-4 py-3.5">
+                                    {/* Radio dot — click to select (does not switch yet) */}
+                                    <button
+                                        onClick={() => setSelectedId(set.id)}
+                                        className="flex-shrink-0 w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all"
+                                        style={{
+                                            borderColor: isSelected ? 'var(--accent)' : 'var(--border-strong)',
+                                            background: isSelected ? 'var(--accent)' : 'transparent',
+                                        }}
+                                        aria-label={`Select ${set.display_name}`}
+                                        aria-pressed={isSelected}
+                                    >
+                                        {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'oklch(100% 0.003 275)' }} />}
+                                    </button>
+
+                                    {/* Name + dates — clicking selects the row */}
+                                    <button
+                                        onClick={() => setSelectedId(set.id)}
+                                        className="flex-1 min-w-0 text-left"
+                                    >
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                                                {set.display_name}
+                                            </span>
+                                            {isActive && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0"
+                                                    style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)' }}>
+                                                    <MdCheckCircle className="w-3 h-3" /> In use
+                                                </span>
+                                            )}
+                                            {set.info_type === 'warning' && (
+                                                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Demo</span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                            Created {created}
+                                            {updated !== created && <> · Updated {updated}</>}
+                                        </div>
+                                    </button>
+
+                                    {/* Icon actions */}
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                                        <button
+                                            onClick={() => handleExport(set.id, set.name)}
+                                            className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
+                                            style={{ color: 'var(--text-secondary)' }}
+                                            title="Save to file"
+                                            aria-label="Save to file"
+                                        >
+                                            <MdDownload className="w-4 h-4" />
+                                        </button>
+                                        {set.id !== 'demo' && (
+                                            <button
+                                                onClick={() => setDeletingId(set.id)}
+                                                className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
+                                                style={{ color: 'var(--pnl-red)' }}
+                                                title="Delete"
+                                                aria-label="Delete portfolio"
+                                            >
+                                                <MdDelete className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {onImport && (
+                    <button
+                        onClick={onImport}
+                        className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm font-medium transition-opacity"
+                        style={{
+                            borderTop: sets.length > 0 ? '1px solid var(--border)' : 'none',
+                            background: 'var(--surface)',
+                            color: 'var(--accent)',
+                            opacity: 0.75,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.75')}
+                    >
+                        <MdUpload className="w-4 h-4" />
+                        Load from file
+                    </button>
+                )}
             </div>
+
+            {/* Confirm switch — selecting a row only highlights it; the user
+                applies the change here so portfolios never toggle by accident. */}
+            {showConfirm && (
+                <div className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
+                    <p className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+                        Start using <strong>{selectedSet!.display_name}</strong>?
+                    </p>
+                    <button
+                        onClick={() => handleActivate(selectedId)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0 transition-all"
+                        style={{ background: 'var(--accent)', color: 'oklch(100% 0.003 275)' }}
+                    >
+                        <MdSwapHoriz className="w-4 h-4" />
+                        Switch
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

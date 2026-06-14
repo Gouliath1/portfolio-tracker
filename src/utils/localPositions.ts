@@ -229,6 +229,17 @@ export function exportSetTransactions(id: string): Transaction[] {
     return getTransactionsForSet(id);
 }
 
+/** Bump a set's updated_at so "last updated" stays accurate after edits. */
+function touchSet(id: string): void {
+    if (id === DEMO_SET_ID) return;
+    const stored = getStoredSets();
+    const s = stored.find(x => x.id === id);
+    if (s) {
+        s.updated_at = new Date().toISOString();
+        saveStoredSets(stored);
+    }
+}
+
 /**
  * Append a transaction to a set. If acting on the demo set, promotes it to
  * a real "My Portfolio" set first. Returns the id of the set written to.
@@ -237,6 +248,7 @@ export function addTransactionToSet(setId: string, tx: Transaction): string {
     if (setId !== DEMO_SET_ID) {
         const existing = getTransactionsForSet(setId);
         localStorage.setItem(positionsKey(setId), JSON.stringify([...existing, tx]));
+        touchSet(setId);
         return setId;
     }
     const newSet = importPositionSet(
@@ -273,6 +285,7 @@ export function removeTransactionFromSet(setId: string, index: number): { remove
     const removed = txs[index];
     const updated = [...txs.slice(0, index), ...txs.slice(index + 1)];
     localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
+    touchSet(setId);
     return { removed, actualSetId: setId };
 }
 
@@ -282,6 +295,7 @@ export function insertTransactionIntoSet(setId: string, tx: Transaction, index: 
     const clamped = Math.max(0, Math.min(index, txs.length));
     const updated = [...txs.slice(0, clamped), tx, ...txs.slice(clamped)];
     localStorage.setItem(positionsKey(setId), JSON.stringify(updated));
+    touchSet(setId);
 }
 
 // ── Internal helpers ──────────────────────────────────────────
