@@ -428,21 +428,26 @@ export function ScreenerTable({
                                                     </span>
                                                 )}
                                             </span>
-                                            {/* Resize handle — 6px wide, always visible, turns accent when dragging */}
+                                            {/* Resize handle: wide invisible hit area + thin visible bar */}
                                             {canResize && (
                                                 <div
                                                     onMouseDown={header.getResizeHandler()}
                                                     onTouchStart={header.getResizeHandler()}
                                                     onClick={e => e.stopPropagation()}
-                                                    className="absolute right-0 top-1 bottom-1 w-1.5 cursor-col-resize select-none touch-none rounded-full"
-                                                    style={{
+                                                    className="absolute top-0 h-full cursor-col-resize select-none touch-none"
+                                                    style={{ width: 16, right: -8, zIndex: 2 }}
+                                                >
+                                                    <div style={{
+                                                        position: 'absolute', left: '50%', top: '15%', bottom: '15%',
+                                                        width: header.column.getIsResizing() ? 3 : 2,
+                                                        transform: 'translateX(-50%)',
+                                                        borderRadius: 2,
                                                         background: header.column.getIsResizing()
                                                             ? 'var(--accent)'
-                                                            : 'var(--border-strong, var(--border))',
-                                                        opacity: header.column.getIsResizing() ? 1 : 0.6,
-                                                        zIndex: 1,
-                                                    }}
-                                                />
+                                                            : 'var(--accent)',
+                                                        opacity: header.column.getIsResizing() ? 1 : 0.35,
+                                                    }} />
+                                                </div>
                                             )}
                                         </th>
                                     );
