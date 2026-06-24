@@ -23,10 +23,12 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 
 const PAGE_SIZE = 50;
-// Tiered column hiding so Name always has room to breathe.
-// lg (1024px): hide sector + marketCap
-// xl (1280px): also hide forwardPE
-// Only show all columns on very wide screens.
+// Progressive column reveal — each set contains columns first shown at that breakpoint.
+// Phone (<640px) : pin · ticker · name · price · actions only
+// Tablet (640px+): + P/E · Div% · P/B · Alert
+// Laptop (1024px+): + Sector · Mkt Cap
+// Wide  (1280px+): + Fwd P/E
+const HIDE_BELOW_SM  = new Set(['trailingPE', 'dividendYield', 'priceToBook', 'alert']);
 const HIDE_BELOW_LG  = new Set(['sector', 'marketCap']);
 const HIDE_BELOW_XL  = new Set(['forwardPE']);
 
@@ -221,7 +223,7 @@ export function ScreenerTable({
             }),
             // ── Right actions: alert + refresh ──
             columnHelper.display({
-                id: 'alert', header: 'Alert', size: 74, minSize: 60, enableResizing: false,
+                id: 'alert', header: 'Alert', size: 46, minSize: 40, maxSize: 46, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const alert = alertsRef.current[c.symbol];
@@ -275,7 +277,13 @@ export function ScreenerTable({
     const table = useReactTable({
         data: constituents,
         columns,
-        state: { sorting, globalFilter: filter },
+        state: {
+            sorting,
+            globalFilter: filter,
+            // Hide the remove column entirely when there are no added (removable) tickers,
+            // so the table doesn't waste 32px of left whitespace.
+            columnVisibility: { remove: (removableSymbols?.size ?? 0) > 0 },
+        },
         initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
         onSortingChange: setSorting,
         onGlobalFilterChange: setFilter,
@@ -411,7 +419,8 @@ export function ScreenerTable({
                                 {headerGroup.headers.map(header => {
                                     const canSort = header.column.getCanSort();
                                     const canResize = header.column.getCanResize();
-                                    const hide = HIDE_BELOW_LG.has(header.column.id) ? 'hidden lg:table-cell'
+                                    const hide = HIDE_BELOW_SM.has(header.column.id) ? 'hidden sm:table-cell'
+                                        : HIDE_BELOW_LG.has(header.column.id) ? 'hidden lg:table-cell'
                                         : HIDE_BELOW_XL.has(header.column.id) ? 'hidden xl:table-cell' : '';
                                     return (
                                         <th
@@ -428,25 +437,22 @@ export function ScreenerTable({
                                                     </span>
                                                 )}
                                             </span>
-                                            {/* Resize handle: wide invisible hit area + thin visible bar */}
+                                            {/* Resize handle: 16px hit area, 1px visible bar shown on hover / while dragging */}
                                             {canResize && (
                                                 <div
                                                     onMouseDown={header.getResizeHandler()}
                                                     onTouchStart={header.getResizeHandler()}
                                                     onClick={e => e.stopPropagation()}
-                                                    className="absolute top-0 h-full cursor-col-resize select-none touch-none"
+                                                    className="group/resize absolute top-0 h-full cursor-col-resize select-none touch-none"
                                                     style={{ width: 16, right: -8, zIndex: 2 }}
                                                 >
-                                                    <div style={{
-                                                        position: 'absolute', left: '50%', top: '15%', bottom: '15%',
-                                                        width: header.column.getIsResizing() ? 3 : 2,
-                                                        transform: 'translateX(-50%)',
-                                                        borderRadius: 2,
-                                                        background: header.column.getIsResizing()
-                                                            ? 'var(--accent)'
-                                                            : 'var(--accent)',
-                                                        opacity: header.column.getIsResizing() ? 1 : 0.35,
-                                                    }} />
+                                                    <div className={header.column.getIsResizing() ? '' : 'opacity-0 group-hover/resize:opacity-100'}
+                                                        style={{
+                                                            position: 'absolute', left: '50%', top: '20%', bottom: '20%',
+                                                            width: 1, transform: 'translateX(-50%)', borderRadius: 1,
+                                                            background: 'var(--accent)',
+                                                            transition: 'opacity 0.1s',
+                                                        }} />
                                                 </div>
                                             )}
                                         </th>
@@ -463,7 +469,8 @@ export function ScreenerTable({
                                 style={{ borderBottom: '1px solid var(--border)' }}
                             >
                                 {row.getVisibleCells().map(cell => {
-                                    const hide = HIDE_BELOW_LG.has(cell.column.id) ? 'hidden lg:table-cell'
+                                    const hide = HIDE_BELOW_SM.has(cell.column.id) ? 'hidden sm:table-cell'
+                                        : HIDE_BELOW_LG.has(cell.column.id) ? 'hidden lg:table-cell'
                                         : HIDE_BELOW_XL.has(cell.column.id) ? 'hidden xl:table-cell' : '';
                                     const isName = cell.column.id === 'name';
                                     return (
