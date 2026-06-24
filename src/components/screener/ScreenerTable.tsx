@@ -21,28 +21,43 @@ import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../type
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
 
 const columnHelper = createColumnHelper<IndexConstituent>();
-
 const PAGE_SIZE = 50;
-// Progressive column reveal — each set contains columns first shown at that breakpoint.
-// Phone (<640px) : pin · ticker · name · price · actions only
-// Tablet (640px+): + P/E · Div% · P/B · Alert
-// Laptop (1024px+): + Sector · Mkt Cap
-// Wide  (1280px+): + Fwd P/E
-const HIDE_BELOW_SM  = new Set(['trailingPE', 'dividendYield', 'priceToBook', 'alert']);
-const HIDE_BELOW_LG  = new Set(['sector', 'marketCap']);
-const HIDE_BELOW_XL  = new Set(['forwardPE']);
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
 const fmtNum = (v: number, digits = 2) =>
     v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+// JPY prices: strip .00 but keep .5 for half-yen increments.
+const fmtPrice = (price: number, currency: string | null) =>
+    currency === 'JPY'
+        ? price.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+        : fmtNum(price, 2);
+
 const fmtCompact = (v: number) =>
     new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
-/** True when the latest price has crossed the alert's target. */
 function isAlertTriggered(alert: PriceAlert, price: number | null): boolean {
     if (price == null) return false;
     return alert.direction === 'above' ? price >= alert.target : price <= alert.target;
+}
+
+// Responsive breakpoint hook — drives columnVisibility so react-table truly
+// excludes hidden columns from the width calculation (CSS-only hiding doesn't).
+function useBreakpoints() {
+    const [bp, setBp] = useState({ sm: true, lg: true, xl: true });
+    useEffect(() => {
+        const queries = [
+            window.matchMedia('(min-width: 640px)'),
+            window.matchMedia('(min-width: 1024px)'),
+            window.matchMedia('(min-width: 1280px)'),
+        ];
+        const update = () => setBp({ sm: queries[0].matches, lg: queries[1].matches, xl: queries[2].matches });
+        update();
+        queries.forEach(q => q.addEventListener('change', update));
+        return () => queries.forEach(q => q.removeEventListener('change', update));
+    }, []);
+    return bp;
 }
 
 interface ScreenerTableProps {
@@ -56,13 +71,6 @@ interface ScreenerTableProps {
     onOpenChart: (c: IndexConstituent, currency: string | null) => void;
 }
 
-/**
- * Screener table: sortable/filterable list of an index's names with
- * on-demand fundamentals (PE, div yield, P/B, …). Clicking a row opens its
- * chart; per-row star pins to the watchlist, bell sets a price alert, the
- * refresh icon force-fetches that row, and the leftmost × removes an added
- * ticker. Built on the same @tanstack/react-table stack as PositionsTable.
- */
 export function ScreenerTable({
     constituents, onRemove, removableSymbols,
     pinnedSymbols, onTogglePin, alerts, onEditAlert, onOpenChart,
@@ -70,18 +78,18 @@ export function ScreenerTable({
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
+    const bp = useBreakpoints();
 
-    // Read by cells at render time; kept in refs so columns stay stable.
     const mapRef = useRef<Map<string, FundEntry>>(new Map());
     const pinnedRef = useRef(pinnedSymbols); pinnedRef.current = pinnedSymbols;
     const alertsRef = useRef(alerts); alertsRef.current = alerts;
     const refreshRef = useRef<(symbol: string) => void>(() => {});
+    // Cache Yahoo names so they don't revert to static title-case on re-render.
+    const nameCacheRef = useRef<Map<string, string>>(new Map());
 
-    // Buttons inside a row must not also trigger the row's open-chart click.
     const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
     const columns = useMemo(() => {
-        // Sort helper for numeric fundamental fields — nulls always sort to bottom.
         const numSort = (field: keyof StockFundamentals) =>
             (rowA: Row<IndexConstituent>, rowB: Row<IndexConstituent>): number => {
                 const ea = mapRef.current.get(rowA.original.symbol);
@@ -89,7 +97,7 @@ export function ScreenerTable({
                 const a = ea?.status === 'done' ? (ea.data[field] as number | null) : null;
                 const b = eb?.status === 'done' ? (eb.data[field] as number | null) : null;
                 if (a == null && b == null) return 0;
-                if (a == null) return 1;  // nulls last in ascending
+                if (a == null) return 1;
                 if (b == null) return -1;
                 return (a as number) - (b as number);
             };
@@ -100,172 +108,165 @@ export function ScreenerTable({
             isRatio = false,
         ): React.ReactNode => {
             const e = mapRef.current.get(symbol);
-            if (!e) return muted('·'); // not loaded yet — use refresh / Load page
+            if (!e) return muted('·');
             if (e.status === 'loading') return muted('…');
             if (e.status === 'error') return <span style={{ color: 'var(--text-muted)' }} title={e.reason}>—</span>;
             const v = render(e.data);
             if (v != null && v !== '') return v;
-            // Ratios still pending (price loaded via chart, crumb not yet) → show a
-            // retrying dot rather than "—", which would imply "no value".
             if (isRatio && e.ratiosPending) {
-                const tip = e.ratiosError
-                    ? `Ratios unavailable: ${e.ratiosError}`
-                    : "Ratios not loaded yet — click the row's ⟳ to fetch";
+                const tip = e.ratiosError ? `Ratios unavailable: ${e.ratiosError}` : 'Ratios pending — click ⟳ to fetch';
                 return <span style={{ color: 'var(--text-muted)' }} title={tip}>…</span>;
             }
             return muted('—');
         };
-        const priceOf = (symbol: string): number | null => {
+
+        const priceOf = (symbol: string) => {
             const e = mapRef.current.get(symbol);
             return e?.status === 'done' ? e.data.price : null;
         };
 
         return [
-            // ── Left actions: remove (added only) + pin ──
+            // Remove (added tickers only)
             columnHelper.display({
-                id: 'remove',
-                size: 32, minSize: 32, maxSize: 32, enableResizing: false,
+                id: 'remove', size: 28, minSize: 28, maxSize: 28, enableResizing: false,
                 header: () => null,
                 cell: props => {
                     if (!removableSymbols?.has(props.row.original.symbol)) return null;
                     return (
                         <button onClick={stop(() => onRemove?.(props.row.original.symbol))}
-                            className="flex items-center justify-center p-1 rounded transition-all hover:opacity-70"
-                            style={{ color: 'var(--text-muted)' }} aria-label={`Remove ${props.row.original.symbol}`} title="Remove from list">
-                            <MdClose size={15} />
+                            className="flex items-center justify-center p-1 rounded hover:opacity-70"
+                            style={{ color: 'var(--text-muted)' }} title="Remove from list">
+                            <MdClose size={14} />
                         </button>
                     );
                 },
             }),
+            // Pin / star
             columnHelper.display({
-                id: 'pin',
-                size: 32, minSize: 32, maxSize: 32, enableResizing: false,
+                id: 'pin', size: 28, minSize: 28, maxSize: 28, enableResizing: false,
                 header: () => null,
                 cell: props => {
                     const sym = props.row.original.symbol;
                     const pinned = pinnedRef.current.has(sym);
                     return (
                         <button onClick={stop(() => onTogglePin(sym))}
-                            className="flex items-center justify-center p-1 rounded transition-all hover:opacity-70"
+                            className="flex items-center justify-center p-1 rounded hover:opacity-70"
                             style={{ color: pinned ? 'var(--accent)' : 'var(--text-muted)' }}
-                            aria-label={pinned ? `Unpin ${sym}` : `Pin ${sym}`}
-                            title={pinned ? 'Pinned to watchlist — click to unpin' : 'Pin to watchlist'}>
-                            {pinned ? <MdStar size={17} /> : <MdStarBorder size={17} />}
+                            title={pinned ? 'Pinned — click to unpin' : 'Pin to watchlist'}>
+                            {pinned ? <MdStar size={16} /> : <MdStarBorder size={16} />}
                         </button>
                     );
                 },
             }),
+            // Ticker code — Yahoo Finance link
             columnHelper.accessor('code', {
-                header: 'Ticker',
-                size: 70, minSize: 56,
+                header: 'Ticker', size: 68, minSize: 52,
                 cell: props => (
-                    <a
-                        href={`https://finance.yahoo.com/quote/${props.row.original.symbol}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <a href={`https://finance.yahoo.com/quote/${props.row.original.symbol}`}
+                        target="_blank" rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
                         className="font-semibold tabular-nums hover:underline"
-                        style={{ color: 'var(--accent)' }}
-                    >
+                        style={{ color: 'var(--accent)' }}>
                         {props.getValue()}
                     </a>
                 ),
             }),
+            // Name — prefers Yahoo name; falls back to title-cased static name.
+            // nameCacheRef prevents the flicker from static → Yahoo on each re-render.
             columnHelper.accessor('name', {
-                header: 'Name', size: 220, minSize: 120,
-                // Prefer the fetched Yahoo name (proper casing, full name).
-                // The static index names (from BlackRock CSV) are ALL CAPS, so
-                // convert them to title case as a fallback until the row loads.
+                header: 'Name', size: 220, minSize: 100,
                 cell: props => {
-                    const e = mapRef.current.get(props.row.original.symbol);
-                    const fetched = e?.status === 'done' ? e.data.name : null;
+                    const sym = props.row.original.symbol;
+                    const e = mapRef.current.get(sym);
+                    const yahooName = e?.status === 'done' ? e.data.name : null;
+                    if (yahooName) nameCacheRef.current.set(sym, yahooName);
+                    const cached = nameCacheRef.current.get(sym);
                     const staticName = props.getValue() ?? '';
-                    const displayStatic = staticName === staticName.toUpperCase() && staticName.length > 0
+                    const fallback = staticName === staticName.toUpperCase() && staticName.length > 0
                         ? staticName.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
                         : staticName;
-                    return fetched ?? displayStatic;
+                    return cached ?? fallback;
                 },
             }),
+            // Sector (hidden on phone + tablet)
             columnHelper.accessor('sector', {
-                header: 'Sector', size: 170, minSize: 80,
+                header: 'Sector', size: 160, minSize: 80,
                 cell: props => props.getValue() ?? muted('—'),
             }),
+            // Price
             columnHelper.display({
-                id: 'price', header: 'Price', size: 120, minSize: 80,
+                id: 'price', header: 'Price', size: 110, minSize: 72,
                 enableSorting: true, sortingFn: numSort('price'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.price == null ? null : <span className="tabular-nums">{fmtNum(d.price)} <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span></span>),
+                    d.price == null ? null : (
+                        <span className="tabular-nums">
+                            {fmtPrice(d.price, d.currency)}{' '}
+                            <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span>
+                        </span>
+                    )),
             }),
+            // P/E (hidden on phone)
             columnHelper.display({
-                id: 'trailingPE', header: 'P/E', size: 62, minSize: 50,
+                id: 'trailingPE', header: 'P/E', size: 58, minSize: 44,
                 enableSorting: true, sortingFn: numSort('trailingPE'),
-                cell: props => fundCell(props.row.original.symbol, d => d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
+                cell: props => fundCell(props.row.original.symbol, d =>
+                    d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
             }),
+            // Fwd P/E (hidden until xl)
             columnHelper.display({
-                id: 'forwardPE', header: 'Fwd P/E', size: 72, minSize: 56,
+                id: 'forwardPE', header: 'Fwd P/E', size: 68, minSize: 52,
                 enableSorting: true, sortingFn: numSort('forwardPE'),
-                cell: props => fundCell(props.row.original.symbol, d => d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
+                cell: props => fundCell(props.row.original.symbol, d =>
+                    d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
             }),
+            // Div % (hidden on phone)
             columnHelper.display({
-                id: 'dividendYield', header: 'Div %', size: 68, minSize: 52,
+                id: 'dividendYield', header: 'Div %', size: 62, minSize: 48,
                 enableSorting: true, sortingFn: numSort('dividendYield'),
-                cell: props => fundCell(props.row.original.symbol, d => d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
+                cell: props => fundCell(props.row.original.symbol, d =>
+                    d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
             }),
+            // P/B (hidden on phone)
             columnHelper.display({
-                id: 'priceToBook', header: 'P/B', size: 60, minSize: 48,
+                id: 'priceToBook', header: 'P/B', size: 56, minSize: 44,
                 enableSorting: true, sortingFn: numSort('priceToBook'),
-                cell: props => fundCell(props.row.original.symbol, d => d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
+                cell: props => fundCell(props.row.original.symbol, d =>
+                    d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
             }),
+            // Mkt Cap (hidden on phone + tablet)
             columnHelper.display({
-                id: 'marketCap', header: 'Mkt Cap', size: 80, minSize: 60,
+                id: 'marketCap', header: 'Mkt Cap', size: 78, minSize: 58,
                 enableSorting: true, sortingFn: numSort('marketCap'),
-                cell: props => fundCell(props.row.original.symbol, d => d.marketCap == null ? null : <span className="tabular-nums">{fmtCompact(d.marketCap)}</span>, true),
+                cell: props => fundCell(props.row.original.symbol, d =>
+                    d.marketCap == null ? null : <span className="tabular-nums">{fmtCompact(d.marketCap)}</span>, true),
             }),
-            // ── Right actions: alert + refresh ──
+            // ── Single Actions column: alert · chart · refresh ──
             columnHelper.display({
-                id: 'alert', header: 'Alert', size: 46, minSize: 40, maxSize: 46, enableResizing: false,
-                cell: props => {
-                    const c = props.row.original;
-                    const alert = alertsRef.current[c.symbol];
-                    if (!alert) {
-                        return (
-                            <button onClick={stop(() => onEditAlert(c))}
-                                className="flex items-center p-1 rounded transition-all hover:opacity-70"
-                                style={{ color: 'var(--text-muted)' }} aria-label={`Set alert for ${c.symbol}`} title="Set a price alert">
-                                <MdNotificationsNone size={16} />
-                            </button>
-                        );
-                    }
-                    const triggered = isAlertTriggered(alert, priceOf(c.symbol));
-                    return (
-                        <button onClick={stop(() => onEditAlert(c))}
-                            className="flex items-center gap-1 px-1.5 py-1 rounded transition-all hover:opacity-80"
-                            style={triggered ? { background: 'var(--accent-dim)', color: 'var(--accent)' } : { color: 'var(--text-secondary)' }}
-                            title={`Price alert ${alert.direction} ${alert.target}${triggered ? ' · triggered' : ''}`}>
-                            <MdNotificationsActive size={15} />
-                            <span className="tabular-nums text-xs">{alert.direction === 'above' ? '≥' : '≤'}{fmtNum(alert.target, 0)}</span>
-                        </button>
-                    );
-                },
-            }),
-            columnHelper.display({
-                id: 'actions', size: 64, minSize: 64, maxSize: 64, enableResizing: false, header: () => null,
+                id: 'actions', header: 'Actions', size: 96, minSize: 88, maxSize: 120, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
                     const loading = e?.status === 'loading';
                     const currency = e?.status === 'done' ? e.data.currency : null;
+                    const alert = alertsRef.current[c.symbol];
+                    const triggered = alert ? isAlertTriggered(alert, priceOf(c.symbol)) : false;
                     return (
-                        <div className="flex items-center gap-0.5">
-                            <button onClick={stop(() => { onOpenChart(c, currency); })}
-                                className="flex items-center justify-center p-1.5 rounded transition-all hover:opacity-70"
-                                style={{ color: 'var(--text-secondary)' }} aria-label={`Chart ${c.symbol}`} title="View price chart">
-                                <MdShowChart size={16} />
+                        <div className="flex items-center gap-0.5 pr-2">
+                            <button onClick={stop(() => onEditAlert(c))}
+                                className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
+                                style={{ color: triggered ? 'var(--accent)' : 'var(--text-muted)' }}
+                                title={alert ? `Alert ${alert.direction} ${fmtNum(alert.target, 0)}${triggered ? ' · triggered' : ''}` : 'Set price alert'}>
+                                {alert ? <MdNotificationsActive size={15} /> : <MdNotificationsNone size={15} />}
+                            </button>
+                            <button onClick={stop(() => onOpenChart(c, currency))}
+                                className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
+                                style={{ color: 'var(--text-secondary)' }} title="View chart">
+                                <MdShowChart size={15} />
                             </button>
                             <button onClick={stop(() => refreshRef.current(c.symbol))}
-                                className="flex items-center justify-center p-1.5 rounded transition-all hover:opacity-70"
-                                style={{ color: 'var(--text-secondary)' }} aria-label={`Refresh ${c.symbol}`} title="Refresh this row's data">
-                                <MdRefresh size={16} className={loading ? 'animate-spin' : ''} />
+                                className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
+                                style={{ color: 'var(--text-secondary)' }} title="Refresh data">
+                                <MdRefresh size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
                         </div>
                     );
@@ -274,16 +275,25 @@ export function ScreenerTable({
         ];
     }, [onRemove, removableSymbols, onTogglePin, onEditAlert]);
 
+    // Column visibility drives responsive hiding AND true width exclusion on mobile.
+    const columnVisibility = useMemo(() => ({
+        remove: (removableSymbols?.size ?? 0) > 0,
+        // Phone (<640px): only pin · ticker · name · price · actions
+        trailingPE: bp.sm,
+        dividendYield: bp.sm,
+        priceToBook: bp.sm,
+        // Tablet (640–1023px): add P/E · Div% · P/B
+        sector: bp.lg,
+        marketCap: bp.lg,
+        // Laptop (1024–1279px): add Sector · Mkt Cap
+        forwardPE: bp.xl,
+        // Wide (1280px+): add Fwd P/E
+    }), [bp, removableSymbols]);
+
     const table = useReactTable({
         data: constituents,
         columns,
-        state: {
-            sorting,
-            globalFilter: filter,
-            // Hide the remove column entirely when there are no added (removable) tickers,
-            // so the table doesn't waste 32px of left whitespace.
-            columnVisibility: { remove: (removableSymbols?.size ?? 0) > 0 },
-        },
+        state: { sorting, globalFilter: filter, columnVisibility },
         initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
         onSortingChange: setSorting,
         onGlobalFilterChange: setFilter,
@@ -301,7 +311,6 @@ export function ScreenerTable({
 
     const totalCount = table.getFilteredRowModel().rows.length;
     const pageRows = table.getRowModel().rows;
-
     const pageSymbolsKey = pageRows.map(r => r.original.symbol).join(',');
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
     const { map: fundMap, refresh, loadMany, loadCached, progress } = useScreenerFundamentals();
@@ -309,149 +318,133 @@ export function ScreenerTable({
     refreshRef.current = refresh;
     const pageLoading = progress !== null;
 
-    // On load / page change, restore already-cached rows from the DB (no Yahoo).
     useEffect(() => { loadCached(pageSymbols); }, [pageSymbols, loadCached]);
 
     const pageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
 
-    // Total pixel width of all visible columns for table-layout:fixed.
-    const tableWidth = table.getVisibleLeafColumns().reduce((sum, col) => sum + col.getSize(), 0);
+    // Table fills container (width:100%) but each column has a fixed pixel width
+    // from its `size`. The name column has no explicit width so it absorbs the rest.
+    // minWidth keeps us at least as wide as the sum of fixed columns.
+    const fixedWidth = table.getVisibleLeafColumns()
+        .filter(c => c.id !== 'name')
+        .reduce((sum, c) => sum + c.getSize(), 0);
 
     return (
-        <div className="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-4 h-full">
+        <div className="glass rounded-2xl p-3 sm:p-4 flex flex-col gap-3 h-full">
             {/* Controls */}
-            <div className="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
-                <div className="relative flex-1 min-w-[200px] max-w-sm">
-                    <MdSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
+            <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
+                <div className="relative flex-1 min-w-[160px] max-w-sm">
+                    <MdSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+                    <input value={filter} onChange={e => setFilter(e.target.value)}
                         placeholder="Filter by ticker, name, or sector…"
                         className="w-full pl-9 pr-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1"
-                        style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' }}
-                    />
+                        style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' }} />
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => loadMany(pageSymbols)}
-                        disabled={pageLoading || pageSymbols.length === 0}
+                <div className="flex items-center gap-2">
+                    <button onClick={() => loadMany(pageSymbols)} disabled={pageLoading || pageSymbols.length === 0}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                        title="Fetch price + fundamentals for all rows on this page"
-                    >
-                        <MdRefresh size={15} className={pageLoading ? 'animate-spin' : ''} />
-                        {progress ? `Loading ${progress.done}/${progress.total}…` : 'Load page'}
+                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                        <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
+                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Load page'}</span>
+                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Load'}</span>
                     </button>
-                    <button
-                        onClick={() => setInfoOpen(v => !v)}
-                        className="flex items-center justify-center p-1.5 rounded-lg transition-all"
-                        style={{ color: infoOpen ? 'var(--accent)' : 'var(--text-muted)', background: infoOpen ? 'var(--accent-dim)' : undefined }}
-                        title="How are these values calculated?"
-                        aria-label="Data methodology info"
-                    >
-                        <MdInfoOutline size={18} />
+                    {/* Info — text label so it's harder to miss */}
+                    <button onClick={() => setInfoOpen(v => !v)}
+                        className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                            color: infoOpen ? 'var(--accent)' : 'var(--text-secondary)',
+                            background: infoOpen ? 'var(--accent-dim)' : 'var(--glass-bg)',
+                            border: '1px solid var(--border)',
+                        }}>
+                        <MdInfoOutline size={14} />
+                        <span className="hidden sm:inline">How it works</span>
                     </button>
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        {totalCount.toLocaleString()} {totalCount === 1 ? 'name' : 'names'}
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {totalCount.toLocaleString()} names
                     </span>
                 </div>
             </div>
 
-            {/* Methodology info panel */}
+            {/* Info panel */}
             {infoOpen && (
                 <div className="rounded-xl px-4 py-3 text-xs flex flex-col gap-3 flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex flex-col gap-3 min-w-0">
-
-                            {/* How columns are calculated */}
                             <div>
                                 <p className="font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>Where do the numbers come from?</p>
-                                <p className="mb-2">
-                                    <strong>Price</strong> is live from Yahoo Finance. Everything else is <em>calculated</em> using
-                                    the latest official earnings data from <strong>J-Quants</strong> (Japan Exchange Group):
-                                </p>
+                                <p className="mb-2"><strong>Price</strong> is live from Yahoo Finance. Everything else is <em>calculated</em> from official JPX earnings data (J-Quants):</p>
                                 <div className="flex flex-col gap-1" style={{ color: 'var(--text-primary)' }}>
-                                    <span><span className="font-medium">P/E</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by the last 12 months of earnings per share</span>
-                                    <span><span className="font-medium">Fwd P/E</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by the company's own earnings forecast for next year</span>
-                                    <span><span className="font-medium">P/B</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by book value per share (last annual report)</span>
-                                    <span><span className="font-medium">Div %</span> <span style={{ color: 'var(--text-muted)' }}>—</span> annual dividend divided by current price</span>
-                                    <span><span className="font-medium">Mkt Cap</span> <span style={{ color: 'var(--text-muted)' }}>—</span> shares outstanding × current price</span>
+                                    <span><strong>P/E</strong> — price ÷ last 12 months of earnings per share</span>
+                                    <span><strong>Fwd P/E</strong> — price ÷ company&apos;s own earnings forecast for next year</span>
+                                    <span><strong>P/B</strong> — price ÷ book value per share (last annual report)</span>
+                                    <span><strong>Div %</strong> — annual dividend ÷ current price</span>
+                                    <span><strong>Mkt Cap</strong> — shares outstanding × current price</span>
                                 </div>
                             </div>
-
-                            {/* Freshness */}
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
                                 <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>How fresh is the data?</p>
-                                <p>
-                                    Financial statements update quarterly, so P/E and P/B may be up to one quarter behind real-time sources.
-                                    Prices are always current. Click a ticker to open Yahoo Finance for live values.
-                                </p>
+                                <p>Earnings update quarterly — P/E and P/B may lag real-time sources by up to one quarter. Prices are always current. Click a ticker to open Yahoo Finance for live values.</p>
                             </div>
-
-                            {/* How refresh works */}
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>How does refresh work?</p>
-                                <div className="flex flex-col gap-1">
-                                    <span><span className="font-medium">On page open</span> <span style={{ color: 'var(--text-muted)' }}>—</span> prices appear instantly; ratios fill in automatically within a few seconds</span>
-                                    <span><span className="font-medium">Load page</span> <span style={{ color: 'var(--text-muted)' }}>—</span> forces a fresh fetch for all visible rows at once</span>
-                                    <span><span className="font-medium">⟳ per row</span> <span style={{ color: 'var(--text-muted)' }}>—</span> refreshes a single stock immediately</span>
-                                    <span><span className="font-medium">Cache</span> <span style={{ color: 'var(--text-muted)' }}>—</span> data is stored for 24 h; re-opening the page restores it without new API calls</span>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Refreshing data</p>
+                                <div className="flex flex-col gap-0.5">
+                                    <span><strong>On open</strong> — prices appear instantly; ratios fill in within a few seconds</span>
+                                    <span><strong>Load page</strong> — forces a fresh fetch for all visible rows</span>
+                                    <span><strong>⟳ per row</strong> — refreshes a single stock immediately</span>
+                                    <span><strong>Cache</strong> — data stored 24 h; page reloads restore without API calls</span>
                                 </div>
                             </div>
-
                         </div>
-                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="Close">
-                            <MdClose size={15} />
-                        </button>
+                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)', flexShrink: 0 }}><MdClose size={15} /></button>
                     </div>
                 </div>
             )}
 
-            {/* Table — table-layout:fixed so column widths never shift on sort or content
-                change. Each column has an explicit size; drag the resize handle to adjust. */}
+            {/* Table */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-xl">
-                <table className="data-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
+                <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: fixedWidth + 100 }}>
                     <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
-                        {table.getHeaderGroups().map(headerGroup => (
-                            <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                {headerGroup.headers.map(header => {
+                        {table.getHeaderGroups().map(hg => (
+                            <tr key={hg.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                {hg.headers.map(header => {
                                     const canSort = header.column.getCanSort();
                                     const canResize = header.column.getCanResize();
-                                    const hide = HIDE_BELOW_SM.has(header.column.id) ? 'hidden sm:table-cell'
-                                        : HIDE_BELOW_LG.has(header.column.id) ? 'hidden lg:table-cell'
-                                        : HIDE_BELOW_XL.has(header.column.id) ? 'hidden xl:table-cell' : '';
+                                    const isName = header.column.id === 'name';
                                     return (
-                                        <th
-                                            key={header.id}
-                                            className={`px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative ${canSort ? 'cursor-pointer' : ''} ${hide}`}
-                                            style={{ color: 'var(--text-muted)', width: header.getSize() }}
-                                            onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                                        >
-                                            <span className="inline-flex items-center gap-1" style={{ overflow: 'hidden', maxWidth: '100%' }}>
-                                                <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                                        <th key={header.id}
+                                            className={`px-2 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative align-top ${canSort ? 'cursor-pointer' : ''}`}
+                                            style={{
+                                                color: 'var(--text-muted)',
+                                                // Name column: no explicit width — fills remaining space.
+                                                // Others: locked to their size.
+                                                width: isName ? undefined : header.getSize(),
+                                                minWidth: isName ? header.getSize() : undefined,
+                                            }}
+                                            onClick={canSort ? header.column.getToggleSortingHandler() : undefined}>
+                                            {/* Header label — allowed to wrap */}
+                                            <span className="inline-flex items-start gap-1" style={{ maxWidth: '100%' }}>
+                                                <span style={{ wordBreak: 'break-word' }}>
+                                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                                </span>
                                                 {canSort && (
-                                                    <span style={{ color: 'var(--accent)', display: 'inline-block', width: '10px', textAlign: 'center', flexShrink: 0 }}>
+                                                    <span style={{ color: 'var(--accent)', display: 'inline-block', width: 10, textAlign: 'center', flexShrink: 0, lineHeight: 1.2 }}>
                                                         {{ asc: '↑', desc: '↓' }[header.column.getIsSorted() as string] ?? ''}
                                                     </span>
                                                 )}
                                             </span>
-                                            {/* Resize handle: 16px hit area, 1px visible bar shown on hover / while dragging */}
+                                            {/* Resize handle */}
                                             {canResize && (
-                                                <div
-                                                    onMouseDown={header.getResizeHandler()}
-                                                    onTouchStart={header.getResizeHandler()}
+                                                <div onMouseDown={header.getResizeHandler()} onTouchStart={header.getResizeHandler()}
                                                     onClick={e => e.stopPropagation()}
                                                     className="group/resize absolute top-0 h-full cursor-col-resize select-none touch-none"
-                                                    style={{ width: 16, right: -8, zIndex: 2 }}
-                                                >
+                                                    style={{ width: 16, right: -8, zIndex: 2 }}>
                                                     <div className={header.column.getIsResizing() ? '' : 'opacity-0 group-hover/resize:opacity-100'}
                                                         style={{
                                                             position: 'absolute', left: '50%', top: '20%', bottom: '20%',
                                                             width: 1, transform: 'translateX(-50%)', borderRadius: 1,
-                                                            background: 'var(--accent)',
-                                                            transition: 'opacity 0.1s',
+                                                            background: 'var(--accent)', transition: 'opacity 0.1s',
                                                         }} />
                                                 </div>
                                             )}
@@ -463,22 +456,20 @@ export function ScreenerTable({
                     </thead>
                     <tbody>
                         {pageRows.map(row => (
-                            <tr
-                                key={row.id}
+                            <tr key={row.id}
                                 className="group transition-colors hover:bg-[var(--glass-bg)]"
-                                style={{ borderBottom: '1px solid var(--border)' }}
-                            >
+                                style={{ borderBottom: '1px solid var(--border)' }}>
                                 {row.getVisibleCells().map(cell => {
-                                    const hide = HIDE_BELOW_SM.has(cell.column.id) ? 'hidden sm:table-cell'
-                                        : HIDE_BELOW_LG.has(cell.column.id) ? 'hidden lg:table-cell'
-                                        : HIDE_BELOW_XL.has(cell.column.id) ? 'hidden xl:table-cell' : '';
                                     const isName = cell.column.id === 'name';
                                     return (
-                                        <td
-                                            key={cell.id}
-                                            className={`px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm ${isName ? 'truncate' : ''} ${hide}`}
-                                            style={{ color: 'var(--text-primary)', width: cell.column.getSize(), overflow: 'hidden' }}
-                                        >
+                                        <td key={cell.id}
+                                            className={`px-2 py-2 sm:py-2.5 text-xs sm:text-sm ${isName ? 'truncate' : ''}`}
+                                            style={{
+                                                color: 'var(--text-primary)',
+                                                width: isName ? undefined : cell.column.getSize(),
+                                                minWidth: isName ? cell.column.getSize() : undefined,
+                                                overflow: 'hidden',
+                                            }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
                                     );
@@ -487,11 +478,8 @@ export function ScreenerTable({
                         ))}
                     </tbody>
                 </table>
-
                 {totalCount === 0 && (
-                    <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        No names match your filter
-                    </div>
+                    <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>No names match your filter</div>
                 )}
             </div>
 
