@@ -10,6 +10,7 @@ import {
     createColumnHelper,
     flexRender,
     type SortingState,
+    type Row,
 } from '@tanstack/react-table';
 import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
@@ -78,6 +79,19 @@ export function ScreenerTable({
     const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
     const columns = useMemo(() => {
+        // Sort helper for numeric fundamental fields — nulls always sort to bottom.
+        const numSort = (field: keyof StockFundamentals) =>
+            (rowA: Row<IndexConstituent>, rowB: Row<IndexConstituent>): number => {
+                const ea = mapRef.current.get(rowA.original.symbol);
+                const eb = mapRef.current.get(rowB.original.symbol);
+                const a = ea?.status === 'done' ? (ea.data[field] as number | null) : null;
+                const b = eb?.status === 'done' ? (eb.data[field] as number | null) : null;
+                if (a == null && b == null) return 0;
+                if (a == null) return 1;  // nulls last in ascending
+                if (b == null) return -1;
+                return (a as number) - (b as number);
+            };
+
         const fundCell = (
             symbol: string,
             render: (d: StockFundamentals) => React.ReactNode | null,
@@ -176,27 +190,33 @@ export function ScreenerTable({
             }),
             columnHelper.display({
                 id: 'price', header: 'Price',
+                enableSorting: true, sortingFn: numSort('price'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.price == null ? null : <span className="tabular-nums">{fmtNum(d.price)} <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span></span>),
             }),
             columnHelper.display({
                 id: 'trailingPE', header: 'P/E',
+                enableSorting: true, sortingFn: numSort('trailingPE'),
                 cell: props => fundCell(props.row.original.symbol, d => d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
             }),
             columnHelper.display({
                 id: 'forwardPE', header: 'Fwd P/E',
+                enableSorting: true, sortingFn: numSort('forwardPE'),
                 cell: props => fundCell(props.row.original.symbol, d => d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
             }),
             columnHelper.display({
                 id: 'dividendYield', header: 'Div %',
+                enableSorting: true, sortingFn: numSort('dividendYield'),
                 cell: props => fundCell(props.row.original.symbol, d => d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
             }),
             columnHelper.display({
                 id: 'priceToBook', header: 'P/B',
+                enableSorting: true, sortingFn: numSort('priceToBook'),
                 cell: props => fundCell(props.row.original.symbol, d => d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
             }),
             columnHelper.display({
                 id: 'marketCap', header: 'Mkt Cap',
+                enableSorting: true, sortingFn: numSort('marketCap'),
                 cell: props => fundCell(props.row.original.symbol, d => d.marketCap == null ? null : <span className="tabular-nums">{fmtCompact(d.marketCap)}</span>, true),
             }),
             // ── Right actions: alert + refresh ──
@@ -403,8 +423,9 @@ export function ScreenerTable({
                                         >
                                             <span className="inline-flex items-center gap-1">
                                                 {flexRender(header.column.columnDef.header, header.getContext())}
+                                                {/* Fixed-width slot — always reserve space so the column never shifts when sort activates. */}
                                                 {canSort && (
-                                                    <span style={{ color: 'var(--accent)' }}>
+                                                    <span style={{ color: 'var(--accent)', display: 'inline-block', width: '10px', textAlign: 'center', flexShrink: 0 }}>
                                                         {{ asc: '↑', desc: '↓' }[header.column.getIsSorted() as string] ?? ''}
                                                     </span>
                                                 )}
