@@ -323,40 +323,51 @@ export function ScreenerTable({
 
             {/* Methodology info panel */}
             {infoOpen && (
-                <div className="rounded-xl px-4 py-3 text-xs flex flex-col gap-2 flex-shrink-0"
+                <div className="rounded-xl px-4 py-3 text-xs flex flex-col gap-3 flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                     <div className="flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-2">
-                            <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                ⚠ Ratios are computed, not streamed
-                            </p>
-                            <p>
-                                Fundamental values are calculated server-side from <strong>J-Quants</strong> (official JPX financial statements)
-                                combined with the current price from Yahoo Finance. They are <em>not</em> live data feeds.
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 mt-1 font-mono" style={{ color: 'var(--text-primary)' }}>
-                                <span><span style={{ color: 'var(--text-muted)' }}>P/E     </span> price ÷ trailing-12-month EPS</span>
-                                <span><span style={{ color: 'var(--text-muted)' }}>Fwd P/E </span> price ÷ company-guided next-FY EPS</span>
-                                <span><span style={{ color: 'var(--text-muted)' }}>P/B     </span> price ÷ annual book value per share</span>
-                                <span><span style={{ color: 'var(--text-muted)' }}>Div %   </span> annual dividend ÷ current price</span>
-                                <span><span style={{ color: 'var(--text-muted)' }}>Mkt Cap </span> shares outstanding × current price</span>
+                        <div className="flex flex-col gap-3 min-w-0">
+
+                            {/* How columns are calculated */}
+                            <div>
+                                <p className="font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>Where do the numbers come from?</p>
+                                <p className="mb-2">
+                                    <strong>Price</strong> is live from Yahoo Finance. Everything else is <em>calculated</em> using
+                                    the latest official earnings data from <strong>J-Quants</strong> (Japan Exchange Group):
+                                </p>
+                                <div className="flex flex-col gap-1" style={{ color: 'var(--text-primary)' }}>
+                                    <span><span className="font-medium">P/E</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by the last 12 months of earnings per share</span>
+                                    <span><span className="font-medium">Fwd P/E</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by the company's own earnings forecast for next year</span>
+                                    <span><span className="font-medium">P/B</span> <span style={{ color: 'var(--text-muted)' }}>—</span> price divided by book value per share (last annual report)</span>
+                                    <span><span className="font-medium">Div %</span> <span style={{ color: 'var(--text-muted)' }}>—</span> annual dividend divided by current price</span>
+                                    <span><span className="font-medium">Mkt Cap</span> <span style={{ color: 'var(--text-muted)' }}>—</span> shares outstanding × current price</span>
+                                </div>
                             </div>
+
+                            {/* Freshness */}
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>How fresh is the data?</p>
+                                <p>
+                                    Financial statements update quarterly, so P/E and P/B may be up to one quarter behind real-time sources.
+                                    Prices are always current. Click a ticker to open Yahoo Finance for live values.
+                                </p>
+                            </div>
+
+                            {/* How refresh works */}
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>How does refresh work?</p>
+                                <div className="flex flex-col gap-1">
+                                    <span><span className="font-medium">On page open</span> <span style={{ color: 'var(--text-muted)' }}>—</span> prices appear instantly; ratios fill in automatically within a few seconds</span>
+                                    <span><span className="font-medium">Load page</span> <span style={{ color: 'var(--text-muted)' }}>—</span> forces a fresh fetch for all visible rows at once</span>
+                                    <span><span className="font-medium">⟳ per row</span> <span style={{ color: 'var(--text-muted)' }}>—</span> refreshes a single stock immediately</span>
+                                    <span><span className="font-medium">Cache</span> <span style={{ color: 'var(--text-muted)' }}>—</span> data is stored for 24 h; re-opening the page restores it without new API calls</span>
+                                </div>
+                            </div>
+
                         </div>
                         <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="Close">
                             <MdClose size={15} />
                         </button>
-                    </div>
-                    <div className="flex flex-col gap-1 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
-                        <p>
-                            <strong>Data lag:</strong> J-Quants free plan covers through ~April 2026.
-                            TTM P/E may differ from real-time sources (e.g. Yahoo Finance) by up to one quarter.
-                            Click a ticker to see the Yahoo Finance page for live values.
-                        </p>
-                        <p>
-                            <strong>API budget:</strong> Each row refresh makes 2 API calls (price + J-Quants).
-                            &ldquo;Load page&rdquo; fetches up to {PAGE_SIZE} rows at once (paced, 3 at a time).
-                            Results are cached for 24 h — subsequent page loads restore from cache at no cost.
-                        </p>
                     </div>
                 </div>
             )}
