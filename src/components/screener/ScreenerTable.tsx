@@ -165,7 +165,7 @@ export function ScreenerTable({
                     <a href={`https://finance.yahoo.com/quote/${props.row.original.symbol}`}
                         target="_blank" rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
-                        className="font-semibold tabular-nums hover:underline"
+                        className="hover:underline"
                         style={{ color: 'var(--accent)' }}>
                         {props.getValue()}
                     </a>
@@ -174,7 +174,7 @@ export function ScreenerTable({
             // Name — prefers Yahoo name; falls back to title-cased static name.
             // nameCacheRef prevents the flicker from static → Yahoo on each re-render.
             columnHelper.accessor('name', {
-                header: 'Name', size: 220, minSize: 100,
+                header: 'Name', size: 180, minSize: 100, maxSize: 220,
                 cell: props => {
                     const sym = props.row.original.symbol;
                     const e = mapRef.current.get(sym);
@@ -417,10 +417,11 @@ export function ScreenerTable({
                                             className={`px-2 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative align-top ${canSort ? 'cursor-pointer' : ''}`}
                                             style={{
                                                 color: 'var(--text-muted)',
-                                                // Name column: no explicit width — fills remaining space.
-                                                // Others: locked to their size.
+                                                // Name fills remaining space but is capped at its maxSize.
+                                                // Others are locked to their explicit size.
                                                 width: isName ? undefined : header.getSize(),
-                                                minWidth: isName ? header.getSize() : undefined,
+                                                minWidth: isName ? header.column.getMinSize() : undefined,
+                                                maxWidth: isName ? header.column.getMaxSize() : undefined,
                                             }}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}>
                                             {/* Header label — allowed to wrap */}
@@ -467,7 +468,8 @@ export function ScreenerTable({
                                             style={{
                                                 color: 'var(--text-primary)',
                                                 width: isName ? undefined : cell.column.getSize(),
-                                                minWidth: isName ? cell.column.getSize() : undefined,
+                                                minWidth: isName ? cell.column.getMinSize() : undefined,
+                                                maxWidth: isName ? cell.column.getMaxSize() : undefined,
                                                 overflow: 'hidden',
                                             }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
