@@ -208,6 +208,19 @@ export function activateSet(id: string): void {
     localStorage.setItem(ACTIVE_KEY, id);
 }
 
+/** Rename a set's display_name. The demo set is read-only and cannot be renamed. */
+export function renameSet(id: string, displayName: string): void {
+    if (id === DEMO_SET_ID) return;
+    const name = displayName.trim();
+    if (!name) return;
+    const stored = getStoredSets();
+    const s = stored.find(x => x.id === id);
+    if (!s) return;
+    s.display_name = name;
+    s.updated_at = new Date().toISOString();
+    saveStoredSets(stored);
+}
+
 export function deleteSet(id: string): void {
     if (id === DEMO_SET_ID) return;
     const stored = getStoredSets().filter(s => s.id !== id);

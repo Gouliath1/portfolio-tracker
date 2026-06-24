@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MdDownload, MdDelete, MdWarning, MdSwapHoriz, MdCheckCircle } from 'react-icons/md';
+import { MdDownload, MdDelete, MdWarning, MdSwapHoriz, MdCheckCircle, MdEdit, MdCheck, MdClose } from 'react-icons/md';
 import {
     getPositionSets,
     getActiveSetId,
     activateSet,
     deleteSet,
+    renameSet,
     exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
@@ -22,6 +23,8 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     // The highlighted row — a pending choice, not applied until the user confirms.
     const [selectedId, setSelectedId] = useState<string>('demo');
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
     const [error, setError] = useState<string | null>(null);
 
     const refresh = () => {
@@ -53,6 +56,24 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             if (wasActive) onPositionSetChanged?.();
         } catch {
             setError('Failed to delete portfolio');
+        }
+    };
+
+    const startRename = (set: PositionSetLocal) => {
+        setEditingId(set.id);
+        setEditName(set.display_name);
+    };
+
+    const handleRename = (id: string) => {
+        const name = editName.trim();
+        if (!name) { setEditingId(null); return; }
+        try {
+            renameSet(id, name);
+            setEditingId(null);
+            refresh();
+            if (getActiveSetId() === id) onPositionSetChanged?.();
+        } catch {
+            setError('Failed to rename portfolio');
         }
     };
 
@@ -102,6 +123,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                     const isActive = set.id === activeId;
                     const isSelected = set.id === selectedId;
                     const isDeleting = deletingId === set.id;
+                    const isEditing = editingId === set.id;
                     const notLast = i < sets.length - 1;
                     const created = formatDate(set.created_at);
                     const updated = formatDate(set.updated_at);
@@ -115,7 +137,40 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                 transition: 'background 150ms',
                             }}
                         >
-                            {isDeleting ? (
+                            {isEditing ? (
+                                <div className="flex items-center gap-2 px-4 py-3.5">
+                                    <input
+                                        autoFocus
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleRename(set.id);
+                                            if (e.key === 'Escape') setEditingId(null);
+                                        }}
+                                        className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm bg-transparent outline-none"
+                                        style={{ color: 'var(--text-primary)', border: '1px solid var(--accent)' }}
+                                        aria-label="Portfolio name"
+                                    />
+                                    <button
+                                        onClick={() => handleRename(set.id)}
+                                        className="p-2 rounded-md transition-opacity opacity-70 hover:opacity-100 flex-shrink-0"
+                                        style={{ color: 'var(--pnl-green)' }}
+                                        title="Save name"
+                                        aria-label="Save name"
+                                    >
+                                        <MdCheck className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingId(null)}
+                                        className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90 flex-shrink-0"
+                                        style={{ color: 'var(--text-secondary)' }}
+                                        title="Cancel"
+                                        aria-label="Cancel rename"
+                                    >
+                                        <MdClose className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : isDeleting ? (
                                 <div className="flex items-center gap-3 px-4 py-3.5">
                                     <p className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
                                         Delete <strong>{set.display_name}</strong>?
@@ -180,6 +235,17 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
 
                                     {/* Icon actions */}
                                     <div className="flex items-center gap-0.5 flex-shrink-0">
+                                        {set.id !== 'demo' && (
+                                            <button
+                                                onClick={() => startRename(set)}
+                                                className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
+                                                style={{ color: 'var(--text-secondary)' }}
+                                                title="Rename"
+                                                aria-label="Rename portfolio"
+                                            >
+                                                <MdEdit className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleExport(set.id, set.name)}
                                             className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"

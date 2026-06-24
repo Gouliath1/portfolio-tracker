@@ -16,6 +16,7 @@
 
 import { createClient, Client } from '@libsql/client';
 import { forwardFillLookup } from '@portfolio/core';
+import type { StockFundamentals } from '@portfolio/types/screener';
 import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -110,6 +111,41 @@ async function ensureInit(): Promise<boolean> {
                     refreshed_at TEXT NOT NULL
                 )
             `);
+            // Screener fundamentals — one row per ticker. Price/name/currency come
+            // from the no-auth chart endpoint (reliable); the valuation ratios come
+            // from the crumb-authed quoteSummary (flaky). We track their freshness
+            // separately (fetched_at = price, ratios_fetched_at = ratios) so a crumb
+            // outage doesn't freeze the ratios as "fresh" for a day.
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS security_fundamentals (
+                    ticker TEXT PRIMARY KEY,
+                    name TEXT,
+                    price REAL,
+                    currency TEXT,
+                    trailing_pe REAL,
+                    forward_pe REAL,
+                    dividend_yield REAL,
+                    price_to_book REAL,
+                    market_cap REAL,
+                    fetched_at TEXT NOT NULL,
+                    ratios_fetched_at TEXT
+                )
+            `);
+            // Existing DBs predate ratios_fetched_at — add it if missing.
+            const fcols = await c.execute('PRAGMA table_info(security_fundamentals)');
+            if (!fcols.rows.some(r => String(r.name) === 'ratios_fetched_at')) {
+                await c.execute('ALTER TABLE security_fundamentals ADD COLUMN ratios_fetched_at TEXT');
+            }
+            // Persisted Yahoo cookie+crumb (single row) so the rare successful
+            // acquisition survives restarts and is reused for hours.
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS yahoo_auth (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    cookie TEXT NOT NULL,
+                    crumb TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            `);
         } catch (err) {
             console.warn('[marketDataDb] Schema init failed:', err);
             _storageUnavailable = true;
@@ -130,9 +166,11 @@ type DividendRow = { amount: number; currency: string };
 const _memPrices = new Map<string, Map<DateString, number>>();
 const _memFx = new Map<string, Map<DateString, number>>();
 const _memDividends = new Map<string, Map<DateString, DividendRow>>();
+const _memFundamentals = new Map<string, { data: StockFundamentals; fetchedAt: string; ratiosFetchedAt: string | null }>();
 const _loadedPriceKeys = new Set<string>();
 const _loadedFxKeys = new Set<string>();
 const _loadedDividendKeys = new Set<string>();
+const _loadedFundamentalsKeys = new Set<string>();
 
 async function loadPricesForTicker(ticker: string): Promise<void> {
     if (_loadedPriceKeys.has(ticker)) return;
@@ -252,6 +290,153 @@ export async function setCachedHistoricalPrices(ticker: string, prices: Record<D
 }
 
 /** Return all cached FX rates for a pair (e.g. "USDJPY") as { date: rate }. */
+// ── Screener fundamentals ────────────────────────────────────────────────────
+
+async function loadFundamentalsForTicker(ticker: string): Promise<void> {
+    if (_loadedFundamentalsKeys.has(ticker)) return;
+    if (!(await ensureInit())) { _loadedFundamentalsKeys.add(ticker); return; }
+    const c = getClient();
+    if (!c) return;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT * FROM security_fundamentals WHERE ticker = ?',
+            args: [ticker],
+        });
+        const row = rows.rows[0];
+        if (row) {
+            const num = (v: unknown) => (v == null ? null : Number(v));
+            _memFundamentals.set(ticker, {
+                fetchedAt: row.fetched_at as string,
+                ratiosFetchedAt: (row.ratios_fetched_at as string) ?? null,
+                data: {
+                    symbol: ticker,
+                    name: (row.name as string) ?? null,
+                    price: num(row.price),
+                    currency: (row.currency as string) ?? null,
+                    trailingPE: num(row.trailing_pe),
+                    forwardPE: num(row.forward_pe),
+                    dividendYield: num(row.dividend_yield),
+                    priceToBook: num(row.price_to_book),
+                    marketCap: num(row.market_cap),
+                },
+            });
+        }
+        _loadedFundamentalsKeys.add(ticker);
+    } catch (err) {
+        console.warn(`[marketDataDb] Read fundamentals failed for ${ticker}:`, err);
+        _loadedFundamentalsKeys.add(ticker);
+    }
+}
+
+/** Cached fundamentals for a ticker, with separate price/ratios fetch times. */
+export async function getCachedFundamentals(
+    ticker: string,
+): Promise<{ data: StockFundamentals; fetchedAt: string; ratiosFetchedAt: string | null } | null> {
+    await loadFundamentalsForTicker(ticker);
+    return _memFundamentals.get(ticker) ?? null;
+}
+
+/** Basics from the no-auth chart endpoint (price/name/currency). */
+export interface PriceInfo { name: string | null; price: number | null; currency: string | null; }
+/** Valuation ratios from the crumb-authed quoteSummary. */
+export interface RatioInfo {
+    trailingPE: number | null; forwardPE: number | null; dividendYield: number | null;
+    priceToBook: number | null; marketCap: number | null;
+}
+
+function mergeMem(ticker: string, patch: Partial<StockFundamentals>, stamp: { price?: string; ratios?: string }) {
+    const prev = _memFundamentals.get(ticker);
+    const base: StockFundamentals = prev?.data ?? {
+        symbol: ticker, name: null, price: null, currency: null,
+        trailingPE: null, forwardPE: null, dividendYield: null, priceToBook: null, marketCap: null,
+    };
+    _memFundamentals.set(ticker, {
+        data: { ...base, ...patch, symbol: ticker },
+        fetchedAt: stamp.price ?? prev?.fetchedAt ?? new Date().toISOString(),
+        ratiosFetchedAt: stamp.ratios ?? prev?.ratiosFetchedAt ?? null,
+    });
+    _loadedFundamentalsKeys.add(ticker);
+}
+
+/** Upsert price/name/currency, stamping fetched_at (price freshness). */
+export async function setCachedPriceInfo(ticker: string, info: PriceInfo): Promise<void> {
+    const now = new Date().toISOString();
+    mergeMem(ticker, info, { price: now });
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        await c.execute({
+            sql: `INSERT INTO security_fundamentals (ticker, name, price, currency, fetched_at)
+                  VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT (ticker) DO UPDATE SET
+                    name = excluded.name, price = excluded.price,
+                    currency = excluded.currency, fetched_at = excluded.fetched_at`,
+            args: [ticker, info.name, info.price, info.currency, now],
+        });
+    } catch (err) {
+        console.warn(`[marketDataDb] Write price info failed for ${ticker}:`, err);
+    }
+}
+
+/** Upsert valuation ratios, stamping ratios_fetched_at. */
+export async function setCachedRatios(ticker: string, info: RatioInfo): Promise<void> {
+    const now = new Date().toISOString();
+    mergeMem(ticker, info, { ratios: now });
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        // Ensure a row exists (price may not have been written first), then update ratios.
+        await c.execute({
+            sql: `INSERT INTO security_fundamentals (ticker, fetched_at, trailing_pe, forward_pe, dividend_yield, price_to_book, market_cap, ratios_fetched_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT (ticker) DO UPDATE SET
+                    trailing_pe = excluded.trailing_pe, forward_pe = excluded.forward_pe,
+                    dividend_yield = excluded.dividend_yield, price_to_book = excluded.price_to_book,
+                    market_cap = excluded.market_cap, ratios_fetched_at = excluded.ratios_fetched_at`,
+            args: [ticker, now, info.trailingPE, info.forwardPE, info.dividendYield, info.priceToBook, info.marketCap, now],
+        });
+    } catch (err) {
+        console.warn(`[marketDataDb] Write ratios failed for ${ticker}:`, err);
+    }
+}
+
+// ── Persisted Yahoo auth (cookie + crumb) ────────────────────────────────────
+
+export async function getStoredYahooAuth(): Promise<{ cookie: string; crumb: string } | null> {
+    if (!(await ensureInit())) return null;
+    const c = getClient();
+    if (!c) return null;
+    try {
+        const rows = await c.execute('SELECT cookie, crumb FROM yahoo_auth WHERE id = 1');
+        const row = rows.rows[0];
+        return row ? { cookie: row.cookie as string, crumb: row.crumb as string } : null;
+    } catch { return null; }
+}
+
+export async function setStoredYahooAuth(cookie: string, crumb: string): Promise<void> {
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        await c.execute({
+            sql: `INSERT INTO yahoo_auth (id, cookie, crumb, updated_at) VALUES (1, ?, ?, ?)
+                  ON CONFLICT (id) DO UPDATE SET cookie = excluded.cookie, crumb = excluded.crumb, updated_at = excluded.updated_at`,
+            args: [cookie, crumb, new Date().toISOString()],
+        });
+    } catch (err) {
+        console.warn('[marketDataDb] Write yahoo_auth failed:', err);
+    }
+}
+
+export async function clearStoredYahooAuth(): Promise<void> {
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try { await c.execute('DELETE FROM yahoo_auth WHERE id = 1'); } catch { /* ignore */ }
+}
+
 export async function getCachedHistoricalFxRates(pair: string): Promise<Record<DateString, number>> {
     await loadFxForPair(pair);
     const map = _memFx.get(pair);
