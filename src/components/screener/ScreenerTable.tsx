@@ -153,12 +153,17 @@ export function ScreenerTable({
             }),
             columnHelper.accessor('name', {
                 header: 'Name',
-                // Prefer the fetched company name (fills in real names for tickers
-                // added by symbol via paste/CSV once their row loads).
+                // Prefer the fetched Yahoo name (proper casing, full name).
+                // The static index names (from BlackRock CSV) are ALL CAPS, so
+                // convert them to title case as a fallback until the row loads.
                 cell: props => {
                     const e = mapRef.current.get(props.row.original.symbol);
                     const fetched = e?.status === 'done' ? e.data.name : null;
-                    return fetched || props.getValue();
+                    const staticName = props.getValue() ?? '';
+                    const displayStatic = staticName === staticName.toUpperCase() && staticName.length > 0
+                        ? staticName.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+                        : staticName;
+                    return fetched ?? displayStatic;
                 },
             }),
             columnHelper.accessor('sector', {
