@@ -22,8 +22,12 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 
 const PAGE_SIZE = 50;
-// Secondary columns hidden on narrow screens so the table never needs horizontal scroll.
-const HIDE_ON_SMALL = new Set(['sector', 'marketCap']);
+// Tiered column hiding so Name always has room to breathe.
+// lg (1024px): hide sector + marketCap
+// xl (1280px): also hide forwardPE
+// Only show all columns on very wide screens.
+const HIDE_BELOW_LG  = new Set(['sector', 'marketCap']);
+const HIDE_BELOW_XL  = new Set(['forwardPE']);
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
@@ -282,9 +286,11 @@ export function ScreenerTable({
     const pageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
 
-    // name flexes to fill remaining width and truncates; everything else is min-content.
+    // Name flexes but has a floor so it never shrinks to an unreadable sliver.
     const cellWidthStyle = (id: string): React.CSSProperties =>
-        id === 'name' ? { width: '100%', maxWidth: 0 } : { whiteSpace: 'nowrap', width: '1%' };
+        id === 'name'
+            ? { width: '100%', maxWidth: 0, minWidth: '180px' }
+            : { whiteSpace: 'nowrap', width: '1%' };
 
     return (
         <div className="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-4 h-full">
@@ -386,7 +392,8 @@ export function ScreenerTable({
                             <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                 {headerGroup.headers.map(header => {
                                     const canSort = header.column.getCanSort();
-                                    const hide = HIDE_ON_SMALL.has(header.column.id) ? 'hidden lg:table-cell' : '';
+                                    const hide = HIDE_BELOW_LG.has(header.column.id) ? 'hidden lg:table-cell'
+                                        : HIDE_BELOW_XL.has(header.column.id) ? 'hidden xl:table-cell' : '';
                                     return (
                                         <th
                                             key={header.id}
@@ -416,7 +423,8 @@ export function ScreenerTable({
                                 style={{ borderBottom: '1px solid var(--border)' }}
                             >
                                 {row.getVisibleCells().map(cell => {
-                                    const hide = HIDE_ON_SMALL.has(cell.column.id) ? 'hidden lg:table-cell' : '';
+                                    const hide = HIDE_BELOW_LG.has(cell.column.id) ? 'hidden lg:table-cell'
+                                        : HIDE_BELOW_XL.has(cell.column.id) ? 'hidden xl:table-cell' : '';
                                     const isName = cell.column.id === 'name';
                                     return (
                                         <td
