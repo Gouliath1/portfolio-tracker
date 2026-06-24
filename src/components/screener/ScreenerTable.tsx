@@ -60,7 +60,7 @@ export function ScreenerTable({
     constituents, onRemove, removableSymbols,
     pinnedSymbols, onTogglePin, alerts, onEditAlert, onOpenChart,
 }: ScreenerTableProps) {
-    const [sorting, setSorting] = useState<SortingState>([]);
+    const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
 
