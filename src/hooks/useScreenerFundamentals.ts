@@ -116,10 +116,15 @@ export function useScreenerFundamentals(): FundamentalsApi {
             await Promise.all(toCheck.map(async symbol => {
                 try {
                     const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}&cachedOnly=1`);
-                    if (res.status === 204 || !res.ok) return;
+                    if (res.status === 204 || !res.ok) {
+                        // Not in cache (e.g. no DB on Vercel) → queue a full fetch.
+                        ratiosPending.push(symbol);
+                        return;
+                    }
                     const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean };
                     requested.current.add(symbol);
                     setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending }));
+                    // Price cached but ratios missing → back-fill.
                     if (data.ratiosPending) ratiosPending.push(symbol);
                 } catch { /* leave unloaded */ }
             }));
