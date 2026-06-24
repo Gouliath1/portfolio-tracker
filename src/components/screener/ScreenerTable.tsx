@@ -417,10 +417,10 @@ export function ScreenerTable({
                                         <th
                                             key={header.id}
                                             className={`px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative ${canSort ? 'cursor-pointer' : ''} ${hide}`}
-                                            style={{ color: 'var(--text-muted)', width: header.getSize(), overflow: 'hidden' }}
+                                            style={{ color: 'var(--text-muted)', width: header.getSize() }}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                                         >
-                                            <span className="inline-flex items-center gap-1 overflow-hidden">
+                                            <span className="inline-flex items-center gap-1" style={{ overflow: 'hidden', maxWidth: '100%' }}>
                                                 <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
                                                 {canSort && (
                                                     <span style={{ color: 'var(--accent)', display: 'inline-block', width: '10px', textAlign: 'center', flexShrink: 0 }}>
@@ -428,20 +428,20 @@ export function ScreenerTable({
                                                     </span>
                                                 )}
                                             </span>
-                                            {/* Resize handle */}
+                                            {/* Resize handle — 6px wide, always visible, turns accent when dragging */}
                                             {canResize && (
                                                 <div
                                                     onMouseDown={header.getResizeHandler()}
                                                     onTouchStart={header.getResizeHandler()}
                                                     onClick={e => e.stopPropagation()}
-                                                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none"
+                                                    className="absolute right-0 top-1 bottom-1 w-1.5 cursor-col-resize select-none touch-none rounded-full"
                                                     style={{
                                                         background: header.column.getIsResizing()
                                                             ? 'var(--accent)'
-                                                            : 'var(--border)',
-                                                        opacity: header.column.getIsResizing() ? 1 : 0.4,
+                                                            : 'var(--border-strong, var(--border))',
+                                                        opacity: header.column.getIsResizing() ? 1 : 0.6,
+                                                        zIndex: 1,
                                                     }}
-                                                    title="Drag to resize column"
                                                 />
                                             )}
                                         </th>
