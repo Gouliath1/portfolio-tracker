@@ -122,7 +122,7 @@ export function ScreenerTable({
             // ── Left actions: remove (added only) + pin ──
             columnHelper.display({
                 id: 'remove',
-                size: 36,
+                size: 32, minSize: 32, maxSize: 32, enableResizing: false,
                 header: () => null,
                 cell: props => {
                     if (!removableSymbols?.has(props.row.original.symbol)) return null;
@@ -137,7 +137,7 @@ export function ScreenerTable({
             }),
             columnHelper.display({
                 id: 'pin',
-                size: 36,
+                size: 32, minSize: 32, maxSize: 32, enableResizing: false,
                 header: () => null,
                 cell: props => {
                     const sym = props.row.original.symbol;
@@ -155,7 +155,7 @@ export function ScreenerTable({
             }),
             columnHelper.accessor('code', {
                 header: 'Ticker',
-                size: 80,
+                size: 70, minSize: 56,
                 cell: props => (
                     <a
                         href={`https://finance.yahoo.com/quote/${props.row.original.symbol}`}
@@ -170,7 +170,7 @@ export function ScreenerTable({
                 ),
             }),
             columnHelper.accessor('name', {
-                header: 'Name',
+                header: 'Name', size: 220, minSize: 120,
                 // Prefer the fetched Yahoo name (proper casing, full name).
                 // The static index names (from BlackRock CSV) are ALL CAPS, so
                 // convert them to title case as a fallback until the row loads.
@@ -185,43 +185,43 @@ export function ScreenerTable({
                 },
             }),
             columnHelper.accessor('sector', {
-                header: 'Sector',
+                header: 'Sector', size: 170, minSize: 80,
                 cell: props => props.getValue() ?? muted('—'),
             }),
             columnHelper.display({
-                id: 'price', header: 'Price',
+                id: 'price', header: 'Price', size: 120, minSize: 80,
                 enableSorting: true, sortingFn: numSort('price'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.price == null ? null : <span className="tabular-nums">{fmtNum(d.price)} <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span></span>),
             }),
             columnHelper.display({
-                id: 'trailingPE', header: 'P/E',
+                id: 'trailingPE', header: 'P/E', size: 62, minSize: 50,
                 enableSorting: true, sortingFn: numSort('trailingPE'),
                 cell: props => fundCell(props.row.original.symbol, d => d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
             }),
             columnHelper.display({
-                id: 'forwardPE', header: 'Fwd P/E',
+                id: 'forwardPE', header: 'Fwd P/E', size: 72, minSize: 56,
                 enableSorting: true, sortingFn: numSort('forwardPE'),
                 cell: props => fundCell(props.row.original.symbol, d => d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
             }),
             columnHelper.display({
-                id: 'dividendYield', header: 'Div %',
+                id: 'dividendYield', header: 'Div %', size: 68, minSize: 52,
                 enableSorting: true, sortingFn: numSort('dividendYield'),
                 cell: props => fundCell(props.row.original.symbol, d => d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
             }),
             columnHelper.display({
-                id: 'priceToBook', header: 'P/B',
+                id: 'priceToBook', header: 'P/B', size: 60, minSize: 48,
                 enableSorting: true, sortingFn: numSort('priceToBook'),
                 cell: props => fundCell(props.row.original.symbol, d => d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
             }),
             columnHelper.display({
-                id: 'marketCap', header: 'Mkt Cap',
+                id: 'marketCap', header: 'Mkt Cap', size: 80, minSize: 60,
                 enableSorting: true, sortingFn: numSort('marketCap'),
                 cell: props => fundCell(props.row.original.symbol, d => d.marketCap == null ? null : <span className="tabular-nums">{fmtCompact(d.marketCap)}</span>, true),
             }),
             // ── Right actions: alert + refresh ──
             columnHelper.display({
-                id: 'alert', header: 'Alert',
+                id: 'alert', header: 'Alert', size: 74, minSize: 60, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const alert = alertsRef.current[c.symbol];
@@ -247,7 +247,7 @@ export function ScreenerTable({
                 },
             }),
             columnHelper.display({
-                id: 'actions', size: 64, header: () => null,
+                id: 'actions', size: 64, minSize: 64, maxSize: 64, enableResizing: false, header: () => null,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
@@ -284,6 +284,7 @@ export function ScreenerTable({
             const c = row.original;
             return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || (c.sector ?? '').toLowerCase().includes(q);
         },
+        columnResizeMode: 'onChange',
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -306,11 +307,8 @@ export function ScreenerTable({
     const pageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
 
-    // Name flexes but has a floor so it never shrinks to an unreadable sliver.
-    const cellWidthStyle = (id: string): React.CSSProperties =>
-        id === 'name'
-            ? { width: '100%', maxWidth: 0, minWidth: '180px' }
-            : { whiteSpace: 'nowrap', width: '1%' };
+    // Total pixel width of all visible columns for table-layout:fixed.
+    const tableWidth = table.getVisibleLeafColumns().reduce((sum, col) => sum + col.getSize(), 0);
 
     return (
         <div className="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-4 h-full">
@@ -403,33 +401,49 @@ export function ScreenerTable({
                 </div>
             )}
 
-            {/* Table — fits width on desktop (no scroll); secondary cols hide on small
-                screens, and overflow-x-auto avoids clipping if it's ever narrower. */}
+            {/* Table — table-layout:fixed so column widths never shift on sort or content
+                change. Each column has an explicit size; drag the resize handle to adjust. */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-xl">
-                <table className="w-full data-table">
+                <table className="data-table" style={{ tableLayout: 'fixed', width: tableWidth }}>
                     <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                         {table.getHeaderGroups().map(headerGroup => (
                             <tr key={headerGroup.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                 {headerGroup.headers.map(header => {
                                     const canSort = header.column.getCanSort();
+                                    const canResize = header.column.getCanResize();
                                     const hide = HIDE_BELOW_LG.has(header.column.id) ? 'hidden lg:table-cell'
                                         : HIDE_BELOW_XL.has(header.column.id) ? 'hidden xl:table-cell' : '';
                                     return (
                                         <th
                                             key={header.id}
-                                            className={`px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none ${canSort ? 'cursor-pointer' : ''} ${hide}`}
-                                            style={{ color: 'var(--text-muted)', ...cellWidthStyle(header.column.id) }}
+                                            className={`px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative ${canSort ? 'cursor-pointer' : ''} ${hide}`}
+                                            style={{ color: 'var(--text-muted)', width: header.getSize(), overflow: 'hidden' }}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                                         >
-                                            <span className="inline-flex items-center gap-1">
-                                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                                {/* Fixed-width slot — always reserve space so the column never shifts when sort activates. */}
+                                            <span className="inline-flex items-center gap-1 overflow-hidden">
+                                                <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
                                                 {canSort && (
                                                     <span style={{ color: 'var(--accent)', display: 'inline-block', width: '10px', textAlign: 'center', flexShrink: 0 }}>
                                                         {{ asc: '↑', desc: '↓' }[header.column.getIsSorted() as string] ?? ''}
                                                     </span>
                                                 )}
                                             </span>
+                                            {/* Resize handle */}
+                                            {canResize && (
+                                                <div
+                                                    onMouseDown={header.getResizeHandler()}
+                                                    onTouchStart={header.getResizeHandler()}
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none"
+                                                    style={{
+                                                        background: header.column.getIsResizing()
+                                                            ? 'var(--accent)'
+                                                            : 'var(--border)',
+                                                        opacity: header.column.getIsResizing() ? 1 : 0.4,
+                                                    }}
+                                                    title="Drag to resize column"
+                                                />
+                                            )}
                                         </th>
                                     );
                                 })}
@@ -451,7 +465,7 @@ export function ScreenerTable({
                                         <td
                                             key={cell.id}
                                             className={`px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm ${isName ? 'truncate' : ''} ${hide}`}
-                                            style={{ color: 'var(--text-primary)', ...cellWidthStyle(cell.column.id) }}
+                                            style={{ color: 'var(--text-primary)', width: cell.column.getSize(), overflow: 'hidden' }}
                                         >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
