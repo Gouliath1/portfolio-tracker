@@ -22,7 +22,7 @@ import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo, MdUpload,
-    MdHome, MdAccountBalance, MdTune, MdTrendingUp,
+    MdHome, MdAccountBalance, MdTune, MdTrendingUp, MdManageSearch,
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
 
@@ -566,6 +566,15 @@ export default function Home() {
                 >
                     <MdTrendingUp size={20} />
                     <span>Analysis</span>
+                </button>
+                {/* Screener — separate page */}
+                <button
+                    onClick={() => window.location.href = '/screener'}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    <MdManageSearch size={20} />
+                    <span>Screener</span>
                 </button>
                 {/* Assets */}
                 <button

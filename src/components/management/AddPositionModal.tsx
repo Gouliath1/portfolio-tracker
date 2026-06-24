@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { MdClose, MdAdd, MdInfo } from 'react-icons/md';
 import { Transaction, Currency } from '@portfolio/types';
 import { DEMO_SET_ID } from '../../data/demoPositions';
 import { getTransactionsForSet } from '../../utils/localPositions';
+import { useTickerName } from '../../hooks/useTickerName';
 
 interface AddPositionModalProps {
     setId: string;
@@ -91,11 +92,16 @@ function useKnownValues(setId: string) {
 export default function AddPositionModal({ setId, onSaved, onClose }: AddPositionModalProps) {
     const [form, setForm] = useState<FormState>({ ...EMPTY, transactionDate: todayIso() });
     const [error, setError] = useState<string | null>(null);
-    const [nameLookupState, setNameLookupState] = useState<'idle' | 'loading' | 'found' | 'not-found'>('idle');
     const [nameOverridden, setNameOverridden] = useState(false);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { brokers, accounts } = useKnownValues(setId);
+
+    // Debounced ticker → company name lookup (shared with the screener).
+    const nameLookupState = useTickerName(
+        form.ticker,
+        name => { if (name) setForm(p => ({ ...p, fullName: name })); },
+        { enabled: !nameOverridden },
+    );
 
     const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const value = e.target.value;
@@ -103,40 +109,12 @@ export default function AddPositionModal({ setId, onSaved, onClose }: AddPositio
 
         if (key === 'ticker') {
             setNameOverridden(false);
-            setNameLookupState('idle');
         }
     };
-
-    // Debounced ticker → company name lookup
-    useEffect(() => {
-        const ticker = form.ticker.trim();
-        if (!ticker || nameOverridden) return;
-
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-
-        debounceRef.current = setTimeout(async () => {
-            setNameLookupState('loading');
-            try {
-                const res = await fetch(`/api/ticker-info?symbol=${encodeURIComponent(ticker.toUpperCase())}`);
-                const data = await res.json();
-                if (data.name) {
-                    setForm(p => ({ ...p, fullName: data.name }));
-                    setNameLookupState('found');
-                } else {
-                    setNameLookupState('not-found');
-                }
-            } catch {
-                setNameLookupState('not-found');
-            }
-        }, 600);
-
-        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    }, [form.ticker, nameOverridden]);
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm(p => ({ ...p, fullName: e.target.value }));
         setNameOverridden(true);
-        setNameLookupState('idle');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

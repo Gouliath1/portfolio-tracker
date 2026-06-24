@@ -3,13 +3,13 @@
 import { useRouter } from 'next/navigation';
 import {
     MdHome, MdAccountBalance, MdTune,
-    MdTrendingUp, MdSettings, MdAccountBalanceWallet,
+    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
 } from 'react-icons/md';
 
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive';
+    activePage: 'home' | 'deep-dive' | 'screener';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -112,6 +112,22 @@ export function AppSidebar({
                                     style={defaultStyle}>
                                     <MdTrendingUp size={17} />
                                     Analysis
+                                </button>
+                            )}
+
+                            {/* Screener — separate page for researching stocks before buying */}
+                            {activePage === 'screener' ? (
+                                <div className={itemClass} style={activeStyle}>
+                                    <MdManageSearch size={17} />
+                                    Screener
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => router.push('/screener')}
+                                    className={itemClass}
+                                    style={defaultStyle}>
+                                    <MdManageSearch size={17} />
+                                    Screener
                                 </button>
                             )}
 

@@ -255,6 +255,28 @@ export function assetClassFromInstrumentType(instrumentType: string | null | und
     }
 }
 
+// Server-side: basic quote info (price/currency/name) from the no-auth chart
+// endpoint. Used by the screener so every row shows price + name even when the
+// crumb-authed fundamentals endpoint is rate-limited. Deduped/cached by fetchJson.
+export interface ChartMeta { price: number | null; currency: string | null; name: string | null; }
+export async function fetchChartMeta(symbol: string): Promise<ChartMeta | null> {
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await fetchJson(url) as any;
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (!meta) return null;
+        return {
+            price: typeof meta.regularMarketPrice === 'number' ? meta.regularMarketPrice : null,
+            currency: meta.currency ?? null,
+            name: meta.longName ?? meta.shortName ?? null,
+        };
+    } catch (error) {
+        console.error(`Error fetching chart meta for ${symbol}:`, error);
+        return null;
+    }
+}
+
 // Server-side: fetch a security's instrument type from Yahoo's chart meta. The
 // same chart endpoint that backs prices already returns `meta.instrumentType`,
 // so this is a single lightweight request, deduped/cached by fetchJson.
