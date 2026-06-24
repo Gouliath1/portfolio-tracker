@@ -68,7 +68,8 @@ src/components/chart/
 src/utils/database/
 src/app/api/database/
 src/types/table.d.ts
-src/data/
+src/data/*
+!src/data/indices/
 # Auto-generated script files
 scripts/initDatabase.js
 scripts/testDatabase.js
