@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
     useReactTable,
     getCoreRowModel,
@@ -15,7 +16,7 @@ import {
 import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
     MdStar, MdStarBorder, MdNotificationsActive, MdNotificationsNone,
-    MdShowChart, MdInfoOutline,
+    MdShowChart, MdInfoOutline, MdDownload,
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
@@ -200,8 +201,8 @@ export function ScreenerTable({
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.price == null ? null : (
                         <span className="tabular-nums">
-                            {fmtPrice(d.price, d.currency)}{' '}
-                            <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span>
+                            {d.currency === 'JPY' ? '¥' : ''}{fmtPrice(d.price, d.currency)}{' '}
+                            {d.currency !== 'JPY' && <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span>}
                         </span>
                     )),
             }),
@@ -320,6 +321,33 @@ export function ScreenerTable({
 
     useEffect(() => { loadCached(pageSymbols); }, [pageSymbols, loadCached]);
 
+    const exportToExcel = useCallback((scope: 'page' | 'all') => {
+        const rows = scope === 'page'
+            ? table.getRowModel().rows.map(r => r.original)
+            : table.getFilteredRowModel().rows.map(r => r.original);
+
+        const data = rows.map(c => {
+            const e = fundMap.get(c.symbol);
+            const d = e?.status === 'done' ? e.data : null;
+            return {
+                Ticker: c.code,
+                Name: nameCacheRef.current.get(c.symbol) ?? c.name,
+                Sector: c.sector ?? '',
+                'Price (JPY)': d?.price ?? '',
+                'P/E': d?.trailingPE ?? '',
+                'Fwd P/E': d?.forwardPE ?? '',
+                'Div %': d?.dividendYield != null ? +(d.dividendYield * 100).toFixed(2) : '',
+                'P/B': d?.priceToBook ?? '',
+                'Mkt Cap (¥)': d?.marketCap ?? '',
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Screener');
+        XLSX.writeFile(wb, `screener-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }, [table, fundMap]);
+
     const pageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
 
@@ -347,6 +375,28 @@ export function ScreenerTable({
                         <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Load page'}</span>
                         <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Load'}</span>
                     </button>
+                    {/* Export dropdown */}
+                    <div className="relative group/export">
+                        <button className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                            style={{ color: 'var(--text-secondary)', background: 'var(--glass-bg)', border: '1px solid var(--border)' }}
+                            title="Export to Excel">
+                            <MdDownload size={14} />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+                        <div className="absolute right-0 top-full mt-1 z-20 rounded-lg overflow-hidden shadow-lg opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all"
+                            style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', minWidth: '140px' }}>
+                            <button onClick={() => exportToExcel('page')}
+                                className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
+                                style={{ color: 'var(--text-primary)' }}>
+                                Current page ({pageRows.length} rows)
+                            </button>
+                            <button onClick={() => exportToExcel('all')}
+                                className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
+                                style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
+                                All filtered ({totalCount} rows)
+                            </button>
+                        </div>
+                    </div>
                     {/* Info — text label so it's harder to miss */}
                     <button onClick={() => setInfoOpen(v => !v)}
                         className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
