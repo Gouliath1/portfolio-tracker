@@ -122,6 +122,31 @@ export async function fetchHistoricalPrices(symbol: string, positions: PositionL
     }
 }
 
+export interface OHLCPoint { date: string; open: number; high: number; low: number; close: number; }
+
+/** Fetch OHLC candle data for a symbol directly from Yahoo (server-side only). */
+export async function fetchHistoricalOHLC(symbol: string, interval: '1d' | '1wk' | '1mo', months: number): Promise<OHLCPoint[] | null> {
+    const rangeMap: Record<number, string> = { 6: '6mo', 12: '1y', 24: '2y', 60: '5y', 360: 'max' };
+    const range = rangeMap[months] ?? (months <= 6 ? '6mo' : months <= 12 ? '1y' : months <= 24 ? '2y' : months <= 60 ? '5y' : 'max');
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
+    try {
+        const data = await fetchJson(url) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const result = data.chart?.result?.[0];
+        if (!result?.timestamp || !result.indicators?.quote?.[0]) return null;
+        const { open, high, low, close } = result.indicators.quote[0];
+        const ts: number[] = result.timestamp;
+        const candles: OHLCPoint[] = [];
+        for (let i = 0; i < ts.length; i++) {
+            const o = open[i]; const h = high[i]; const l = low[i]; const c = close[i];
+            if (o == null || h == null || l == null || c == null) continue;
+            candles.push({ date: new Date(ts[i] * 1000).toISOString().split('T')[0], open: o, high: h, low: l, close: c });
+        }
+        return candles.sort((a, b) => a.date.localeCompare(b.date));
+    } catch {
+        return null;
+    }
+}
+
 // Dividend event from Yahoo, keyed by ISO ex-date.
 // Currency comes from chart.result[0].meta.currency — Yahoo returns the
 // dividend in the security's listing currency. Conversion to base currency
