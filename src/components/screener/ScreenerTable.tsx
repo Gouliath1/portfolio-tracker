@@ -195,7 +195,7 @@ export function ScreenerTable({
                 cell: props => props.getValue() ?? muted('—'),
             }),
             // Price
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'price', header: 'Price', size: 110, minSize: 72,
                 enableSorting: true, sortingFn: numSort('price'),
                 cell: props => fundCell(props.row.original.symbol, d =>
@@ -207,35 +207,35 @@ export function ScreenerTable({
                     )),
             }),
             // P/E (hidden on phone)
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'trailingPE', header: 'P/E', size: 58, minSize: 44,
                 enableSorting: true, sortingFn: numSort('trailingPE'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
             }),
             // Fwd P/E (hidden until xl)
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'forwardPE', header: 'Fwd P/E', size: 68, minSize: 52,
                 enableSorting: true, sortingFn: numSort('forwardPE'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
             }),
             // Div % (hidden on phone)
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'dividendYield', header: 'Div %', size: 62, minSize: 48,
                 enableSorting: true, sortingFn: numSort('dividendYield'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
             }),
             // P/B (hidden on phone)
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'priceToBook', header: 'P/B', size: 56, minSize: 44,
                 enableSorting: true, sortingFn: numSort('priceToBook'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
             }),
             // Mkt Cap (hidden on phone + tablet)
-            columnHelper.display({
+            columnHelper.accessor(() => null, {
                 id: 'marketCap', header: 'Mkt Cap (¥)', size: 82, minSize: 60,
                 enableSorting: true, sortingFn: numSort('marketCap'),
                 cell: props => fundCell(props.row.original.symbol, d =>
