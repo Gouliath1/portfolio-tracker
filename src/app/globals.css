@@ -103,6 +103,7 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
 }
 
 body {
@@ -110,6 +111,7 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   background: var(--bg-base);
+  overscroll-behavior: none;
 }
 
 /* ── Opaque surface utility ────────────────────────────────── */
