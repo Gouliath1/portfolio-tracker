@@ -97,7 +97,7 @@ function CandleChart({ candles, currency, isDark }: { candles: OHLCPoint[]; curr
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [candles, isDark]);
 
-    return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+    return <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />;
 }
 
 export function StockChartModal({ symbol, name, currency = null, onClose }: StockChartModalProps) {
@@ -135,7 +135,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
@@ -183,7 +183,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                 </div>
 
                 {/* Chart */}
-                <div className="px-6 pb-6 pt-4 flex-1 min-h-0" style={{ minHeight: 220 }}>
+                <div className="px-6 pb-6 pt-4 flex-1 min-h-0 relative" style={{ minHeight: 220 }}>
                     {state === 'loading' && (
                         <div className="h-full flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</div>
                     )}
