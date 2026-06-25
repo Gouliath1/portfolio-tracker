@@ -276,19 +276,14 @@ export function ScreenerTable({
         ];
     }, [onRemove, removableSymbols, onTogglePin, onEditAlert]);
 
-    // Column visibility drives responsive hiding AND true width exclusion on mobile.
+    // Column visibility — all data columns always shown; only layout columns
+    // (Sector, Mkt Cap, Fwd P/E) hide on narrower screens to reduce clutter.
+    // On phone the table scrolls horizontally to show all columns.
     const columnVisibility = useMemo(() => ({
         remove: (removableSymbols?.size ?? 0) > 0,
-        // Phone (<640px): only pin · ticker · name · price · actions
-        trailingPE: bp.sm,
-        dividendYield: bp.sm,
-        priceToBook: bp.sm,
-        // Tablet (640–1023px): add P/E · Div% · P/B
         sector: bp.lg,
         marketCap: bp.lg,
-        // Laptop (1024–1279px): add Sector · Mkt Cap
         forwardPE: bp.xl,
-        // Wide (1280px+): add Fwd P/E
     }), [bp, removableSymbols]);
 
     const table = useReactTable({
