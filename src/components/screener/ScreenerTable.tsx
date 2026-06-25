@@ -174,7 +174,7 @@ export function ScreenerTable({
             // Name — prefers Yahoo name; falls back to title-cased static name.
             // nameCacheRef prevents the flicker from static → Yahoo on each re-render.
             columnHelper.accessor('name', {
-                header: 'Name', size: 180, minSize: 100, maxSize: 220,
+                header: 'Name', size: 160, minSize: 90,
                 cell: props => {
                     const sym = props.row.original.symbol;
                     const e = mapRef.current.get(sym);
@@ -190,7 +190,7 @@ export function ScreenerTable({
             }),
             // Sector (hidden on phone + tablet)
             columnHelper.accessor('sector', {
-                header: 'Sector', size: 160, minSize: 80,
+                header: 'Sector', size: 150, minSize: 80,
                 cell: props => props.getValue() ?? muted('—'),
             }),
             // Price
@@ -235,14 +235,14 @@ export function ScreenerTable({
             }),
             // Mkt Cap (hidden on phone + tablet)
             columnHelper.display({
-                id: 'marketCap', header: 'Mkt Cap', size: 78, minSize: 58,
+                id: 'marketCap', header: 'Mkt Cap (¥)', size: 82, minSize: 60,
                 enableSorting: true, sortingFn: numSort('marketCap'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.marketCap == null ? null : <span className="tabular-nums">{fmtCompact(d.marketCap)}</span>, true),
+                    d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap)}</span>, true),
             }),
             // ── Single Actions column: alert · chart · refresh ──
             columnHelper.display({
-                id: 'actions', header: 'Actions', size: 96, minSize: 88, maxSize: 120, enableResizing: false,
+                id: 'actions', header: 'Actions', size: 88, minSize: 80, maxSize: 88, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
@@ -323,12 +323,10 @@ export function ScreenerTable({
     const pageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
 
-    // Table fills container (width:100%) but each column has a fixed pixel width
-    // from its `size`. The name column has no explicit width so it absorbs the rest.
-    // minWidth keeps us at least as wide as the sum of fixed columns.
-    const fixedWidth = table.getVisibleLeafColumns()
-        .filter(c => c.id !== 'name')
-        .reduce((sum, c) => sum + c.getSize(), 0);
+    // All columns have explicit pixel widths. Table is width:100% so they
+    // scale proportionally to fill the container. minWidth prevents the table
+    // from shrinking below the sum of minimum column sizes.
+    const minTableWidth = table.getVisibleLeafColumns().reduce((sum, c) => sum + (c.columnDef.minSize ?? 40), 0);
 
     return (
         <div className="glass rounded-2xl p-3 sm:p-4 flex flex-col gap-3 h-full">
@@ -404,7 +402,7 @@ export function ScreenerTable({
 
             {/* Table */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-xl">
-                <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: fixedWidth + 100 }}>
+                <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: minTableWidth }}>
                     <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                         {table.getHeaderGroups().map(hg => (
                             <tr key={hg.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -417,11 +415,7 @@ export function ScreenerTable({
                                             className={`px-2 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative align-top ${canSort ? 'cursor-pointer' : ''}`}
                                             style={{
                                                 color: 'var(--text-muted)',
-                                                // Name fills remaining space but is capped at its maxSize.
-                                                // Others are locked to their explicit size.
-                                                width: isName ? undefined : header.getSize(),
-                                                minWidth: isName ? header.column.getMinSize() : undefined,
-                                                maxWidth: isName ? header.column.getMaxSize() : undefined,
+                                                width: header.getSize(),
                                             }}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}>
                                             {/* Header label — allowed to wrap */}
@@ -467,9 +461,7 @@ export function ScreenerTable({
                                             className={`px-2 py-2 sm:py-2.5 text-xs sm:text-sm ${isName ? 'truncate' : ''}`}
                                             style={{
                                                 color: 'var(--text-primary)',
-                                                width: isName ? undefined : cell.column.getSize(),
-                                                minWidth: isName ? cell.column.getMinSize() : undefined,
-                                                maxWidth: isName ? cell.column.getMaxSize() : undefined,
+                                                width: cell.column.getSize(),
                                                 overflow: 'hidden',
                                             }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
