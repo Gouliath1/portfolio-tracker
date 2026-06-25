@@ -186,7 +186,17 @@ export function ScreenerTable({
                     const fallback = staticName === staticName.toUpperCase() && staticName.length > 0
                         ? staticName.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
                         : staticName;
-                    return cached ?? fallback;
+                    const displayName = cached ?? fallback;
+                    const currency = e?.status === 'done' ? (e.data.currency ?? null) : null;
+                    return (
+                        <button
+                            onClick={stop(() => onOpenChart(props.row.original, currency))}
+                            className="text-left w-full truncate hover:opacity-70 transition-opacity"
+                            style={{ color: 'inherit' }}
+                            title={displayName}>
+                            {displayName}
+                        </button>
+                    );
                 },
             }),
             // Sector (hidden on phone + tablet)
