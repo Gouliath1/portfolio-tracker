@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import {
     Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler,
@@ -12,24 +12,100 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip,
 
 const RANGES = ['6mo', '1y', '5y', 'max'] as const;
 type Range = typeof RANGES[number];
+type ChartType = 'line' | 'candle';
 
 interface PricePoint { date: string; close: number; }
+interface OHLCPoint { date: string; open: number; high: number; low: number; close: number; }
+
 interface StockChartModalProps {
     symbol: string;
     name: string;
-    /** Listing currency, passed from the table row (already known there). */
     currency?: string | null;
     onClose: () => void;
 }
 
-/**
- * Lightweight on-the-fly price chart for a screener stock. Fetches from
- * /api/screener/history (no SQLite persistence) and renders a line chart.
- */
+function CandleChart({ candles, currency, isDark }: { candles: OHLCPoint[]; currency: string | null; isDark: boolean }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!containerRef.current || candles.length === 0) return;
+
+        let cancelled = false;
+        let chartInstance: import('lightweight-charts').IChartApi | null = null;
+        let ro: ResizeObserver | null = null;
+
+        import('lightweight-charts').then(({ createChart, ColorType, CrosshairMode, CandlestickSeries }) => {
+            if (cancelled || !containerRef.current) return;
+
+            const grid = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+            const text = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+
+            chartInstance = createChart(containerRef.current, {
+                layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: text },
+                grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+                crosshair: { mode: CrosshairMode.Normal },
+                rightPriceScale: { borderColor: 'transparent' },
+                timeScale: { borderColor: 'transparent', timeVisible: false },
+                width: containerRef.current.clientWidth,
+                height: containerRef.current.clientHeight,
+                handleScroll: true,
+                handleScale: true,
+            });
+
+            const series = chartInstance.addSeries(CandlestickSeries, {
+                upColor: '#16a34a',
+                downColor: '#dc2626',
+                borderUpColor: '#16a34a',
+                borderDownColor: '#dc2626',
+                wickUpColor: '#16a34a',
+                wickDownColor: '#dc2626',
+            });
+
+            series.setData(candles.map(c => ({
+                time: c.date as import('lightweight-charts').Time,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+            })));
+
+            if (currency) {
+                series.applyOptions({
+                    priceFormat: { type: 'custom', formatter: (p: number) => `${p.toLocaleString()} ${currency}` },
+                });
+            }
+
+            chartInstance.timeScale().fitContent();
+
+            ro = new ResizeObserver(() => {
+                if (chartInstance && containerRef.current) {
+                    chartInstance.applyOptions({
+                        width: containerRef.current.clientWidth,
+                        height: containerRef.current.clientHeight,
+                    });
+                }
+            });
+            ro.observe(containerRef.current);
+        });
+
+        return () => {
+            cancelled = true;
+            ro?.disconnect();
+            chartInstance?.remove();
+            chartInstance = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [candles, isDark]);
+
+    return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
+
 export function StockChartModal({ symbol, name, currency = null, onClose }: StockChartModalProps) {
     const { resolvedTheme } = useTheme();
     const [range, setRange] = useState<Range>('1y');
-    const [points, setPoints] = useState<PricePoint[] | null>(null);
+    const [chartType, setChartType] = useState<ChartType>('candle');
+    const [prices, setPrices] = useState<PricePoint[] | null>(null);
+    const [candles, setCandles] = useState<OHLCPoint[] | null>(null);
     const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
     useEffect(() => {
@@ -41,7 +117,8 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 if (cancelled) return;
-                setPoints(data.prices ?? []);
+                setPrices(data.prices ?? []);
+                setCandles(data.candles ?? []);
                 setState((data.prices?.length ?? 0) > 0 ? 'ready' : 'error');
             } catch {
                 if (!cancelled) setState('error');
@@ -53,7 +130,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
     const isDark = resolvedTheme === 'dark';
     const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
     const tick = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
-    const up = points && points.length > 1 && points[points.length - 1].close >= points[0].close;
+    const up = prices && prices.length > 1 && prices[prices.length - 1].close >= prices[0].close;
     const line = up ? '#16a34a' : '#dc2626';
 
     return (
@@ -82,13 +159,24 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                     </button>
                 </div>
 
-                {/* Range toggle */}
-                <div className="px-6 pt-4">
+                {/* Controls */}
+                <div className="px-6 pt-4 flex items-center gap-3">
+                    {/* Range toggle */}
                     <div className="inline-flex rounded-lg p-0.5 text-xs font-medium" style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                         {RANGES.map(r => (
                             <button key={r} onClick={() => setRange(r)} className="px-3 py-1.5 rounded-md transition-all uppercase"
                                 style={range === r ? { background: 'var(--accent-dim)', color: 'var(--accent)' } : { color: 'var(--text-secondary)' }}>
                                 {r}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Chart type toggle */}
+                    <div className="inline-flex rounded-lg p-0.5 text-xs font-medium" style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+                        {(['candle', 'line'] as ChartType[]).map(t => (
+                            <button key={t} onClick={() => setChartType(t)} className="px-3 py-1.5 rounded-md transition-all capitalize"
+                                style={chartType === t ? { background: 'var(--accent-dim)', color: 'var(--accent)' } : { color: 'var(--text-secondary)' }}>
+                                {t === 'candle' ? '🕯' : '📈'}
                             </button>
                         ))}
                     </div>
@@ -104,12 +192,20 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                             No price data available
                         </div>
                     )}
-                    {state === 'ready' && points && (
+                    {state === 'ready' && chartType === 'candle' && candles && candles.length > 0 && (
+                        <CandleChart candles={candles} currency={currency} isDark={isDark} />
+                    )}
+                    {state === 'ready' && chartType === 'candle' && (!candles || candles.length === 0) && (
+                        <div className="h-full flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                            No candle data available
+                        </div>
+                    )}
+                    {state === 'ready' && chartType === 'line' && prices && (
                         <Line
                             data={{
-                                labels: points.map(p => p.date),
+                                labels: prices.map(p => p.date),
                                 datasets: [{
-                                    data: points.map(p => p.close),
+                                    data: prices.map(p => p.close),
                                     borderColor: line,
                                     backgroundColor: `${line}22`,
                                     borderWidth: 2,
@@ -123,7 +219,6 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                             options={{
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                // Hover anywhere snaps to the nearest point (no need to hit it exactly).
                                 interaction: { mode: 'index', intersect: false },
                                 plugins: {
                                     legend: { display: false },

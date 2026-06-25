@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { fetchHistoricalPrices } from '@portfolio/core';
+import { fetchHistoricalPrices, fetchHistoricalOHLC } from '@portfolio/core';
 
 const RANGE_MONTHS: Record<string, number> = { '6mo': 6, '1y': 12, '2y': 24, '5y': 60, 'max': 360 };
 
@@ -30,12 +30,16 @@ export async function GET(request: Request) {
 
     // Daily resolution for short ranges, monthly for long ones (smaller payload).
     const interval = months <= 12 ? '1d' : '1mo';
+    const candleInterval = months <= 12 ? '1d' : months <= 24 ? '1wk' : '1mo';
     const start = new Date();
     start.setMonth(start.getMonth() - months);
     const synthetic = [{ transactionDate: start.toISOString().split('T')[0], ticker: symbol }];
 
     try {
-        const map = await fetchHistoricalPrices(symbol, synthetic, interval);
+        const [map, candles] = await Promise.all([
+            fetchHistoricalPrices(symbol, synthetic, interval),
+            fetchHistoricalOHLC(symbol, candleInterval, months),
+        ]);
         if (!map || Object.keys(map).length === 0) {
             return NextResponse.json({ error: 'no data', symbol }, { status: 502 });
         }
@@ -43,7 +47,7 @@ export async function GET(request: Request) {
             .map(([date, close]) => ({ date, close }))
             .sort((a, b) => a.date.localeCompare(b.date));
         return NextResponse.json(
-            { symbol, prices },
+            { symbol, prices, candles: candles ?? [] },
             { headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' } },
         );
     } catch (error) {
