@@ -446,7 +446,7 @@ export function ScreenerTable({
             )}
 
             {/* Table */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-xl">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto overscroll-contain rounded-xl">
                 <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: minTableWidth }}>
                     <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                         {table.getHeaderGroups().map(hg => (
@@ -468,11 +468,18 @@ export function ScreenerTable({
                                                 <span style={{ wordBreak: 'break-word' }}>
                                                     {flexRender(header.column.columnDef.header, header.getContext())}
                                                 </span>
-                                                {canSort && (
-                                                    <span style={{ color: 'var(--accent)', display: 'inline-block', width: 10, textAlign: 'center', flexShrink: 0, lineHeight: 1.2 }}>
-                                                        {{ asc: '↑', desc: '↓' }[header.column.getIsSorted() as string] ?? ''}
-                                                    </span>
-                                                )}
+                                                {canSort && (() => {
+                                                    const sorted = header.column.getIsSorted();
+                                                    return (
+                                                        <span style={{
+                                                            color: sorted ? 'var(--accent)' : 'var(--text-muted)',
+                                                            display: 'inline-block', width: 10, textAlign: 'center', flexShrink: 0, lineHeight: 1.2,
+                                                            opacity: sorted ? 1 : 0.4,
+                                                        }}>
+                                                            {sorted === 'asc' ? '↑' : sorted === 'desc' ? '↓' : '⇅'}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </span>
                                             {/* Resize handle */}
                                             {canResize && (
