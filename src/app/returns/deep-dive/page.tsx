@@ -4,7 +4,8 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppSidebar } from '../../../components/layout/AppSidebar';
 import { SettingsPanel } from '../../../components/layout/SettingsPanel';
-import { MdHome, MdAccountBalance, MdTune, MdTrendingUp, MdSettings, MdAccountBalanceWallet } from 'react-icons/md';
+import { MdAccountBalanceWallet, MdSettings } from 'react-icons/md';
+import { MobileBottomNav } from '../../../components/layout/MobileBottomNav';
 import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../../hooks/useActiveSetName';
@@ -637,64 +638,11 @@ export default function DeepDivePage() {
                 </main>
             </div>
 
-            {/* ── Mobile bottom tab bar ────────────────────────────── */}
-            {/* z-[60] keeps the bar above the settings drawer so it stays
-                tappable — matches the main page. */}
-            <nav
-                className="md:hidden fixed bottom-0 inset-x-0 z-[60] flex"
-                style={{
-                    background: 'var(--surface-sidebar)',
-                    borderTop: '1px solid var(--border)',
-                    paddingBottom: 'env(safe-area-inset-bottom)',
-                }}
-            >
-                {/* Overview */}
-                <button
-                    onClick={() => router.push('/?view=overview')}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                >
-                    <MdHome size={20} />
-                    <span>Overview</span>
-                </button>
-                {/* Analysis — current page; tapping it just closes settings */}
-                <button
-                    onClick={() => setSettingsOpen(false)}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: settingsOpen ? 'var(--text-muted)' : 'var(--accent)' }}
-                >
-                    <MdTrendingUp size={20} />
-                    <span>Analysis</span>
-                </button>
-                {/* Assets */}
-                <button
-                    onClick={() => router.push('/?view=assets')}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                >
-                    <MdAccountBalance size={20} />
-                    <span>Assets</span>
-                </button>
-                {/* Data */}
-                <button
-                    onClick={() => router.push('/?view=data')}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                >
-                    <MdTune size={20} />
-                    <span>Data</span>
-                </button>
-                {/* Settings */}
-                <button
-                    onClick={() => setSettingsOpen(o => !o)}
-                    aria-label="Settings"
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: settingsOpen ? 'var(--accent)' : 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
-                >
-                    <MdSettings size={20} />
-                    <span>Settings</span>
-                </button>
-            </nav>
+            <MobileBottomNav
+                activePage="deep-dive"
+                settingsOpen={settingsOpen}
+                onSettingsToggle={() => setSettingsOpen(o => !o)}
+            />
 
             <SettingsPanel
                 open={settingsOpen}

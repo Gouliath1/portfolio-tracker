@@ -9,6 +9,7 @@ import { AlertModal } from '../../components/screener/AlertModal';
 import { StockChartModal } from '../../components/screener/StockChartModal';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
+import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
 import topix from '../../data/indices/topix.json';
 import type { IndexConstituent, IndexConstituentsFile, PriceAlert } from '../../types/screener';
 
@@ -206,6 +207,12 @@ export default function ScreenerPage() {
                 onClose={() => setSettingsOpen(false)}
                 currency={currency}
                 onCurrencyChange={setCurrency}
+            />
+
+            <MobileBottomNav
+                activePage="screener"
+                settingsOpen={settingsOpen}
+                onSettingsToggle={() => setSettingsOpen(o => !o)}
             />
         </div>
     );
