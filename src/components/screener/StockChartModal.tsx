@@ -183,7 +183,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                 </div>
 
                 {/* Chart */}
-                <div className="px-6 py-5" style={{ height: 360 }}>
+                <div className="px-6 pb-6 pt-4 flex-1 min-h-0" style={{ minHeight: 220 }}>
                     {state === 'loading' && (
                         <div className="h-full flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</div>
                     )}
