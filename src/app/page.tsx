@@ -22,9 +22,9 @@ import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo, MdUpload,
-    MdHome, MdAccountBalance, MdTune, MdTrendingUp, MdManageSearch,
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
+import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 
 import ImportSetModal from '../components/management/ImportSetModal';
 import AddPositionModal from '../components/management/AddPositionModal';
@@ -538,73 +538,13 @@ export default function Home() {
                 </div>
             </div>
 
-            {/* ── Mobile bottom tab bar ────────────────────────────── */}
-            {/* z-[60] keeps the bar above the settings drawer/backdrop so it
-                stays tappable — settings behaves like any other tab. */}
-            <nav
-                className="md:hidden fixed bottom-0 inset-x-0 z-[60] flex"
-                style={{
-                    background: 'var(--surface-sidebar)',
-                    borderTop: '1px solid var(--border)',
-                    paddingBottom: 'env(safe-area-inset-bottom)',
-                }}
-            >
-                {/* Overview */}
-                <button
-                    onClick={() => { setSettingsOpen(false); setActiveView('overview'); }}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: !settingsOpen && activeView === 'overview' ? 'var(--accent)' : 'var(--text-muted)' }}
-                >
-                    <MdHome size={20} />
-                    <span>Overview</span>
-                </button>
-                {/* Analysis — separate page */}
-                <button
-                    onClick={() => window.location.href = '/returns/deep-dive'}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                >
-                    <MdTrendingUp size={20} />
-                    <span>Analysis</span>
-                </button>
-                {/* Screener — separate page */}
-                <button
-                    onClick={() => window.location.href = '/screener'}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                >
-                    <MdManageSearch size={20} />
-                    <span>Screener</span>
-                </button>
-                {/* Assets */}
-                <button
-                    onClick={() => { setSettingsOpen(false); setActiveView('assets'); }}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: !settingsOpen && activeView === 'assets' ? 'var(--accent)' : 'var(--text-muted)' }}
-                >
-                    <MdAccountBalance size={20} />
-                    <span>Assets</span>
-                </button>
-                {/* Data */}
-                <button
-                    onClick={() => { setSettingsOpen(false); setActiveView('data'); }}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: !settingsOpen && activeView === 'data' ? 'var(--accent)' : 'var(--text-muted)' }}
-                >
-                    <MdTune size={20} />
-                    <span>Data</span>
-                </button>
-                {/* Settings */}
-                <button
-                    onClick={() => setSettingsOpen(o => !o)}
-                    aria-label="Settings"
-                    className="flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
-                    style={{ color: settingsOpen ? 'var(--accent)' : 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}
-                >
-                    <MdSettings size={20} />
-                    <span>Settings</span>
-                </button>
-            </nav>
+            <MobileBottomNav
+                activePage="home"
+                activeView={activeView}
+                onViewChange={(v) => { setSettingsOpen(false); setActiveView(v); }}
+                settingsOpen={settingsOpen}
+                onSettingsToggle={() => setSettingsOpen(o => !o)}
+            />
 
             {/* ── Undo toast ───────────────────────────────────────── */}
             {undoEntry && (
