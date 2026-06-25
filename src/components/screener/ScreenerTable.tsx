@@ -446,7 +446,7 @@ export function ScreenerTable({
             )}
 
             {/* Table */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto overscroll-contain rounded-xl">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto overscroll-none rounded-xl">
                 <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: minTableWidth }}>
                     <thead className="sticky top-0 z-10" style={{ background: 'var(--table-header-bg)', backdropFilter: 'blur(12px)' }}>
                         {table.getHeaderGroups().map(hg => (
