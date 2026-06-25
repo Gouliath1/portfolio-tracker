@@ -373,7 +373,7 @@ export default function DeepDivePage() {
                                                 — click a row to see its cash flows
                                             </span>
                                         </p>
-                                        <div className="glass rounded-xl overflow-auto overscroll-contain">
+                                        <div className="glass rounded-xl overflow-auto overscroll-none">
                                             <table className="min-w-full data-table xirr-table">
                                                 <thead className="sticky top-0 z-20"
                                                     style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
@@ -547,7 +547,7 @@ export default function DeepDivePage() {
                                                 Loading price history…
                                             </p>
                                         ) : (
-                                            <div className="glass rounded-xl overflow-auto overscroll-contain">
+                                            <div className="glass rounded-xl overflow-auto overscroll-none">
                                                 <table className="min-w-full data-table xirr-table xirr-annual">
                                                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                         <tr>

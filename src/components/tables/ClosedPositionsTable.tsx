@@ -70,7 +70,7 @@ export const ClosedPositionsTable = ({
             </button>
 
             {expanded && (
-                <div className="overflow-x-auto overscroll-contain">
+                <div className="overflow-x-auto overscroll-none">
                     <table className="w-full text-sm tabular-nums">
                         <thead>
                             <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
