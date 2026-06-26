@@ -404,7 +404,7 @@ export function ScreenerTable({
         <button
             key={id}
             onClick={() => handleSetView(id)}
-            className="px-2.5 py-1 text-xs font-medium transition-all rounded-md"
+            className="h-full px-2.5 text-sm font-medium transition-all rounded-md flex items-center gap-1"
             style={view === id
                 ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
                 : { color: 'var(--text-secondary)' }}
@@ -415,14 +415,14 @@ export function ScreenerTable({
 
     return (
         <div className="glass rounded-2xl p-3 sm:p-4 flex flex-col gap-3 h-full">
-            {/* Single controls row */}
+            {/* Single controls row — all elements h-9 for uniform height */}
             <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
                 {/* Search */}
                 <div className="relative" style={{ flex: '1 1 140px', maxWidth: 260 }}>
                     <MdSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                     <input value={filter} onChange={e => setFilter(e.target.value)}
                         placeholder="Filter by ticker or name…"
-                        className="w-full pl-9 pr-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1"
+                        className="w-full h-9 pl-9 pr-3 rounded-lg text-sm glass outline-none focus:ring-1"
                         style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' }} />
                 </div>
 
@@ -430,7 +430,7 @@ export function ScreenerTable({
                 <div className="relative flex-shrink-0">
                     <button
                         onClick={() => setSectorOpen(o => !o)}
-                        className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
                         style={{
                             color: selectedSectors ? 'var(--accent)' : 'var(--text-secondary)',
                             background: selectedSectors ? 'var(--accent-dim)' : 'var(--glass-bg)',
@@ -483,7 +483,7 @@ export function ScreenerTable({
                 </div>
 
                 {/* View tabs */}
-                <div className="inline-flex rounded-lg p-0.5 gap-0.5 flex-shrink-0"
+                <div className="inline-flex h-9 items-center rounded-lg p-1 gap-0.5 flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                     {viewTab('all', 'All', constituents.length)}
                     {viewTab('loaded', 'Loaded', loadedCount)}
@@ -493,14 +493,14 @@ export function ScreenerTable({
                 {/* Actions — pushed to the right */}
                 <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
                     <button onClick={() => loadMany(pageSymbols)} disabled={pageLoading || pageSymbols.length === 0}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                        className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
                         <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
                         <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Fetch prices'}</span>
                         <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Fetch'}</span>
                     </button>
                     <div className="relative group/export">
-                        <button className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        <button className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
                             style={{ color: 'var(--text-secondary)', background: 'var(--glass-bg)', border: '1px solid var(--border)' }}
                             title="Export to Excel">
                             <MdDownload size={14} />
@@ -521,7 +521,7 @@ export function ScreenerTable({
                         </div>
                     </div>
                     <button onClick={() => setInfoOpen(v => !v)}
-                        className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        className="h-9 flex items-center gap-1 px-2.5 rounded-lg text-sm font-medium transition-all"
                         style={{
                             color: infoOpen ? 'var(--accent)' : 'var(--text-secondary)',
                             background: infoOpen ? 'var(--accent-dim)' : 'var(--glass-bg)',

@@ -196,29 +196,6 @@ export default function DeepDivePage() {
             {/* ── Content column ───────────────────────────────── */}
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
 
-                {/* ── Header ───────────────────────────────────── */}
-                <header className="sticky top-0 z-10 px-4 sm:px-6 h-[52px] flex items-center"
-                    style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)' }}>
-                    {/* Active portfolio — mobile (sidebar shows it on desktop) */}
-                    <div className="md:hidden flex items-center gap-2 min-w-0">
-                        <MdAccountBalanceWallet size={18} className="flex-shrink-0"
-                            style={{ color: 'var(--accent)' }} />
-                        <span className="text-sm font-medium truncate" title={activeSetName}
-                            style={{ color: 'var(--text-primary)' }}>
-                            {activeSetName || 'Portfolio'}
-                        </span>
-                    </div>
-                    {/* Settings — mobile only (sidebar shows it on desktop) */}
-                    <button
-                        onClick={() => setSettingsOpen(true)}
-                        className="md:hidden ml-auto p-2 rounded-lg"
-                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                        aria-label="Open settings"
-                    >
-                        <MdSettings size={18} />
-                    </button>
-                </header>
-
                 {/* ── Main content ─────────────────────────────── */}
                 <main className="flex-1 pb-20 md:pb-0">
                     <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
