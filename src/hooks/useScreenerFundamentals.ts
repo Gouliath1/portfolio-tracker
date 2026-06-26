@@ -122,11 +122,13 @@ export function useScreenerFundamentals(): FundamentalsApi {
     }, [fetchOne, setEntry]);
 
     // Restore what's already in the DB cache — chunked batch requests, no upstream calls.
-    // Safe to call with the full universe (1600+ symbols): chunks of 200 keep URLs short,
-    // and cacheChecked prevents re-fetching symbols already seen this session.
+    // Symbols are marked in-flight immediately to prevent duplicate concurrent requests.
+    // On failure (server error or network exception) they are removed from cacheChecked
+    // so the next loadCached call (e.g. per-page fallback) can retry them.
     const loadCached = useCallback((symbols: string[]) => {
         const toCheck = symbols.filter(s => !requested.current.has(s) && !cacheChecked.current.has(s));
         if (toCheck.length === 0) return;
+        // Mark in-flight to prevent duplicate concurrent requests.
         toCheck.forEach(s => cacheChecked.current.add(s));
 
         const CHUNK = 200;
@@ -137,7 +139,11 @@ export function useScreenerFundamentals(): FundamentalsApi {
             await Promise.all(chunks.map(async chunk => {
                 try {
                     const res = await fetch(`/api/screener/quotes?symbols=${chunk.map(encodeURIComponent).join(',')}`);
-                    if (!res.ok) return;
+                    if (!res.ok) {
+                        // Server error — unblock so per-page fallback can retry.
+                        chunk.forEach(s => cacheChecked.current.delete(s));
+                        return;
+                    }
                     const batch = await res.json() as Record<string, StockFundamentals & {
                         ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
                     }>;
@@ -150,7 +156,10 @@ export function useScreenerFundamentals(): FundamentalsApi {
                             ratiosFetchedAt: data.ratiosFetchedAt,
                         });
                     });
-                } catch { /* ignore chunk failure */ }
+                } catch {
+                    // Network error — unblock so per-page fallback can retry.
+                    chunk.forEach(s => cacheChecked.current.delete(s));
+                }
             }));
         })();
     }, [setEntry]);
