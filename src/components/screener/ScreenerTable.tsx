@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -231,12 +231,36 @@ export function ScreenerTable({
                     const displayName = cached ?? fallback;
                     const currency = e?.status === 'done' ? (e.data.currency ?? null) : null;
                     const isLoaded = e?.status === 'done';
+                    const fetchedAt = e?.status === 'done' ? e.fetchedAt : undefined;
+                    const ratiosFetchedAt = e?.status === 'done' ? e.ratiosFetchedAt : undefined;
+                    const STALE_MS = 24 * 60 * 60 * 1000;
+                    const isStale = fetchedAt
+                        ? Date.now() - new Date(fetchedAt).getTime() > STALE_MS
+                        : false;
+                    const dotColor = !isLoaded ? 'var(--border-strong)'
+                        : isStale ? 'oklch(68% 0.14 60)'  // amber for stale
+                        : 'var(--pnl-green)';
+                    const dotTitle = (() => {
+                        if (!isLoaded) return undefined;
+                        const fmt = (iso: string | null | undefined) => {
+                            if (!iso) return null;
+                            const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+                            if (h < 1) return 'just now';
+                            if (h < 24) return `${h}h ago`;
+                            return `${Math.floor(h / 24)}d ago`;
+                        };
+                        const parts: string[] = [];
+                        if (fetchedAt) parts.push(`price: ${fmt(fetchedAt)}`);
+                        if (ratiosFetchedAt) parts.push(`ratios: ${fmt(ratiosFetchedAt)}`);
+                        return parts.length ? parts.join(' · ') : undefined;
+                    })();
                     return (
                         <div className="flex items-center gap-1.5 w-full min-w-0">
-                            <span className="flex-shrink-0 rounded-full" style={{
+                            <span className="flex-shrink-0 rounded-full" title={dotTitle} style={{
                                 width: 5, height: 5,
-                                background: isLoaded ? 'var(--pnl-green)' : 'var(--border-strong)',
+                                background: dotColor,
                                 opacity: isLoaded ? 1 : 0.45,
+                                cursor: dotTitle ? 'help' : undefined,
                             }} />
                             <button
                                 onClick={stop(() => onOpenChart(props.row.original, currency))}
@@ -369,7 +393,10 @@ export function ScreenerTable({
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
     const pageLoading = progress !== null;
 
-    useEffect(() => { loadCached(pageSymbols); }, [pageSymbols, loadCached]);
+    // Don't auto-probe the DB cache for all rows when "Show all" is active —
+    // that would fire 1600+ parallel fetches and freeze the browser. In show-all
+    // mode the user manually triggers loading via Fetch prices.
+    useEffect(() => { if (!showAll) loadCached(pageSymbols); }, [pageSymbols, loadCached, showAll]);
 
     const exportToExcel = useCallback((scope: 'page' | 'all') => {
         const rows = scope === 'page'
@@ -666,7 +693,7 @@ export function ScreenerTable({
                     {/* Show all / Paginate toggle — only for All view */}
                     {view === 'all' && (
                         <button
-                            onClick={() => setShowAll(o => !o)}
+                            onClick={() => startTransition(() => { setShowAll(o => !o); })}
                             className="px-2.5 py-1.5 rounded-lg transition-all"
                             style={{ color: showAll ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)', background: showAll ? 'var(--accent-dim)' : 'transparent' }}
                         >

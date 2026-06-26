@@ -303,9 +303,9 @@ export default function Home() {
                     <main className="flex-1 pb-20 md:pb-0">
                         <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-                            {/* Portfolio name + controls — inline, no separate header bar */}
+                            {/* Portfolio controls — portfolio name shown only on mobile (sidebar has it on desktop) */}
                             <div className="flex items-center gap-3 flex-shrink-0">
-                                <div className="flex items-center gap-2 min-w-0">
+                                <div className="md:hidden flex items-center gap-2 min-w-0">
                                     <MdAccountBalanceWallet size={18} className="flex-shrink-0"
                                         style={{ color: 'var(--accent)' }} />
                                     <span className="text-sm font-semibold truncate" title={activeSetName}
