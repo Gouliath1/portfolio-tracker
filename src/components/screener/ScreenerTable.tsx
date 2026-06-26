@@ -628,13 +628,14 @@ export function ScreenerTable({
                         {/* Col 3 — Loading mechanism */}
                         <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
                             <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading mechanism</p>
-                            <span><strong>On open</strong> — cached data restores from DB; dot appears immediately</span>
-                            <span><strong>Fetch data</strong> — fresh Yahoo fetch for all rows on the current page (price + ratios)</span>
+                            <span><strong>On open / page refresh</strong> — restores instantly from browser storage (localStorage); falls back to DB if not cached locally</span>
+                            <span><strong>Refresh page</strong> — fetches live data from Yahoo for the 50 visible rows (price + ratios)</span>
+                            <span><strong>Refresh all</strong> — same, but for all rows when "Show all" is active</span>
                             <span><strong>⟳ per row</strong> — refreshes a single stock on demand</span>
                             <span><strong>Loaded tab</strong> — shows all rows that have data, no pagination</span>
                             <span><strong>Show all</strong> — renders the full list on one page</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is shown immediately rather than forcing a slow reload — use Fetch data or ⟳ to update.
+                                Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is always shown immediately — use Refresh page/all or ⟳ to get live values.
                             </p>
                         </div>
                     </div>
