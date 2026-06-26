@@ -16,7 +16,7 @@ import {
 import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
     MdStar, MdStarBorder, MdNotificationsActive, MdNotificationsNone,
-    MdShowChart, MdInfoOutline, MdDownload,
+    MdShowChart, MdInfoOutline, MdDownload, MdFilterList, MdExpandMore, MdCheck,
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
@@ -24,12 +24,13 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
 
+type View = 'all' | 'loaded' | 'pinned';
+
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
 const fmtNum = (v: number, digits = 2) =>
     v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-// JPY prices: strip .00 but keep .5 for half-yen increments.
 const fmtPrice = (price: number, currency: string | null) =>
     currency === 'JPY'
         ? price.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
@@ -43,8 +44,6 @@ function isAlertTriggered(alert: PriceAlert, price: number | null): boolean {
     return alert.direction === 'above' ? price >= alert.target : price <= alert.target;
 }
 
-// Responsive breakpoint hook — drives columnVisibility so react-table truly
-// excludes hidden columns from the width calculation (CSS-only hiding doesn't).
 function useBreakpoints() {
     const [bp, setBp] = useState({ sm: true, lg: true, xl: true });
     useEffect(() => {
@@ -79,6 +78,11 @@ export function ScreenerTable({
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
+    const [view, setView] = useState<View>('all');
+    const [selectedSectors, setSelectedSectors] = useState<Set<string> | null>(null);
+    const [sectorOpen, setSectorOpen] = useState(false);
+    const [pageIndex, setPageIndex] = useState(0);
+    const [pageSize, setPageSize] = useState(PAGE_SIZE);
     const bp = useBreakpoints();
 
     const mapRef = useRef<Map<string, FundEntry>>(new Map());
@@ -86,8 +90,55 @@ export function ScreenerTable({
     const pinnedRef = useRef(pinnedSymbols); pinnedRef.current = pinnedSymbols;
     const alertsRef = useRef(alerts); alertsRef.current = alerts;
     const refreshRef = useRef<(symbol: string) => void>(() => {});
-    // Cache Yahoo names so they don't revert to static title-case on re-render.
     const nameCacheRef = useRef<Map<string, string>>(new Map());
+
+    // Must be called before any memos that use fundMap.
+    const { map: fundMap, refresh, loadMany, loadCached, progress } = useScreenerFundamentals();
+    mapRef.current = fundMap;
+    refreshRef.current = refresh;
+
+    // Reset to page 0 and adjust page size when view changes.
+    useEffect(() => {
+        setPageIndex(0);
+        setPageSize(view === 'all' ? PAGE_SIZE : 99999);
+    }, [view]);
+
+    // Rows visible in the current tab.
+    const viewRows = useMemo(() => {
+        if (view === 'loaded') return constituents.filter(c => fundMap.get(c.symbol)?.status === 'done');
+        if (view === 'pinned') return constituents.filter(c => pinnedSymbols.has(c.symbol));
+        return constituents;
+    }, [view, constituents, pinnedSymbols, fundMap]);
+
+    // All unique sectors present in the full constituent list.
+    const allSectors = useMemo(() => {
+        const s = new Set(constituents.map(c => c.sector).filter(Boolean) as string[]);
+        return Array.from(s).sort();
+    }, [constituents]);
+
+    // Apply sector filter on top of the view filter.
+    const sectorFilteredRows = useMemo(() => {
+        if (!selectedSectors) return viewRows;
+        return viewRows.filter(c => c.sector != null && selectedSectors.has(c.sector));
+    }, [viewRows, selectedSectors]);
+
+    const loadedCount = useMemo(
+        () => constituents.filter(c => fundMap.get(c.symbol)?.status === 'done').length,
+        [constituents, fundMap],
+    );
+
+    const toggleSector = (s: string) => {
+        setSelectedSectors(prev => {
+            if (prev === null) return new Set([s]);
+            const next = new Set(prev);
+            if (next.has(s)) {
+                next.delete(s);
+                return next.size === 0 ? null : next;
+            }
+            next.add(s);
+            return next;
+        });
+    };
 
     const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
@@ -176,8 +227,7 @@ export function ScreenerTable({
                     </a>
                 ),
             }),
-            // Name — prefers Yahoo name; falls back to title-cased static name.
-            // nameCacheRef prevents the flicker from static → Yahoo on each re-render.
+            // Name — data-loaded dot + Yahoo name preferred over static name.
             columnHelper.accessor('name', {
                 header: 'Name', size: 160, minSize: 90,
                 cell: props => {
@@ -192,14 +242,25 @@ export function ScreenerTable({
                         : staticName;
                     const displayName = cached ?? fallback;
                     const currency = e?.status === 'done' ? (e.data.currency ?? null) : null;
+                    const isLoaded = e?.status === 'done';
                     return (
-                        <button
-                            onClick={stop(() => onOpenChart(props.row.original, currency))}
-                            className="text-left w-full truncate hover:opacity-70 transition-opacity"
-                            style={{ color: 'inherit' }}
-                            title={displayName}>
-                            {displayName}
-                        </button>
+                        <div className="flex items-center gap-1.5 w-full min-w-0">
+                            <span
+                                className="flex-shrink-0 rounded-full"
+                                style={{
+                                    width: 5, height: 5,
+                                    background: isLoaded ? 'var(--pnl-green)' : 'var(--border-strong)',
+                                    opacity: isLoaded ? 1 : 0.45,
+                                }}
+                            />
+                            <button
+                                onClick={stop(() => onOpenChart(props.row.original, currency))}
+                                className="text-left truncate hover:opacity-70 transition-opacity min-w-0 flex-1"
+                                style={{ color: 'inherit' }}
+                                title={displayName}>
+                                {displayName}
+                            </button>
+                        </div>
                     );
                 },
             }),
@@ -220,7 +281,7 @@ export function ScreenerTable({
                         </span>
                     )),
             }),
-            // P/E (hidden on phone)
+            // P/E
             columnHelper.accessor(() => null, {
                 id: 'trailingPE', header: 'P/E', size: 58, minSize: 44,
                 enableSorting: true, sortingFn: numSort('trailingPE'),
@@ -234,14 +295,14 @@ export function ScreenerTable({
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
             }),
-            // Div % (hidden on phone)
+            // Div %
             columnHelper.accessor(() => null, {
                 id: 'dividendYield', header: 'Div %', size: 62, minSize: 48,
                 enableSorting: true, sortingFn: numSort('dividendYield'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
             }),
-            // P/B (hidden on phone)
+            // P/B
             columnHelper.accessor(() => null, {
                 id: 'priceToBook', header: 'P/B', size: 56, minSize: 44,
                 enableSorting: true, sortingFn: numSort('priceToBook'),
@@ -255,7 +316,7 @@ export function ScreenerTable({
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap)}</span>, true),
             }),
-            // ── Single Actions column: alert · chart · refresh ──
+            // Actions: alert · chart · refresh
             columnHelper.display({
                 id: 'actions', header: 'Actions', size: 88, minSize: 80, maxSize: 88, enableResizing: false,
                 cell: props => {
@@ -290,9 +351,6 @@ export function ScreenerTable({
         ];
     }, [onRemove, removableSymbols, onTogglePin, onEditAlert]);
 
-    // Column visibility — all data columns always shown; only layout columns
-    // (Sector, Mkt Cap, Fwd P/E) hide on narrower screens to reduce clutter.
-    // On phone the table scrolls horizontally to show all columns.
     const columnVisibility = useMemo(() => ({
         remove: (removableSymbols?.size ?? 0) > 0,
         sector: bp.lg,
@@ -301,16 +359,25 @@ export function ScreenerTable({
     }), [bp, removableSymbols]);
 
     const table = useReactTable({
-        data: constituents,
+        data: sectorFilteredRows,
         columns,
-        state: { sorting, globalFilter: filter, columnVisibility },
-        initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
+        state: {
+            sorting,
+            globalFilter: filter,
+            columnVisibility,
+            pagination: { pageIndex, pageSize },
+        },
         onSortingChange: setSorting,
         onGlobalFilterChange: setFilter,
+        onPaginationChange: updater => {
+            const next = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater;
+            setPageIndex(next.pageIndex);
+            setPageSize(next.pageSize);
+        },
         globalFilterFn: (row, _columnId, value) => {
             const q = String(value).toLowerCase();
             const c = row.original;
-            return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || (c.sector ?? '').toLowerCase().includes(q);
+            return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
         },
         columnResizeMode: 'onChange',
         getCoreRowModel: getCoreRowModel(),
@@ -323,9 +390,6 @@ export function ScreenerTable({
     const pageRows = table.getRowModel().rows;
     const pageSymbolsKey = pageRows.map(r => r.original.symbol).join(',');
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
-    const { map: fundMap, refresh, loadMany, loadCached, progress } = useScreenerFundamentals();
-    mapRef.current = fundMap;
-    refreshRef.current = refresh;
     const pageLoading = progress !== null;
 
     useEffect(() => { loadCached(pageSymbols); }, [pageSymbols, loadCached]);
@@ -357,32 +421,111 @@ export function ScreenerTable({
         XLSX.writeFile(wb, `screener-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`);
     }, [table, fundMap]);
 
-    const pageIndex = table.getState().pagination.pageIndex;
+    const curPageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
-
-    // All columns have explicit pixel widths. Table is width:100% so they
-    // scale proportionally to fill the container. minWidth prevents the table
-    // from shrinking below the sum of minimum column sizes.
     const minTableWidth = table.getVisibleLeafColumns().reduce((sum, c) => sum + (c.columnDef.minSize ?? 40), 0);
+
+    const viewTab = (id: View, label: string, count: number) => (
+        <button
+            key={id}
+            onClick={() => setView(id)}
+            className="px-2.5 py-1 text-xs font-medium transition-all rounded-md"
+            style={view === id
+                ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
+                : { color: 'var(--text-secondary)' }}
+        >
+            {label} <span style={{ opacity: 0.6 }}>({count.toLocaleString()})</span>
+        </button>
+    );
 
     return (
         <div className="glass rounded-2xl p-3 sm:p-4 flex flex-col gap-3 h-full">
-            {/* Controls */}
-            <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
+            {/* Controls — row 1: search + sector */}
+            <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
                 <div className="relative flex-1 min-w-[160px] max-w-sm">
                     <MdSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                     <input value={filter} onChange={e => setFilter(e.target.value)}
-                        placeholder="Filter by ticker, name, or sector…"
+                        placeholder="Filter by ticker or name…"
                         className="w-full pl-9 pr-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1"
                         style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' }} />
+                </div>
+                {/* Sector dropdown */}
+                <div className="relative flex-shrink-0">
+                    <button
+                        onClick={() => setSectorOpen(o => !o)}
+                        className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                            color: selectedSectors ? 'var(--accent)' : 'var(--text-secondary)',
+                            background: selectedSectors ? 'var(--accent-dim)' : 'var(--glass-bg)',
+                            border: `1px solid ${selectedSectors ? 'var(--accent-glow)' : 'var(--border)'}`,
+                        }}
+                    >
+                        <MdFilterList size={14} />
+                        <span className="hidden sm:inline">
+                            {selectedSectors ? `${selectedSectors.size} sector${selectedSectors.size !== 1 ? 's' : ''}` : 'Sector'}
+                        </span>
+                        <MdExpandMore size={13} />
+                    </button>
+                    {sectorOpen && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setSectorOpen(false)} />
+                            <div
+                                className="absolute left-0 top-full mt-1 z-20 rounded-xl py-1 overflow-y-auto"
+                                style={{
+                                    background: 'var(--surface-popover)',
+                                    border: '1px solid var(--border-strong)',
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                                    minWidth: 200,
+                                    maxHeight: 280,
+                                }}
+                            >
+                                <button
+                                    onClick={() => { setSelectedSectors(null); setSectorOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-all hover:opacity-70 text-left"
+                                    style={{
+                                        color: !selectedSectors ? 'var(--accent)' : 'var(--text-secondary)',
+                                        fontWeight: !selectedSectors ? 500 : 400,
+                                        borderBottom: '1px solid var(--border)',
+                                    }}
+                                >
+                                    {!selectedSectors && <MdCheck size={12} />}
+                                    <span className={!selectedSectors ? '' : 'pl-4'}>All sectors</span>
+                                </button>
+                                {allSectors.map(sector => {
+                                    const active = selectedSectors?.has(sector) ?? false;
+                                    return (
+                                        <button
+                                            key={sector}
+                                            onClick={() => toggleSector(sector)}
+                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-all hover:opacity-70 text-left"
+                                            style={{ color: active ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: active ? 500 : 400 }}
+                                        >
+                                            {active ? <MdCheck size={12} /> : <span style={{ width: 12, display: 'inline-block' }} />}
+                                            {sector}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Controls — row 2: view tabs + actions */}
+            <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
+                <div className="inline-flex rounded-lg p-0.5 gap-0.5"
+                    style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+                    {viewTab('all', 'All', constituents.length)}
+                    {viewTab('loaded', 'Loaded', loadedCount)}
+                    {viewTab('pinned', 'Pinned', pinnedSymbols.size)}
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => loadMany(pageSymbols)} disabled={pageLoading || pageSymbols.length === 0}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
                         <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
-                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Load page'}</span>
-                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Load'}</span>
+                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Fetch prices'}</span>
+                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Fetch'}</span>
                     </button>
                     {/* Export dropdown */}
                     <div className="relative group/export">
@@ -406,20 +549,16 @@ export function ScreenerTable({
                             </button>
                         </div>
                     </div>
-                    {/* Info — text label so it's harder to miss */}
                     <button onClick={() => setInfoOpen(v => !v)}
                         className="flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-medium transition-all"
                         style={{
                             color: infoOpen ? 'var(--accent)' : 'var(--text-secondary)',
                             background: infoOpen ? 'var(--accent-dim)' : 'var(--glass-bg)',
                             border: '1px solid var(--border)',
-                        }}>
+                        }}
+                        title="How it works">
                         <MdInfoOutline size={14} />
-                        <span className="hidden sm:inline">How it works</span>
                     </button>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {totalCount.toLocaleString()} names
-                    </span>
                 </div>
             </div>
 
@@ -445,11 +584,12 @@ export function ScreenerTable({
                                 <p>Earnings update quarterly — P/E and P/B may lag real-time sources by up to one quarter. Prices are always current. Click a ticker to open Yahoo Finance for live values.</p>
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Refreshing data</p>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading data</p>
                                 <div className="flex flex-col gap-0.5">
-                                    <span><strong>On open</strong> — prices appear instantly; ratios fill in within a few seconds</span>
-                                    <span><strong>Load page</strong> — forces a fresh fetch for all visible rows</span>
+                                    <span><strong>On open</strong> — cached prices restore instantly from local storage; the green dot on each row confirms data is present</span>
+                                    <span><strong>Fetch prices</strong> — forces a fresh fetch from Yahoo for all rows on the current page</span>
                                     <span><strong>⟳ per row</strong> — refreshes a single stock immediately</span>
+                                    <span><strong>Loaded tab</strong> — shows only rows that have data, across all pages, with no pagination</span>
                                     <span><strong>Cache</strong> — data stored 24 h; page reloads restore without API calls</span>
                                 </div>
                             </div>
@@ -468,16 +608,11 @@ export function ScreenerTable({
                                 {hg.headers.map(header => {
                                     const canSort = header.column.getCanSort();
                                     const canResize = header.column.getCanResize();
-                                    const isName = header.column.id === 'name';
                                     return (
                                         <th key={header.id}
                                             className={`px-2 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative align-top ${canSort ? 'cursor-pointer' : ''}`}
-                                            style={{
-                                                color: 'var(--text-muted)',
-                                                width: header.getSize(),
-                                            }}
+                                            style={{ color: 'var(--text-muted)', width: header.getSize() }}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}>
-                                            {/* Header label — allowed to wrap */}
                                             <span className="inline-flex items-start gap-1" style={{ maxWidth: '100%' }}>
                                                 <span style={{ wordBreak: 'break-word' }}>
                                                     {flexRender(header.column.columnDef.header, header.getContext())}
@@ -495,7 +630,6 @@ export function ScreenerTable({
                                                     );
                                                 })()}
                                             </span>
-                                            {/* Resize handle */}
                                             {canResize && (
                                                 <div onMouseDown={header.getResizeHandler()} onTouchStart={header.getResizeHandler()}
                                                     onClick={e => e.stopPropagation()}
@@ -524,11 +658,12 @@ export function ScreenerTable({
                                     const isName = cell.column.id === 'name';
                                     return (
                                         <td key={cell.id}
-                                            className={`px-2 py-2 sm:py-2.5 text-xs sm:text-sm ${isName ? 'truncate' : ''}`}
+                                            className="px-2 py-2 sm:py-2.5 text-xs sm:text-sm"
                                             style={{
                                                 color: 'var(--text-primary)',
                                                 width: cell.column.getSize(),
                                                 overflow: 'hidden',
+                                                maxWidth: isName ? cell.column.getSize() : undefined,
                                             }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
@@ -539,14 +674,25 @@ export function ScreenerTable({
                     </tbody>
                 </table>
                 {totalCount === 0 && (
-                    <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>No names match your filter</div>
+                    <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
+                        {view === 'loaded' ? 'No data loaded yet — click "Fetch prices" to load the current page' :
+                            view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
+                                'No names match your filter'}
+                    </div>
                 )}
             </div>
 
             {/* Pagination */}
             {pageCount > 1 && (
                 <div className="flex items-center justify-between gap-3 flex-shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <span>Page {pageIndex + 1} of {pageCount}</span>
+                    <span>
+                        Page {curPageIndex + 1} of {pageCount}
+                        {loadedCount > 0 && (
+                            <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
+                                · {loadedCount.toLocaleString()} loaded
+                            </span>
+                        )}
+                    </span>
                     <div className="flex items-center gap-2">
                         <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40"

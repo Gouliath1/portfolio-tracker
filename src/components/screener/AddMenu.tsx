@@ -39,7 +39,7 @@ export function AddMenu({ indices, currentIndexKey, onLoadIndex, onAddTicker, on
                     {/* click-away backdrop */}
                     <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
                     <div
-                        className="absolute left-0 top-full mt-2 z-50 w-72 rounded-xl p-3 space-y-3"
+                        className="absolute right-0 top-full mt-2 z-50 w-72 rounded-xl p-3 space-y-3"
                         style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)', boxShadow: '0 16px 48px rgba(0,0,0,0.5)' }}
                     >
                         {/* Add a single ticker */}
@@ -63,8 +63,20 @@ export function AddMenu({ indices, currentIndexKey, onLoadIndex, onAddTicker, on
                                         : { color: 'var(--text-secondary)' }}
                                 >
                                     <span className="flex items-center gap-2"><MdShowChart size={15} /> {f.index}</span>
-                                    <span style={{ opacity: 0.6 }}>{f.count}</span>
+                                    <span className="text-xs" style={{ opacity: 0.6 }}>{f.count.toLocaleString()} stocks</span>
                                 </button>
+                            ))}
+                            {/* Coming-soon indices — shown as disabled to aid discovery */}
+                            {[{ name: 'Nikkei 225', count: 225 }, { name: 'S&P 500', count: 500 }].map(f => (
+                                <div
+                                    key={f.name}
+                                    className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm"
+                                    style={{ color: 'var(--text-muted)', opacity: 0.45, cursor: 'not-allowed' }}
+                                    title="Coming soon — run scripts/fetch-constituents.mjs to add"
+                                >
+                                    <span className="flex items-center gap-2"><MdShowChart size={15} /> {f.name}</span>
+                                    <span className="text-xs">coming soon</span>
+                                </div>
                             ))}
                         </div>
 

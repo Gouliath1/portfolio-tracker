@@ -33,8 +33,8 @@ export function TickerInput({ onAdd }: TickerInputProps) {
     const inputStyle = { color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' };
 
     return (
-        <div className="flex items-center gap-2">
-            <div className="relative">
+        <div className="flex items-start gap-2">
+            <div className="flex flex-col gap-1">
                 <input
                     className={inputClass}
                     style={{ ...inputStyle, width: '160px' }}
@@ -45,18 +45,17 @@ export function TickerInput({ onAdd }: TickerInputProps) {
                     autoComplete="off"
                     aria-label="Add a single ticker"
                 />
-                {symbol && (lookupState === 'loading' || lookupState === 'found' || lookupState === 'not-found') && (
-                    <span
-                        className="absolute left-0 top-full mt-1 text-xs truncate max-w-[220px]"
-                        style={{
-                            color: lookupState === 'found' ? 'var(--pnl-green)'
-                                : lookupState === 'loading' ? 'var(--accent)'
-                                    : 'var(--text-muted)',
-                        }}
-                    >
-                        {lookupState === 'loading' ? 'Looking up…' : name ?? 'Name not found'}
-                    </span>
-                )}
+                <span
+                    className="text-xs truncate max-w-[160px] h-4"
+                    style={{
+                        color: lookupState === 'found' ? 'var(--pnl-green)'
+                            : lookupState === 'loading' ? 'var(--accent)'
+                                : 'var(--text-muted)',
+                        visibility: (symbol && (lookupState === 'loading' || lookupState === 'found' || lookupState === 'not-found')) ? 'visible' : 'hidden',
+                    }}
+                >
+                    {lookupState === 'loading' ? 'Looking up…' : name ?? 'Name not found'}
+                </span>
             </div>
             <button
                 onClick={handleAdd}
