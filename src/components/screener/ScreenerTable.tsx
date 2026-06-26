@@ -250,7 +250,7 @@ export function ScreenerTable({
                         };
                         const parts: string[] = [];
                         if (fetchedAt) parts.push(`price: ${fmt(fetchedAt)}`);
-                        if (ratiosFetchedAt) parts.push(`ratios: ${fmt(ratiosFetchedAt)}`);
+                        parts.push(ratiosFetchedAt ? `ratios: ${fmt(ratiosFetchedAt)}` : 'ratios: not fetched');
                         return parts.length ? parts.join(' · ') : undefined;
                     })();
                     return (
