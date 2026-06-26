@@ -299,85 +299,67 @@ export default function Home() {
                 {/* ── Content column ───────────────────────────────── */}
                 <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
 
-                    {/* ── Header ───────────────────────────────────── */}
-                    <header
-                        className="sticky top-0 z-10 px-4 sm:px-6 h-[52px] flex items-center"
-                        style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)' }}
-                    >
-                        <div className="w-full flex items-center gap-4">
-                            {/* Active portfolio — so it's always clear which one is loaded */}
-                            <div className="flex items-center gap-2 min-w-0">
-                                <MdAccountBalanceWallet size={18} className="flex-shrink-0"
-                                    style={{ color: 'var(--accent)' }} />
-                                <span className="text-sm font-medium truncate" title={activeSetName}
-                                    style={{ color: 'var(--text-primary)' }}>
-                                    {activeSetName || 'Portfolio'}
-                                </span>
-                            </div>
-
-                            {/* Controls — push right */}
-                            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-                                {/* Currency pill — mobile only (sidebar shows it on desktop) */}
-                                <span className="md:hidden px-2 py-0.5 rounded text-xs font-mono font-semibold"
-                                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                                    {currency}
-                                </span>
-
-                                {/* Settings — mobile only (sidebar shows it on desktop) */}
-                                <button
-                                    onClick={() => setSettingsOpen(true)}
-                                    className="md:hidden p-2 rounded-lg"
-                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                    aria-label="Open settings"
-                                >
-                                    <MdSettings size={18} />
-                                </button>
-
-                                {/* Stale price warning */}
-                                {hasStalePrice && (
-                                    <div className="relative group">
-                                        <button
-                                            className="p-2 rounded-lg"
-                                            style={{ color: 'var(--pnl-red)' }}
-                                            aria-label="Some prices unavailable"
-                                        >
-                                            <MdCloudOff size={18} />
-                                        </button>
-                                        <div className="absolute right-0 top-full mt-2 w-56 rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
-                                            style={{ color: 'var(--text-secondary)', background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
-                                            Some prices unavailable — showing last cached values
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Show/hide values */}
-                                <button
-                                    onClick={() => setShowValues(!showValues)}
-                                    className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-all"
-                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                    aria-label={showValues ? 'Hide values' : 'Show values'}
-                                >
-                                    {showValues ? <MdVisibilityOff size={16} /> : <MdVisibility size={16} />}
-                                    <span className="hidden sm:inline">{showValues ? 'Hide' : 'Show'}</span>
-                                </button>
-
-                                {/* Refresh */}
-                                <button
-                                    onClick={handleRefreshClick}
-                                    disabled={refreshing}
-                                    className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                >
-                                    <MdRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
-                                    <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
-                                </button>
-                            </div>
-                        </div>
-                    </header>
-
                     {/* ── Main content ─────────────────────────────── */}
                     <main className="flex-1 pb-20 md:pb-0">
                         <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+
+                            {/* Portfolio name + controls — inline, no separate header bar */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <MdAccountBalanceWallet size={18} className="flex-shrink-0"
+                                        style={{ color: 'var(--accent)' }} />
+                                    <span className="text-sm font-semibold truncate" title={activeSetName}
+                                        style={{ color: 'var(--text-primary)' }}>
+                                        {activeSetName || 'Portfolio'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+                                    <span className="md:hidden px-2 py-0.5 rounded text-xs font-mono font-semibold"
+                                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                                        {currency}
+                                    </span>
+                                    <button
+                                        onClick={() => setSettingsOpen(true)}
+                                        className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg"
+                                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                        aria-label="Open settings"
+                                    >
+                                        <MdSettings size={18} />
+                                    </button>
+                                    {hasStalePrice && (
+                                        <div className="relative group">
+                                            <button className="h-9 w-9 flex items-center justify-center rounded-lg"
+                                                style={{ color: 'var(--pnl-red)' }}
+                                                aria-label="Some prices unavailable">
+                                                <MdCloudOff size={18} />
+                                            </button>
+                                            <div className="absolute right-0 top-full mt-2 w-56 rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                                style={{ color: 'var(--text-secondary)', background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
+                                                Some prices unavailable — showing last cached values
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => setShowValues(!showValues)}
+                                        className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all"
+                                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                        aria-label={showValues ? 'Hide values' : 'Show values'}
+                                    >
+                                        {showValues ? <MdVisibilityOff size={16} /> : <MdVisibility size={16} />}
+                                        <span className="hidden sm:inline">{showValues ? 'Hide' : 'Show'}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleRefreshClick}
+                                        disabled={refreshing}
+                                        className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                    >
+                                        <MdRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
+                                        <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
                             <DemoBanner refreshTrigger={demoBannerRefresh} />
 
                             {/* Loading state (overview renders chrome immediately; other views show spinner) */}
