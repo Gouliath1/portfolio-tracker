@@ -156,7 +156,7 @@ export default function ScreenerPage() {
 
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
                 <div className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden">
-                    <div className="max-w-screen-xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5 pb-0 h-full flex flex-col gap-3">
+                    <div className="max-w-screen-xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5 pb-4 h-full flex flex-col gap-3">
 
                         {/* Title row — no separate sticky header */}
                         <div className="flex items-center justify-between gap-3 flex-shrink-0">

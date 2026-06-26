@@ -5,7 +5,7 @@ import type { StockFundamentals } from '../types/screener';
 
 export type FundEntry =
     | { status: 'loading' }
-    | { status: 'done'; data: StockFundamentals; ratiosPending?: boolean; ratiosError?: string }
+    | { status: 'done'; data: StockFundamentals; ratiosPending?: boolean; ratiosError?: string; fetchedAt?: string; ratiosFetchedAt?: string | null }
     | { status: 'error'; reason?: string };
 
 export interface LoadProgress { done: number; total: number; }
@@ -56,8 +56,8 @@ export function useScreenerFundamentals(): FundamentalsApi {
                 try { const body = await res.json(); if (body?.error) reason = body.error; } catch { /* ignore */ }
                 throw new Error(reason);
             }
-            const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean; ratiosError?: string };
-            setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending, ratiosError: data.ratiosError }));
+            const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean; ratiosError?: string; fetchedAt?: string; ratiosFetchedAt?: string | null };
+            setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending, ratiosError: data.ratiosError, fetchedAt: data.fetchedAt, ratiosFetchedAt: data.ratiosFetchedAt }));
         } catch (e) {
             requested.current.delete(symbol); // allow a later retry
             setMap(prev => new Map(prev).set(symbol, { status: 'error', reason: e instanceof Error ? e.message : undefined }));
@@ -121,9 +121,9 @@ export function useScreenerFundamentals(): FundamentalsApi {
                         ratiosPending.push(symbol);
                         return;
                     }
-                    const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean };
+                    const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null };
                     requested.current.add(symbol);
-                    setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending }));
+                    setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending, fetchedAt: data.fetchedAt, ratiosFetchedAt: data.ratiosFetchedAt }));
                     // Price cached but ratios missing → back-fill.
                     if (data.ratiosPending) ratiosPending.push(symbol);
                 } catch { /* leave unloaded */ }

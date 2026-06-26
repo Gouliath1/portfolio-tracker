@@ -18,10 +18,15 @@ import { fetchQuoteSummary } from '../../../../lib/server/yahooAuth';
 import { getCachedFundamentals, setCachedPriceInfo, setCachedRatios } from '../../../../lib/server/marketDataDb';
 import type { StockFundamentals } from '@portfolio/types/screener';
 
-const MAX_AGE_MS = 24 * 60 * 60 * 1000; // refresh each tier at most once/day
+// Prices refresh daily; ratios update quarterly so 7 days is fine.
+// Keeping stale ratios avoids forcing a slow reload when the user just wants
+// to browse — stale data is shown with a visual indicator in the UI.
+const PRICE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RATIO_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_HEADERS = { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' };
 
-const within = (ts: string | null | undefined) => !!ts && Date.now() - new Date(ts).getTime() < MAX_AGE_MS;
+const withinAge = (ts: string | null | undefined, maxMs: number) =>
+    !!ts && Date.now() - new Date(ts).getTime() < maxMs;
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -41,7 +46,13 @@ export async function GET(request: Request) {
     if (cachedOnly) {
         if (!cached) return new NextResponse(null, { status: 204 });
         return NextResponse.json(
-            { ...cached.data, source: 'cache', ratiosPending: cached.data.trailingPE == null },
+            {
+                ...cached.data,
+                source: 'cache',
+                ratiosPending: cached.data.trailingPE == null,
+                fetchedAt: cached.fetchedAt,
+                ratiosFetchedAt: cached.ratiosFetchedAt,
+            },
             { headers: CACHE_HEADERS },
         );
     }
@@ -51,8 +62,8 @@ export async function GET(request: Request) {
         symbol, name: null, price: null, currency: null,
         trailingPE: null, forwardPE: null, dividendYield: null, priceToBook: null, marketCap: null,
     };
-    const priceFresh = !forceFresh && within(cached?.fetchedAt) && result.price != null;
-    let ratiosOk = !forceFresh && within(cached?.ratiosFetchedAt);
+    const priceFresh = !forceFresh && withinAge(cached?.fetchedAt, PRICE_MAX_AGE_MS) && result.price != null;
+    let ratiosOk = !forceFresh && withinAge(cached?.ratiosFetchedAt, RATIO_MAX_AGE_MS);
     let ratiosError: string | undefined;
 
     // Tier 1 — price/name/currency from the no-auth chart endpoint.
@@ -105,8 +116,16 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: ratiosError ?? 'fetch failed', symbol }, { status: 502 });
     }
 
+    const now = new Date().toISOString();
     return NextResponse.json(
-        { ...result, source: cached ? 'merged' : 'fresh', ratiosPending: !ratiosOk, ...(ratiosError ? { ratiosError } : {}) },
+        {
+            ...result,
+            source: cached ? 'merged' : 'fresh',
+            ratiosPending: !ratiosOk,
+            fetchedAt: !priceFresh ? now : (cached?.fetchedAt ?? now),
+            ratiosFetchedAt: ratiosOk ? now : (cached?.ratiosFetchedAt ?? null),
+            ...(ratiosError ? { ratiosError } : {}),
+        },
         { headers: CACHE_HEADERS },
     );
 }
