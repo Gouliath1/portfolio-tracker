@@ -14,9 +14,9 @@ export interface FundamentalsApi {
     map: Map<string, FundEntry>;
     /** Force a fresh fetch of one symbol (both tiers), bypassing caches. */
     refresh: (symbol: string) => void;
-    /** Paced, price-only bulk load of the given symbols (the "Load page" action). */
+    /** Paced, price-only bulk load of the given symbols (the "Fetch prices" action). */
     loadMany: (symbols: string[]) => void;
-    /** Restore symbols from the DB cache only (no Yahoo) — used on page load. */
+    /** Restore symbols from the DB cache only — no upstream calls. */
     loadCached: (symbols: string[]) => void;
     /** Non-null while a bulk load is in progress. */
     progress: LoadProgress | null;
@@ -24,31 +24,39 @@ export interface FundamentalsApi {
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Low concurrency + a small gap so a bulk load never bursts Yahoo — bursting 50
-// at once throttled even the no-auth chart endpoint (and broke the chart modal).
 const BULK_CONCURRENCY = 3;
 const BULK_GAP_MS = 120;
 
 interface FetchOpts { fresh?: boolean; tier?: 'price'; }
 
-/**
- * Fetches screener fundamentals ON DEMAND (never auto on navigation). Bulk loads
- * ("Load page") are price-only and paced; ratios (crumb-gated) are fetched only
- * per-row via refresh, keeping getcrumb usage tiny. Each request hits
- * /api/screener/quote (DB-cached + Cache-Control).
- */
+// Module-level store — survives component unmount/remount (page navigation).
+// When the user navigates away and returns the map already has data, and
+// cacheChecked prevents re-probing the DB for symbols we already know about.
+const _store = {
+    map: new Map<string, FundEntry>(),
+    requested: new Set<string>(),
+    cacheChecked: new Set<string>(),
+};
+
 export function useScreenerFundamentals(): FundamentalsApi {
-    const [map, setMap] = useState<Map<string, FundEntry>>(new Map());
+    // Seed from the persisted store so remounts see existing data immediately.
+    const [map, _setMap] = useState<Map<string, FundEntry>>(() => new Map(_store.map));
     const [progress, setProgress] = useState<LoadProgress | null>(null);
-    // Symbols already requested (any status) — avoids duplicate in-flight fetches.
-    const requested = useRef<Set<string>>(new Set());
-    // Symbols already checked against the DB cache — avoids re-probing every render.
-    const cacheChecked = useRef<Set<string>>(new Set());
+
+    // Refs point directly to the module-level sets — they survive remounts.
+    const requested = useRef(_store.requested);
+    const cacheChecked = useRef(_store.cacheChecked);
+
+    /** Write one entry to both React state and the persistent store. */
+    const setEntry = useCallback((symbol: string, entry: FundEntry) => {
+        _store.map.set(symbol, entry);
+        _setMap(prev => new Map(prev).set(symbol, entry));
+    }, []);
 
     const fetchOne = useCallback(async (symbol: string, opts: FetchOpts = {}) => {
         const params = new URLSearchParams({ symbol });
-        if (opts.fresh) params.set('fresh', '1');   // bypass server DB cache (force Yahoo)
-        if (opts.tier) params.set('tier', opts.tier); // 'price' → skip crumb-gated ratios
+        if (opts.fresh) params.set('fresh', '1');
+        if (opts.tier) params.set('tier', opts.tier);
         try {
             const res = await fetch(`/api/screener/quote?${params}`, opts.fresh ? { cache: 'no-store' } : undefined);
             if (!res.ok) {
@@ -56,37 +64,47 @@ export function useScreenerFundamentals(): FundamentalsApi {
                 try { const body = await res.json(); if (body?.error) reason = body.error; } catch { /* ignore */ }
                 throw new Error(reason);
             }
-            const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean; ratiosError?: string; fetchedAt?: string; ratiosFetchedAt?: string | null };
-            setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending, ratiosError: data.ratiosError, fetchedAt: data.fetchedAt, ratiosFetchedAt: data.ratiosFetchedAt }));
+            const data = (await res.json()) as StockFundamentals & {
+                ratiosPending?: boolean; ratiosError?: string;
+                fetchedAt?: string; ratiosFetchedAt?: string | null;
+            };
+            setEntry(symbol, {
+                status: 'done', data,
+                ratiosPending: data.ratiosPending,
+                ratiosError: data.ratiosError,
+                fetchedAt: data.fetchedAt,
+                ratiosFetchedAt: data.ratiosFetchedAt,
+            });
         } catch (e) {
-            requested.current.delete(symbol); // allow a later retry
-            setMap(prev => new Map(prev).set(symbol, { status: 'error', reason: e instanceof Error ? e.message : undefined }));
+            requested.current.delete(symbol);
+            setEntry(symbol, { status: 'error', reason: e instanceof Error ? e.message : undefined });
         }
-    }, []);
+    }, [setEntry]);
 
     const loadMany = useCallback((symbols: string[]) => {
-        // Always fetch all page symbols on explicit user action — don't skip symbols
-        // that were previously loaded from cache, since the user is explicitly asking
-        // for a fresh price fetch (e.g. after navigating to a new page).
-        const toFetch = symbols;
-        if (toFetch.length === 0) return;
-        toFetch.forEach(s => requested.current.add(s));
-        setMap(prev => {
+        if (symbols.length === 0) return;
+        symbols.forEach(s => requested.current.add(s));
+
+        // Mark visible rows as loading so the UI responds immediately.
+        _setMap(prev => {
             const next = new Map(prev);
-            toFetch.forEach(s => next.set(s, { status: 'loading' }));
+            symbols.forEach(s => {
+                const loading: FundEntry = { status: 'loading' };
+                next.set(s, loading);
+                _store.map.set(s, loading);
+            });
             return next;
         });
 
-        const total = toFetch.length;
+        const total = symbols.length;
         let done = 0;
         setProgress({ done, total });
 
-        // Bounded worker pool — paced to avoid hitting J-Quants / Twelve Data too fast.
         let idx = 0;
         const worker = async () => {
-            while (idx < toFetch.length) {
-                const symbol = toFetch[idx++];
-                await fetchOne(symbol);
+            while (idx < symbols.length) {
+                const sym = symbols[idx++];
+                await fetchOne(sym);
                 done += 1;
                 setProgress({ done, total });
                 await delay(BULK_GAP_MS);
@@ -98,51 +116,37 @@ export function useScreenerFundamentals(): FundamentalsApi {
 
     const refresh = useCallback((symbol: string) => {
         requested.current.add(symbol);
-        setMap(prev => new Map(prev).set(symbol, { status: 'loading' }));
+        setEntry(symbol, { status: 'loading' });
         void fetchOne(symbol, { fresh: true });
-    }, [fetchOne]);
+    }, [fetchOne, setEntry]);
 
-    // Restore from DB cache. Rows not in the cache stay unloaded.
-    // If a cached row has ratiosPending (price cached but no ratios yet), silently
-    // background-fetch the ratios so the page restores fully after a reload.
+    // Restore what's already in the DB cache — no upstream calls, no backfill.
+    // Ratios that are missing (ratiosPending=true) are left as-is; the user
+    // triggers a full refresh explicitly via Fetch prices or ⟳ per row.
     const loadCached = useCallback((symbols: string[]) => {
         const toCheck = symbols.filter(s => !requested.current.has(s) && !cacheChecked.current.has(s));
         if (toCheck.length === 0) return;
         toCheck.forEach(s => cacheChecked.current.add(s));
 
-        const ratiosPending: string[] = [];
-
         void (async () => {
             await Promise.all(toCheck.map(async symbol => {
                 try {
                     const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}&cachedOnly=1`);
-                    if (res.status === 204 || !res.ok) {
-                        // Not in cache (e.g. no DB on Vercel) → queue a full fetch.
-                        ratiosPending.push(symbol);
-                        return;
-                    }
-                    const data = (await res.json()) as StockFundamentals & { ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null };
+                    if (res.status === 204 || !res.ok) return; // not in cache — leave as unloaded
+                    const data = (await res.json()) as StockFundamentals & {
+                        ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
+                    };
                     requested.current.add(symbol);
-                    setMap(prev => new Map(prev).set(symbol, { status: 'done', data, ratiosPending: data.ratiosPending, fetchedAt: data.fetchedAt, ratiosFetchedAt: data.ratiosFetchedAt }));
-                    // Price cached but ratios missing → back-fill.
-                    if (data.ratiosPending) ratiosPending.push(symbol);
+                    setEntry(symbol, {
+                        status: 'done', data,
+                        ratiosPending: data.ratiosPending,
+                        fetchedAt: data.fetchedAt,
+                        ratiosFetchedAt: data.ratiosFetchedAt,
+                    });
                 } catch { /* leave unloaded */ }
             }));
-
-            // Silently back-fill ratios for any symbol that only had price in the DB.
-            // Paced so we don't burst J-Quants / Twelve Data on every page load.
-            if (ratiosPending.length === 0) return;
-            let idx = 0;
-            const worker = async () => {
-                while (idx < ratiosPending.length) {
-                    const sym = ratiosPending[idx++];
-                    await fetchOne(sym);
-                    await delay(BULK_GAP_MS);
-                }
-            };
-            await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, ratiosPending.length) }, worker));
         })();
-    }, [fetchOne]);
+    }, [setEntry]);
 
     return { map, refresh, loadMany, loadCached, progress };
 }
