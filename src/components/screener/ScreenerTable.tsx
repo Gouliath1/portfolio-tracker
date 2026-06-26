@@ -233,10 +233,12 @@ export function ScreenerTable({
                     const isLoaded = e?.status === 'done';
                     const fetchedAt = e?.status === 'done' ? e.fetchedAt : undefined;
                     const ratiosFetchedAt = e?.status === 'done' ? e.ratiosFetchedAt : undefined;
-                    const STALE_MS = 24 * 60 * 60 * 1000;
-                    const isStale = fetchedAt
-                        ? Date.now() - new Date(fetchedAt).getTime() > STALE_MS
-                        : false;
+                    const PRICE_STALE_MS = 24 * 60 * 60 * 1000;
+                    const RATIO_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+                    const priceAge = fetchedAt ? Date.now() - new Date(fetchedAt).getTime() : Infinity;
+                    const ratioAge = ratiosFetchedAt ? Date.now() - new Date(ratiosFetchedAt).getTime() : Infinity;
+                    // Amber if price is stale, ratios are missing, or ratios are stale.
+                    const isStale = priceAge > PRICE_STALE_MS || ratioAge > RATIO_STALE_MS || (isLoaded && e?.status === 'done' && e.ratiosPending);
                     const dotColor = !isLoaded ? 'var(--border-strong)'
                         : isStale ? 'oklch(68% 0.14 60)'  // amber for stale
                         : 'var(--pnl-green)';
@@ -599,7 +601,7 @@ export function ScreenerTable({
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
                                 <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Data refresh level</p>
-                                <p className="mb-2">The dot next to each name shows the <strong>price</strong> freshness (24 h cycle). Hover the dot to see both price and ratio ages separately — ratios are on a 7-day cycle.</p>
+                                <p className="mb-2">The dot reflects the worst freshness across price (24 h) and ratios (7 d). Hover for exact ages of each.</p>
                                 <div className="flex flex-col gap-1">
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
