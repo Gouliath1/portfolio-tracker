@@ -75,6 +75,15 @@ function scheduleLsSave(): void {
 
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Reset all module-level state. Only for use in tests. */
+export function __resetForTests__(): void {
+    _store.map.clear();
+    _store.requested.clear();
+    _store.cacheChecked.clear();
+    _lsInitDone = false;
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+}
+
 export function useScreenerFundamentals(): FundamentalsApi {
     // Hydrate from localStorage before the first render.
     ensureLsInit();
