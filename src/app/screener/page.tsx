@@ -165,7 +165,7 @@ export default function ScreenerPage() {
                                     {file.index}
                                 </h1>
                                 <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
-                                    {file.source}{file.asOf ? ` · ${file.asOf}` : ''}
+                                    Constituent names · {file.source}{file.asOf ? ` · list snapshot ${file.asOf}` : ''}
                                 </span>
                             </div>
                             <AddMenu

@@ -559,53 +559,64 @@ export function ScreenerTable({
                 </div>
             </div>
 
-            {/* Info panel */}
+            {/* Info panel — 2-column grid to keep height compact */}
             {infoOpen && (
-                <div className="rounded-xl px-4 py-3 text-xs flex flex-col gap-3 flex-shrink-0"
+                <div className="rounded-xl px-4 py-3 text-xs flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-3 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>How it works</span>
+                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)' }}><MdClose size={15} /></button>
+                    </div>
+                    <div className="grid gap-x-6 gap-y-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                        {/* Left column */}
+                        <div className="flex flex-col gap-3">
                             <div>
-                                <p className="font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>Where do the numbers come from?</p>
-                                <p className="mb-2"><strong>Price</strong> is live from Yahoo Finance. Everything else is <em>calculated</em> from official JPX earnings data (J-Quants):</p>
-                                <div className="flex flex-col gap-1" style={{ color: 'var(--text-primary)' }}>
-                                    <span><strong>P/E</strong> — price ÷ last 12 months of earnings per share</span>
-                                    <span><strong>Fwd P/E</strong> — price ÷ company&apos;s own earnings forecast for next year</span>
-                                    <span><strong>P/B</strong> — price ÷ book value per share (last annual report)</span>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Metrics</p>
+                                <div className="flex flex-col gap-0.5">
+                                    <span><strong>Price</strong> — live from Yahoo Finance</span>
+                                    <span><strong>P/E</strong> — price ÷ last 12 months EPS (J-Quants)</span>
+                                    <span><strong>Fwd P/E</strong> — price ÷ company&apos;s next-year forecast</span>
+                                    <span><strong>P/B</strong> — price ÷ book value per share</span>
                                     <span><strong>Div %</strong> — annual dividend ÷ current price</span>
-                                    <span><strong>Mkt Cap</strong> — shares outstanding × current price</span>
+                                    <span><strong>Mkt Cap</strong> — shares outstanding × price</span>
                                 </div>
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                                <p className="font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>Row dot (Name column)</p>
-                                <div className="flex flex-col gap-1 mb-3">
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Universe</p>
+                                <p>The stock list is sourced from the BlackRock iShares ETF 1475 holdings file — <strong>names only</strong>, not market data. The date in the header is when that list was last extracted, not when prices or ratios were fetched.</p>
+                            </div>
+                        </div>
+                        {/* Right column */}
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Row dot</p>
+                                <div className="flex flex-col gap-1">
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
-                                        Fresh — data loaded, price fetched within 24 h
+                                        Fresh — price fetched within 24 h
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'oklch(68% 0.14 60)', display: 'inline-block' }} />
-                                        Stale — data present but older than 24 h; hover for exact age
+                                        Stale — older than 24 h, hover for exact age
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--border-strong)', opacity: 0.45, display: 'inline-block' }} />
-                                        Not loaded — no cached data for this row yet
+                                        Not loaded yet
                                     </span>
                                 </div>
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading data</p>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading</p>
                                 <div className="flex flex-col gap-0.5">
-                                    <span><strong>On open</strong> — cached data restores instantly from DB; dot turns green or amber</span>
-                                    <span><strong>Fetch prices</strong> — forces a fresh fetch from Yahoo for all rows on the current page</span>
-                                    <span><strong>⟳ per row</strong> — refreshes a single stock immediately</span>
-                                    <span><strong>Loaded tab</strong> — shows only rows that have data, all on one page</span>
-                                    <span><strong>Show all</strong> — displays the full list on one page with no pagination</span>
-                                    <span><strong>Cache</strong> — data stored 24 h; page reloads restore without API calls</span>
+                                    <span><strong>On open</strong> — cached data restores from DB instantly</span>
+                                    <span><strong>Fetch prices</strong> — fresh Yahoo fetch for current page</span>
+                                    <span><strong>⟳ per row</strong> — refreshes a single stock</span>
+                                    <span><strong>Loaded tab</strong> — all rows with data, no pagination</span>
+                                    <span><strong>Show all</strong> — full list on one page</span>
+                                    <span><strong>Ratios</strong> cached 7 days · <strong>prices</strong> 24 h</span>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)', flexShrink: 0 }}><MdClose size={15} /></button>
                     </div>
                 </div>
             )}
