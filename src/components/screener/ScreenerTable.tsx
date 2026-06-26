@@ -82,6 +82,7 @@ export function ScreenerTable({
     const bp = useBreakpoints();
 
     const mapRef = useRef<Map<string, FundEntry>>(new Map());
+    const sortingRef = useRef(sorting); sortingRef.current = sorting;
     const pinnedRef = useRef(pinnedSymbols); pinnedRef.current = pinnedSymbols;
     const alertsRef = useRef(alerts); alertsRef.current = alerts;
     const refreshRef = useRef<(symbol: string) => void>(() => {});
@@ -92,14 +93,17 @@ export function ScreenerTable({
 
     const columns = useMemo(() => {
         const numSort = (field: keyof StockFundamentals) =>
-            (rowA: Row<IndexConstituent>, rowB: Row<IndexConstituent>): number => {
+            (rowA: Row<IndexConstituent>, rowB: Row<IndexConstituent>, columnId: string): number => {
                 const ea = mapRef.current.get(rowA.original.symbol);
                 const eb = mapRef.current.get(rowB.original.symbol);
                 const a = ea?.status === 'done' ? (ea.data[field] as number | null) : null;
                 const b = eb?.status === 'done' ? (eb.data[field] as number | null) : null;
                 if (a == null && b == null) return 0;
-                if (a == null) return 1;
-                if (b == null) return -1;
+                // TanStack negates the comparator for desc sorts, so we invert null
+                // handling too — nulls always sink to the bottom regardless of direction.
+                const desc = sortingRef.current.find(s => s.id === columnId)?.desc ?? false;
+                if (a == null) return desc ? -1 : 1;
+                if (b == null) return desc ? 1 : -1;
                 return (a as number) - (b as number);
             };
 
