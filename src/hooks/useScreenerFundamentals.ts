@@ -104,6 +104,7 @@ export function useScreenerFundamentals(): FundamentalsApi {
         const worker = async () => {
             while (idx < symbols.length) {
                 const sym = symbols[idx++];
+                // Full fetch (price + ratios) so ratios are persisted to DB.
                 await fetchOne(sym);
                 done += 1;
                 setProgress({ done, total });
@@ -120,22 +121,21 @@ export function useScreenerFundamentals(): FundamentalsApi {
         void fetchOne(symbol, { fresh: true });
     }, [fetchOne, setEntry]);
 
-    // Restore what's already in the DB cache — no upstream calls, no backfill.
-    // Ratios that are missing (ratiosPending=true) are left as-is; the user
-    // triggers a full refresh explicitly via Fetch prices or ⟳ per row.
+    // Restore what's already in the DB cache — single batch request, no upstream calls.
     const loadCached = useCallback((symbols: string[]) => {
         const toCheck = symbols.filter(s => !requested.current.has(s) && !cacheChecked.current.has(s));
         if (toCheck.length === 0) return;
         toCheck.forEach(s => cacheChecked.current.add(s));
 
         void (async () => {
-            await Promise.all(toCheck.map(async symbol => {
-                try {
-                    const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}&cachedOnly=1`);
-                    if (res.status === 204 || !res.ok) return; // not in cache — leave as unloaded
-                    const data = (await res.json()) as StockFundamentals & {
-                        ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
-                    };
+            try {
+                // One request replaces N individual cachedOnly calls.
+                const res = await fetch(`/api/screener/quotes?symbols=${toCheck.map(encodeURIComponent).join(',')}`);
+                if (!res.ok) return;
+                const batch = await res.json() as Record<string, StockFundamentals & {
+                    ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
+                }>;
+                Object.entries(batch).forEach(([symbol, data]) => {
                     requested.current.add(symbol);
                     setEntry(symbol, {
                         status: 'done', data,
@@ -143,8 +143,8 @@ export function useScreenerFundamentals(): FundamentalsApi {
                         fetchedAt: data.fetchedAt,
                         ratiosFetchedAt: data.ratiosFetchedAt,
                     });
-                } catch { /* leave unloaded */ }
-            }));
+                });
+            } catch { /* leave unloaded */ }
         })();
     }, [setEntry]);
 
