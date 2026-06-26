@@ -239,29 +239,35 @@ export function ScreenerTable({
                     const dotColor = !isLoaded ? 'var(--border-strong)'
                         : isStale ? 'oklch(68% 0.14 60)'
                         : 'var(--pnl-green)';
-                    const dotTitle = (() => {
-                        if (!isLoaded) return undefined;
-                        const fmt = (iso: string | null | undefined) => {
-                            if (!iso) return null;
-                            const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
-                            if (h < 1) return 'just now';
-                            if (h < 24) return `${h}h ago`;
-                            return `${Math.floor(h / 24)}d ago`;
-                        };
-                        const parts: string[] = [];
-                        if (fetchedAt) parts.push(`price: ${fmt(fetchedAt)}`);
-                        parts.push(ratiosFetchedAt ? `ratios: ${fmt(ratiosFetchedAt)}` : 'ratios: not fetched');
-                        return parts.length ? parts.join(' · ') : undefined;
-                    })();
+                    const fmt = (iso: string | null | undefined) => {
+                        if (!iso) return null;
+                        const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+                        if (h < 1) return 'just now';
+                        if (h < 24) return `${h}h ago`;
+                        return `${Math.floor(h / 24)}d ago`;
+                    };
+                    const AMBER = 'oklch(68% 0.14 60)';
+                    const dotTooltip = isLoaded ? (
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {fetchedAt && (
+                                <span style={{ color: priceAge < 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
+                                    price: {fmt(fetchedAt)}
+                                </span>
+                            )}
+                            <span style={{ color: ratiosFetchedAt && ratioAge < 7 * 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
+                                {ratiosFetchedAt ? `ratios: ${fmt(ratiosFetchedAt)}` : 'ratios: not fetched'}
+                            </span>
+                        </span>
+                    ) : null;
                     return (
                         <div className="flex items-center gap-1.5 w-full min-w-0">
                             {/* Custom CSS tooltip — absolute, escapes via td overflow:visible */}
-                            <span className="relative group/dot flex-shrink-0" style={{ display: 'inline-flex', cursor: dotTitle ? 'help' : 'default' }}>
+                            <span className="relative group/dot flex-shrink-0" style={{ display: 'inline-flex', cursor: dotTooltip ? 'help' : 'default' }}>
                                 <span className="rounded-full" style={{ width: 5, height: 5, background: dotColor, opacity: isLoaded ? 1 : 0.45 }} />
-                                {dotTitle && (
+                                {dotTooltip && (
                                     <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 hidden group-hover/dot:block whitespace-nowrap rounded-md px-2 py-1 text-xs"
-                                        style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                                        {dotTitle}
+                                        style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
+                                        {dotTooltip}
                                     </span>
                                 )}
                             </span>
