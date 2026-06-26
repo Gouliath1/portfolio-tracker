@@ -577,9 +577,26 @@ export function ScreenerTable({
                                 </div>
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                                <p className="font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>Row dot (Name column)</p>
+                                <div className="flex flex-col gap-1 mb-3">
+                                    <span className="flex items-center gap-2">
+                                        <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
+                                        Fresh — data loaded, price fetched within 24 h
+                                    </span>
+                                    <span className="flex items-center gap-2">
+                                        <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'oklch(68% 0.14 60)', display: 'inline-block' }} />
+                                        Stale — data present but older than 24 h; hover for exact age
+                                    </span>
+                                    <span className="flex items-center gap-2">
+                                        <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--border-strong)', opacity: 0.45, display: 'inline-block' }} />
+                                        Not loaded — no cached data for this row yet
+                                    </span>
+                                </div>
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
                                 <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading data</p>
                                 <div className="flex flex-col gap-0.5">
-                                    <span><strong>On open</strong> — cached prices restore instantly; green dot = data present</span>
+                                    <span><strong>On open</strong> — cached data restores instantly from DB; dot turns green or amber</span>
                                     <span><strong>Fetch prices</strong> — forces a fresh fetch from Yahoo for all rows on the current page</span>
                                     <span><strong>⟳ per row</strong> — refreshes a single stock immediately</span>
                                     <span><strong>Loaded tab</strong> — shows only rows that have data, all on one page</span>
