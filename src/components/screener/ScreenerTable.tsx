@@ -256,12 +256,16 @@ export function ScreenerTable({
                     })();
                     return (
                         <div className="flex items-center gap-1.5 w-full min-w-0">
-                            <span className="flex-shrink-0 rounded-full" title={dotTitle} style={{
-                                width: 5, height: 5,
-                                background: dotColor,
-                                opacity: isLoaded ? 1 : 0.45,
-                                cursor: dotTitle ? 'help' : undefined,
-                            }} />
+                            {/* Custom CSS tooltip — absolute, escapes via td overflow:visible */}
+                            <span className="relative group/dot flex-shrink-0" style={{ display: 'inline-flex', cursor: dotTitle ? 'help' : 'default' }}>
+                                <span className="rounded-full" style={{ width: 5, height: 5, background: dotColor, opacity: isLoaded ? 1 : 0.45 }} />
+                                {dotTitle && (
+                                    <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 hidden group-hover/dot:block whitespace-nowrap rounded-md px-2 py-1 text-xs"
+                                        style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                                        {dotTitle}
+                                    </span>
+                                )}
+                            </span>
                             <button
                                 onClick={stop(() => onOpenChart(props.row.original, currency))}
                                 className="text-left truncate hover:opacity-70 transition-opacity min-w-0 flex-1"
@@ -685,7 +689,10 @@ export function ScreenerTable({
                                             style={{
                                                 color: 'var(--text-primary)',
                                                 width: cell.column.getSize(),
-                                                overflow: 'hidden',
+                                                // Name cell: visible so the dot tooltip can escape the cell.
+                                                // Text truncation is handled by the inner flex container.
+                                                overflow: isName ? 'visible' : 'hidden',
+                                                position: isName ? 'relative' : undefined,
                                                 maxWidth: isName ? cell.column.getSize() : undefined,
                                             }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}

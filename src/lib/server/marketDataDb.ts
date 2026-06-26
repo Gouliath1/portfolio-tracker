@@ -336,6 +336,64 @@ export async function getCachedFundamentals(
     return _memFundamentals.get(ticker) ?? null;
 }
 
+/**
+ * Batch read from DB — one SQL round-trip for all requested tickers.
+ * Returns only tickers that have an entry in the DB.
+ */
+export async function getCachedFundamentalsBatch(
+    tickers: string[],
+): Promise<Map<string, { data: StockFundamentals; fetchedAt: string; ratiosFetchedAt: string | null }>> {
+    const result = new Map<string, { data: StockFundamentals; fetchedAt: string; ratiosFetchedAt: string | null }>();
+    if (tickers.length === 0) return result;
+
+    // Check which tickers are already in the server-process memory cache.
+    const toLoad = tickers.filter(t => !_loadedFundamentalsKeys.has(t));
+
+    if (toLoad.length > 0 && (await ensureInit())) {
+        const c = getClient();
+        if (c) {
+            try {
+                const placeholders = toLoad.map(() => '?').join(',');
+                const rows = await c.execute({
+                    sql: `SELECT * FROM security_fundamentals WHERE ticker IN (${placeholders})`,
+                    args: toLoad,
+                });
+                const num = (v: unknown) => (v == null ? null : Number(v));
+                for (const row of rows.rows) {
+                    const ticker = row.ticker as string;
+                    const entry = {
+                        fetchedAt: row.fetched_at as string,
+                        ratiosFetchedAt: (row.ratios_fetched_at as string) ?? null,
+                        data: {
+                            symbol: ticker,
+                            name: (row.name as string) ?? null,
+                            price: num(row.price),
+                            currency: (row.currency as string) ?? null,
+                            trailingPE: num(row.trailing_pe),
+                            forwardPE: num(row.forward_pe),
+                            dividendYield: num(row.dividend_yield),
+                            priceToBook: num(row.price_to_book),
+                            marketCap: num(row.market_cap),
+                        },
+                    };
+                    _memFundamentals.set(ticker, entry);
+                    _loadedFundamentalsKeys.add(ticker);
+                }
+            } catch (err) {
+                console.warn('[marketDataDb] Batch read failed:', err);
+            }
+            // Mark all as checked so we don't retry missing ones.
+            toLoad.forEach(t => _loadedFundamentalsKeys.add(t));
+        }
+    }
+
+    for (const ticker of tickers) {
+        const entry = _memFundamentals.get(ticker);
+        if (entry) result.set(ticker, entry);
+    }
+    return result;
+}
+
 /** Basics from the no-auth chart endpoint (price/name/currency). */
 export interface PriceInfo { name: string | null; price: number | null; currency: string | null; }
 /** Valuation ratios from the crumb-authed quoteSummary. */
