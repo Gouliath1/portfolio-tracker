@@ -538,7 +538,7 @@ export function ScreenerTable({
                         className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
                         <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
-                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Fetch prices'}</span>
+                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Fetch data'}</span>
                         <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Fetch'}</span>
                     </button>
                     <div className="relative group/export">
@@ -625,12 +625,12 @@ export function ScreenerTable({
                         <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
                             <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading mechanism</p>
                             <span><strong>On open</strong> — cached data restores from DB; dot appears immediately</span>
-                            <span><strong>Fetch prices</strong> — fresh Yahoo fetch for all rows on the current page (price + ratios)</span>
+                            <span><strong>Fetch data</strong> — fresh Yahoo fetch for all rows on the current page (price + ratios)</span>
                             <span><strong>⟳ per row</strong> — refreshes a single stock on demand</span>
                             <span><strong>Loaded tab</strong> — shows all rows that have data, no pagination</span>
                             <span><strong>Show all</strong> — renders the full list on one page</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is shown immediately rather than forcing a slow reload — use Fetch prices or ⟳ to update.
+                                Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is shown immediately rather than forcing a slow reload — use Fetch data or ⟳ to update.
                             </p>
                         </div>
                     </div>
@@ -716,7 +716,7 @@ export function ScreenerTable({
                 </table>
                 {totalCount === 0 && (
                     <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        {view === 'loaded' ? 'No data loaded yet — click "Fetch prices" to load the current page' :
+                        {view === 'loaded' ? 'No data loaded yet — click "Fetch data" to load the current page' :
                             view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
                                 'No names match your filter'}
                     </div>
