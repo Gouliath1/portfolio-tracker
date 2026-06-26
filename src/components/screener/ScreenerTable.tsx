@@ -538,8 +538,12 @@ export function ScreenerTable({
                         className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
                         <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
-                        <span className="hidden sm:inline">{progress ? `${progress.done}/${progress.total}…` : 'Fetch data'}</span>
-                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : 'Fetch'}</span>
+                        <span className="hidden sm:inline">
+                            {progress
+                                ? `${progress.done}/${progress.total}…`
+                                : showAll ? 'Refresh all' : 'Refresh page'}
+                        </span>
+                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : '↻'}</span>
                     </button>
                     <div className="relative group/export">
                         <button className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
