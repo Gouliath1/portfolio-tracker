@@ -233,7 +233,11 @@ export function ScreenerTable({
                     const isLoaded = e?.status === 'done';
                     const fetchedAt = e?.status === 'done' ? e.fetchedAt : undefined;
                     const ratiosFetchedAt = e?.status === 'done' ? e.ratiosFetchedAt : undefined;
-                    const dotColor = isLoaded ? 'var(--pnl-green)' : 'var(--border-strong)';
+                    const priceAge = fetchedAt ? Date.now() - new Date(fetchedAt).getTime() : Infinity;
+                    const isStale = priceAge > 24 * 3600 * 1000;
+                    const dotColor = !isLoaded ? 'var(--border-strong)'
+                        : isStale ? 'oklch(68% 0.14 60)'
+                        : 'var(--pnl-green)';
                     const dotTitle = (() => {
                         if (!isLoaded) return undefined;
                         const fmt = (iso: string | null | undefined) => {
@@ -593,15 +597,19 @@ export function ScreenerTable({
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
                                 <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Data refresh level</p>
-                                <p className="mb-2">Hover for the exact fetch date of price and ratios.</p>
+                                <p className="mb-2">Reflects price age — hover for exact fetch dates of price and ratios.</p>
                                 <div className="flex flex-col gap-1">
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
-                                        Data loaded (price + ratios in DB)
+                                        Fresh — price fetched within 24 h
+                                    </span>
+                                    <span className="flex items-center gap-2">
+                                        <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'oklch(68% 0.14 60)', display: 'inline-block' }} />
+                                        Stale — price older than 24 h
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--border-strong)', opacity: 0.45, display: 'inline-block' }} />
-                                        Not loaded yet — click Fetch prices or ⟳
+                                        Not loaded yet
                                     </span>
                                 </div>
                             </div>
