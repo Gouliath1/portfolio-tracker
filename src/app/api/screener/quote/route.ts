@@ -49,7 +49,7 @@ export async function GET(request: Request) {
             {
                 ...cached.data,
                 source: 'cache',
-                ratiosPending: cached.data.trailingPE == null,
+                ratiosPending: cached.ratiosFetchedAt == null,
                 fetchedAt: cached.fetchedAt,
                 ratiosFetchedAt: cached.ratiosFetchedAt,
             },
