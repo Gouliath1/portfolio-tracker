@@ -397,9 +397,15 @@ export function ScreenerTable({
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
     const pageLoading = progress !== null;
 
-    // Don't auto-probe the DB cache for all rows when "Show all" is active —
-    // that would fire 1600+ parallel fetches and freeze the browser. In show-all
-    // mode the user manually triggers loading via Fetch prices.
+    // On mount (and when the universe changes), restore ALL constituents from DB.
+    // This means a hard page refresh recovers the full loaded set, not just page 1.
+    // cacheChecked in the hook prevents re-fetching within the same session.
+    useEffect(() => {
+        loadCached(constituents.map(c => c.symbol));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [constituents.length, loadCached]);
+
+    // Per-page cache probe — skipped in show-all mode (all already loaded above).
     useEffect(() => { if (!showAll) loadCached(pageSymbols); }, [pageSymbols, loadCached, showAll]);
 
     const exportToExcel = useCallback((scope: 'page' | 'all') => {
