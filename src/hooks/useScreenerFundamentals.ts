@@ -121,30 +121,37 @@ export function useScreenerFundamentals(): FundamentalsApi {
         void fetchOne(symbol, { fresh: true });
     }, [fetchOne, setEntry]);
 
-    // Restore what's already in the DB cache — single batch request, no upstream calls.
+    // Restore what's already in the DB cache — chunked batch requests, no upstream calls.
+    // Safe to call with the full universe (1600+ symbols): chunks of 200 keep URLs short,
+    // and cacheChecked prevents re-fetching symbols already seen this session.
     const loadCached = useCallback((symbols: string[]) => {
         const toCheck = symbols.filter(s => !requested.current.has(s) && !cacheChecked.current.has(s));
         if (toCheck.length === 0) return;
         toCheck.forEach(s => cacheChecked.current.add(s));
 
+        const CHUNK = 200;
+        const chunks: string[][] = [];
+        for (let i = 0; i < toCheck.length; i += CHUNK) chunks.push(toCheck.slice(i, i + CHUNK));
+
         void (async () => {
-            try {
-                // One request replaces N individual cachedOnly calls.
-                const res = await fetch(`/api/screener/quotes?symbols=${toCheck.map(encodeURIComponent).join(',')}`);
-                if (!res.ok) return;
-                const batch = await res.json() as Record<string, StockFundamentals & {
-                    ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
-                }>;
-                Object.entries(batch).forEach(([symbol, data]) => {
-                    requested.current.add(symbol);
-                    setEntry(symbol, {
-                        status: 'done', data,
-                        ratiosPending: data.ratiosPending,
-                        fetchedAt: data.fetchedAt,
-                        ratiosFetchedAt: data.ratiosFetchedAt,
+            await Promise.all(chunks.map(async chunk => {
+                try {
+                    const res = await fetch(`/api/screener/quotes?symbols=${chunk.map(encodeURIComponent).join(',')}`);
+                    if (!res.ok) return;
+                    const batch = await res.json() as Record<string, StockFundamentals & {
+                        ratiosPending?: boolean; fetchedAt?: string; ratiosFetchedAt?: string | null;
+                    }>;
+                    Object.entries(batch).forEach(([symbol, data]) => {
+                        requested.current.add(symbol);
+                        setEntry(symbol, {
+                            status: 'done', data,
+                            ratiosPending: data.ratiosPending,
+                            fetchedAt: data.fetchedAt,
+                            ratiosFetchedAt: data.ratiosFetchedAt,
+                        });
                     });
-                });
-            } catch { /* leave unloaded */ }
+                } catch { /* ignore chunk failure */ }
+            }));
         })();
     }, [setEntry]);
 
