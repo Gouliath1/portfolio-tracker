@@ -56,10 +56,7 @@ function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove
                             <div key={c.symbol} className="flex items-center justify-between gap-3 px-3 py-1.5 hover:opacity-80">
                                 <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{c.code}</span>
                                 <button
-                                    onClick={() => {
-                                        onRemove(c.symbol);
-                                        if (added.length === 1) setOpen(false);
-                                    }}
+                                    onClick={() => { onRemove(c.symbol); if (added.length === 1) setOpen(false); }}
                                     style={{ color: 'var(--text-muted)' }}
                                     title={`Remove ${c.code}`}
                                 >
@@ -158,80 +155,78 @@ export default function ScreenerPage() {
             <AppSidebar activePage="screener" currency={currency} activeSetName={activeSetName} />
 
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
-                {/* Header */}
-                <header
-                    className="sticky top-0 z-10 px-4 sm:px-6 flex items-center justify-between flex-shrink-0"
-                    style={{ background: 'var(--surface-header)', borderBottom: '1px solid var(--border)', height: 52 }}
-                >
-                    <div className="flex items-baseline gap-2 min-w-0 mr-3">
-                        <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
-                            {file.index}
-                        </h1>
-                        <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
-                            {file.source}{file.asOf ? ` · ${file.asOf}` : ''}
-                        </span>
-                    </div>
-                    <AddMenu
-                        indices={INDICES}
-                        currentIndexKey={indexKey}
-                        onLoadIndex={setIndexKey}
-                        onAddTicker={handleAdd}
-                        onAddMany={handleAddMany}
-                    />
-                </header>
+                <div className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden">
+                    <div className="max-w-screen-xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5 pb-0 h-full flex flex-col gap-3">
 
-                {/* Universe strip */}
-                <div
-                    className="flex items-center gap-2 px-4 sm:px-6 py-2 flex-shrink-0 flex-wrap"
-                    style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-header)' }}
-                >
-                    <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Universe:</span>
-                    <span
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
-                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                    >
-                        {file.index} · {file.count.toLocaleString()}
-                    </span>
-                    {visibleAdded.map(c => (
-                        <span
-                            key={c.symbol}
-                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs flex-shrink-0"
-                            style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                        >
-                            {c.code}
-                            <button
-                                onClick={() => handleRemove(c.symbol)}
-                                className="hover:opacity-70 leading-none"
-                                style={{ color: 'var(--text-muted)' }}
-                                title={`Remove ${c.code}`}
+                        {/* Title row — no separate sticky header */}
+                        <div className="flex items-center justify-between gap-3 flex-shrink-0">
+                            <div className="flex items-baseline gap-2 min-w-0">
+                                <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
+                                    {file.index}
+                                </h1>
+                                <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+                                    {file.source}{file.asOf ? ` · ${file.asOf}` : ''}
+                                </span>
+                            </div>
+                            <AddMenu
+                                indices={INDICES}
+                                currentIndexKey={indexKey}
+                                onLoadIndex={setIndexKey}
+                                onAddTicker={handleAdd}
+                                onAddMany={handleAddMany}
+                            />
+                        </div>
+
+                        {/* Universe strip */}
+                        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Universe:</span>
+                            <span
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                             >
-                                <MdClose size={11} />
-                            </button>
-                        </span>
-                    ))}
-                    {overflowAdded.length > 0 && (
-                        <OverflowPill added={overflowAdded} onRemove={handleRemove} />
-                    )}
-                    <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
-                        {allRows.length.toLocaleString()} names
-                    </span>
-                </div>
+                                {file.index} · {file.count.toLocaleString()}
+                            </span>
+                            {visibleAdded.map(c => (
+                                <span
+                                    key={c.symbol}
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs flex-shrink-0"
+                                    style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                                >
+                                    {c.code}
+                                    <button
+                                        onClick={() => handleRemove(c.symbol)}
+                                        className="hover:opacity-70 leading-none"
+                                        style={{ color: 'var(--text-muted)' }}
+                                        title={`Remove ${c.code}`}
+                                    >
+                                        <MdClose size={11} />
+                                    </button>
+                                </span>
+                            ))}
+                            {overflowAdded.length > 0 && (
+                                <OverflowPill added={overflowAdded} onRemove={handleRemove} />
+                            )}
+                            <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
+                                {allRows.length.toLocaleString()} names
+                            </span>
+                        </div>
 
-                {/* Main */}
-                <main className="flex-1 min-h-0 pb-20 md:pb-0">
-                    <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 h-full flex flex-col">
-                        <ScreenerTable
-                            constituents={allRows}
-                            onRemove={handleRemove}
-                            removableSymbols={addedSymbols}
-                            pinnedSymbols={pinnedSet}
-                            onTogglePin={handleTogglePin}
-                            alerts={alerts}
-                            onEditAlert={handleEditAlert}
-                            onOpenChart={handleOpenChart}
-                        />
+                        {/* Table — fills remaining height */}
+                        <div className="flex-1 min-h-0">
+                            <ScreenerTable
+                                constituents={allRows}
+                                onRemove={handleRemove}
+                                removableSymbols={addedSymbols}
+                                pinnedSymbols={pinnedSet}
+                                onTogglePin={handleTogglePin}
+                                alerts={alerts}
+                                onEditAlert={handleEditAlert}
+                                onOpenChart={handleOpenChart}
+                            />
+                        </div>
+
                     </div>
-                </main>
+                </div>
             </div>
 
             {alertTarget && (
