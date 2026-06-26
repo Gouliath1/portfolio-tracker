@@ -24,7 +24,7 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
 
-type View = 'all' | 'loaded' | 'pinned';
+type View = 'all' | 'loaded' | 'unloaded' | 'pinned';
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
@@ -105,6 +105,7 @@ export function ScreenerTable({
 
     const viewRows = useMemo(() => {
         if (view === 'loaded') return constituents.filter(c => fundMap.get(c.symbol)?.status === 'done');
+        if (view === 'unloaded') return constituents.filter(c => fundMap.get(c.symbol)?.status !== 'done');
         if (view === 'pinned') return constituents.filter(c => pinnedSymbols.has(c.symbol));
         return constituents;
     }, [view, constituents, pinnedSymbols, fundMap]);
@@ -123,6 +124,7 @@ export function ScreenerTable({
         () => constituents.filter(c => fundMap.get(c.symbol)?.status === 'done').length,
         [constituents, fundMap],
     );
+    const unloadedCount = constituents.length - loadedCount;
 
     const toggleSector = (s: string) => {
         setSelectedSectors(prev => {
@@ -529,6 +531,7 @@ export function ScreenerTable({
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                     {viewTab('all', 'All', constituents.length)}
                     {viewTab('loaded', 'Loaded', loadedCount)}
+                    {viewTab('unloaded', 'Not loaded', unloadedCount)}
                     {viewTab('pinned', 'Pinned', pinnedSymbols.size)}
                 </div>
 
@@ -721,7 +724,8 @@ export function ScreenerTable({
                 </table>
                 {totalCount === 0 && (
                     <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        {view === 'loaded' ? 'No data loaded yet — click "Fetch data" to load the current page' :
+                        {view === 'loaded' ? 'No data loaded yet — click "Refresh page" to load the current page' :
+                            view === 'unloaded' ? 'All names have been loaded' :
                             view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
                                 'No names match your filter'}
                     </div>
@@ -734,6 +738,7 @@ export function ScreenerTable({
                     {view === 'all' && !showAll && `Page ${curPageIndex + 1} of ${pageCount}`}
                     {view === 'all' && showAll && `${totalCount.toLocaleString()} names`}
                     {view === 'loaded' && `${totalCount.toLocaleString()} rows with data`}
+                    {view === 'unloaded' && `${totalCount.toLocaleString()} rows without data`}
                     {view === 'pinned' && `${totalCount.toLocaleString()} pinned`}
                     {loadedCount > 0 && view === 'all' && (
                         <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
