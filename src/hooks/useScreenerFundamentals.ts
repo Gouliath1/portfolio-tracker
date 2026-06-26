@@ -12,51 +12,89 @@ export interface LoadProgress { done: number; total: number; }
 
 export interface FundamentalsApi {
     map: Map<string, FundEntry>;
-    /** Force a fresh fetch of one symbol (both tiers), bypassing caches. */
     refresh: (symbol: string) => void;
-    /** Paced, price-only bulk load of the given symbols (the "Fetch prices" action). */
     loadMany: (symbols: string[]) => void;
-    /** Restore symbols from the DB cache only — no upstream calls. */
     loadCached: (symbols: string[]) => void;
-    /** Non-null while a bulk load is in progress. */
     progress: LoadProgress | null;
 }
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-
 const BULK_CONCURRENCY = 3;
 const BULK_GAP_MS = 120;
+interface FetchOpts { fresh?: boolean; }
 
-interface FetchOpts { fresh?: boolean; tier?: 'price'; }
+// ── localStorage persistence ──────────────────────────────────────────────
+// Key is versioned so stale formats are discarded automatically.
+const LS_KEY = 'screener:fundMap:v2';
+// Drop entries older than 30 days from localStorage (they'll re-fetch on demand).
+const LS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Module-level store — survives component unmount/remount (page navigation).
-// When the user navigates away and returns the map already has data, and
-// cacheChecked prevents re-probing the DB for symbols we already know about.
+// Module-level store — in-memory across client-side navigations.
+// Seeded from localStorage on first client render so hard refreshes also restore.
 const _store = {
     map: new Map<string, FundEntry>(),
     requested: new Set<string>(),
     cacheChecked: new Set<string>(),
 };
 
+// Lazy localStorage init — safe for SSR (typeof window guard).
+let _lsInitDone = false;
+function ensureLsInit(): void {
+    if (_lsInitDone || typeof window === 'undefined') return;
+    _lsInitDone = true;
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return;
+        const entries = JSON.parse(raw) as [string, FundEntry][];
+        const now = Date.now();
+        for (const [sym, entry] of entries) {
+            if (entry.status === 'done' && entry.fetchedAt) {
+                if (now - new Date(entry.fetchedAt).getTime() < LS_MAX_AGE_MS) {
+                    _store.map.set(sym, entry);
+                    _store.requested.add(sym);
+                    _store.cacheChecked.add(sym);
+                }
+            }
+        }
+    } catch { /* ignore corrupt/missing data */ }
+}
+
+// Debounced save — batches rapid setEntry calls into one write.
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleLsSave(): void {
+    if (typeof window === 'undefined') return;
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+        _saveTimer = null;
+        try {
+            const entries = Array.from(_store.map.entries()).filter(([, e]) => e.status === 'done');
+            localStorage.setItem(LS_KEY, JSON.stringify(entries));
+        } catch { /* ignore quota errors */ }
+    }, 500);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+
 export function useScreenerFundamentals(): FundamentalsApi {
-    // Seed from the persisted store so remounts see existing data immediately.
+    // Hydrate from localStorage before the first render.
+    ensureLsInit();
+
     const [map, _setMap] = useState<Map<string, FundEntry>>(() => new Map(_store.map));
     const [progress, setProgress] = useState<LoadProgress | null>(null);
 
-    // Refs point directly to the module-level sets — they survive remounts.
     const requested = useRef(_store.requested);
     const cacheChecked = useRef(_store.cacheChecked);
 
-    /** Write one entry to both React state and the persistent store. */
+    /** Write one entry to in-memory store, React state, and localStorage. */
     const setEntry = useCallback((symbol: string, entry: FundEntry) => {
         _store.map.set(symbol, entry);
         _setMap(prev => new Map(prev).set(symbol, entry));
+        if (entry.status === 'done') scheduleLsSave();
     }, []);
 
     const fetchOne = useCallback(async (symbol: string, opts: FetchOpts = {}) => {
         const params = new URLSearchParams({ symbol });
         if (opts.fresh) params.set('fresh', '1');
-        if (opts.tier) params.set('tier', opts.tier);
         try {
             const res = await fetch(`/api/screener/quote?${params}`, opts.fresh ? { cache: 'no-store' } : undefined);
             if (!res.ok) {
@@ -85,7 +123,6 @@ export function useScreenerFundamentals(): FundamentalsApi {
         if (symbols.length === 0) return;
         symbols.forEach(s => requested.current.add(s));
 
-        // Mark visible rows as loading so the UI responds immediately.
         _setMap(prev => {
             const next = new Map(prev);
             symbols.forEach(s => {
@@ -104,7 +141,6 @@ export function useScreenerFundamentals(): FundamentalsApi {
         const worker = async () => {
             while (idx < symbols.length) {
                 const sym = symbols[idx++];
-                // Full fetch (price + ratios) so ratios are persisted to DB.
                 await fetchOne(sym);
                 done += 1;
                 setProgress({ done, total });
@@ -121,10 +157,6 @@ export function useScreenerFundamentals(): FundamentalsApi {
         void fetchOne(symbol, { fresh: true });
     }, [fetchOne, setEntry]);
 
-    // Restore what's already in the DB cache — chunked batch requests, no upstream calls.
-    // Symbols are marked in-flight immediately to prevent duplicate concurrent requests.
-    // On failure (server error or network exception) they are removed from cacheChecked
-    // so the next loadCached call (e.g. per-page fallback) can retry them.
     const loadCached = useCallback((symbols: string[]) => {
         const toCheck = symbols.filter(s => !requested.current.has(s) && !cacheChecked.current.has(s));
         if (toCheck.length === 0) return;
@@ -140,7 +172,7 @@ export function useScreenerFundamentals(): FundamentalsApi {
                 try {
                     const res = await fetch(`/api/screener/quotes?symbols=${chunk.map(encodeURIComponent).join(',')}`);
                     if (!res.ok) {
-                        // Server error — unblock so per-page fallback can retry.
+                        // Server error — unblock so fallback can retry.
                         chunk.forEach(s => cacheChecked.current.delete(s));
                         return;
                     }
@@ -157,7 +189,7 @@ export function useScreenerFundamentals(): FundamentalsApi {
                         });
                     });
                 } catch {
-                    // Network error — unblock so per-page fallback can retry.
+                    // Network error — unblock so fallback can retry.
                     chunk.forEach(s => cacheChecked.current.delete(s));
                 }
             }));
