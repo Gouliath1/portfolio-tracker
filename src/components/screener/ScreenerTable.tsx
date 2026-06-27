@@ -24,7 +24,7 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
 
-type View = 'all' | 'loaded' | 'unloaded' | 'pinned';
+type View = 'all' | 'loaded' | 'unloaded' | 'pinned' | 'alerts';
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
@@ -41,7 +41,9 @@ const fmtCompact = (v: number) =>
 
 function isAlertTriggered(alert: PriceAlert, price: number | null): boolean {
     if (price == null) return false;
-    return alert.direction === 'above' ? price >= alert.target : price <= alert.target;
+    if (alert.targetAbove != null && price >= alert.targetAbove) return true;
+    if (alert.targetBelow != null && price <= alert.targetBelow) return true;
+    return false;
 }
 
 function useBreakpoints() {
@@ -107,8 +109,9 @@ export function ScreenerTable({
         if (view === 'loaded') return constituents.filter(c => fundMap.get(c.symbol)?.status === 'done');
         if (view === 'unloaded') return constituents.filter(c => fundMap.get(c.symbol)?.status !== 'done');
         if (view === 'pinned') return constituents.filter(c => pinnedSymbols.has(c.symbol));
+        if (view === 'alerts') return constituents.filter(c => alerts[c.symbol] != null);
         return constituents;
-    }, [view, constituents, pinnedSymbols, fundMap]);
+    }, [view, constituents, pinnedSymbols, fundMap, alerts]);
 
     const allSectors = useMemo(() => {
         const s = new Set(constituents.map(c => c.sector).filter(Boolean) as string[]);
@@ -125,6 +128,7 @@ export function ScreenerTable({
         [constituents, fundMap],
     );
     const unloadedCount = constituents.length - loadedCount;
+    const alertsCount = useMemo(() => Object.keys(alerts).length, [alerts]);
 
     const toggleSector = (s: string) => {
         setSelectedSectors(prev => {
@@ -348,7 +352,13 @@ export function ScreenerTable({
                             <button onClick={stop(() => onEditAlert(c))}
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
                                 style={{ color: triggered ? 'var(--accent)' : 'var(--text-muted)' }}
-                                title={alert ? `Alert ${alert.direction} ${fmtNum(alert.target, 0)}${triggered ? ' · triggered' : ''}` : 'Set price alert'}>
+                                title={(() => {
+                                    if (!alert) return 'Set price alert';
+                                    const parts: string[] = [];
+                                    if (alert.targetAbove != null) parts.push(`↑ ${fmtNum(alert.targetAbove, 0)}`);
+                                    if (alert.targetBelow != null) parts.push(`↓ ${fmtNum(alert.targetBelow, 0)}`);
+                                    return `Alert ${parts.join(' · ')}${triggered ? ' · triggered' : ''}`;
+                                })()}>
                                 {alert ? <MdNotificationsActive size={15} /> : <MdNotificationsNone size={15} />}
                             </button>
                             <button onClick={stop(() => onOpenChart(c, currency))}
@@ -559,6 +569,7 @@ export function ScreenerTable({
                     {viewTab('loaded', 'Loaded', loadedCount)}
                     {viewTab('unloaded', 'Not loaded', unloadedCount)}
                     {viewTab('pinned', 'Pinned', pinnedSymbols.size)}
+                    {viewTab('alerts', 'Alerts', alertsCount)}
                 </div>
 
                 {/* Actions — pushed to the right */}
@@ -753,6 +764,7 @@ export function ScreenerTable({
                         {view === 'loaded' ? 'No data loaded yet — click "Refresh page" to load the current page' :
                             view === 'unloaded' ? 'All names have been loaded' :
                             view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
+                            view === 'alerts' ? 'No price alerts set — click the bell icon on any row' :
                                 'No names match your filter'}
                     </div>
                 )}
@@ -766,6 +778,7 @@ export function ScreenerTable({
                     {view === 'loaded' && `${totalCount.toLocaleString()} rows with data`}
                     {view === 'unloaded' && `${totalCount.toLocaleString()} rows without data`}
                     {view === 'pinned' && `${totalCount.toLocaleString()} pinned`}
+                    {view === 'alerts' && `${totalCount.toLocaleString()} with alerts`}
                     {loadedCount > 0 && view === 'all' && (
                         <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
                             · {loadedCount.toLocaleString()} loaded

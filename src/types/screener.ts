@@ -13,10 +13,10 @@ export interface IndexConstituent {
     sector: string | null;
 }
 
-/** A user-set price alert: fire when the live price crosses `target`. */
+/** A user-set price alert. Either or both thresholds may be set. */
 export interface PriceAlert {
-    target: number;
-    direction: 'above' | 'below';
+    targetAbove?: number;
+    targetBelow?: number;
 }
 
 /** Shape of each src/data/indices/<key>.json file. */

@@ -10,6 +10,7 @@ import { AlertModal } from '../../components/screener/AlertModal';
 import { StockChartModal } from '../../components/screener/StockChartModal';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
+import { useAlertPoller } from '../../hooks/useAlertPoller';
 import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
 import topix from '../../data/indices/topix.json';
 import type { IndexConstituent, IndexConstituentsFile, PriceAlert } from '../../types/screener';
@@ -26,6 +27,23 @@ interface ScreenerState {
     added: IndexConstituent[];
     pinned: string[];
     alerts: Record<string, PriceAlert>;
+}
+
+function migrateAlert(raw: unknown): PriceAlert | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const a = raw as Record<string, unknown>;
+    // New format
+    if ('targetAbove' in a || 'targetBelow' in a) {
+        const result: PriceAlert = {};
+        if (typeof a.targetAbove === 'number') result.targetAbove = a.targetAbove;
+        if (typeof a.targetBelow === 'number') result.targetBelow = a.targetBelow;
+        return Object.keys(result).length > 0 ? result : null;
+    }
+    // Old format: { target: number, direction: 'above' | 'below' }
+    if (typeof a.target === 'number') {
+        return a.direction === 'below' ? { targetBelow: a.target } : { targetAbove: a.target };
+    }
+    return null;
 }
 
 function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove: (s: string) => void }) {
@@ -97,7 +115,14 @@ export default function ScreenerPage() {
                 if (typeof parsed.indexLoaded === 'boolean') setIndexLoaded(parsed.indexLoaded);
                 if (Array.isArray(parsed.added)) setAdded(parsed.added);
                 if (Array.isArray(parsed.pinned)) setPinned(parsed.pinned);
-                if (parsed.alerts && typeof parsed.alerts === 'object') setAlerts(parsed.alerts);
+                if (parsed.alerts && typeof parsed.alerts === 'object') {
+                    const migrated: Record<string, PriceAlert> = {};
+                    for (const [sym, raw] of Object.entries(parsed.alerts)) {
+                        const alert = migrateAlert(raw);
+                        if (alert) migrated[sym] = alert;
+                    }
+                    setAlerts(migrated);
+                }
             }
         } catch { /* ignore corrupt state */ }
         setLoaded(true);
@@ -135,6 +160,8 @@ export default function ScreenerPage() {
             return fresh.length ? [...fresh, ...prev] : prev;
         });
     }, []);
+    useAlertPoller(alerts);
+
     const handleEditAlert = useCallback((c: IndexConstituent) => setAlertTarget(c), []);
     const handleOpenChart = useCallback((c: IndexConstituent, cur: string | null) => {
         setChartTarget(c);
@@ -145,6 +172,9 @@ export default function ScreenerPage() {
         if (!alertTarget) return;
         setAlerts(prev => ({ ...prev, [alertTarget.symbol]: alert }));
         setAlertTarget(null);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            void Notification.requestPermission();
+        }
     };
     const clearAlert = () => {
         if (!alertTarget) return;
