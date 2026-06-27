@@ -8,7 +8,7 @@ const POLL_INTERVAL = 60 * 60 * 1000;
 
 async function fetchPrice(symbol: string): Promise<{ price: number | null; currency: string | null }> {
     try {
-        const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}`);
+        const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}&tier=price&fresh=1`);
         if (!res.ok) return { price: null, currency: null };
         const d = (await res.json()) as StockFundamentals;
         return { price: d.price ?? null, currency: d.currency ?? null };
@@ -80,9 +80,15 @@ export function useAlertPoller(alerts: Record<string, PriceAlert>) {
             }));
         };
 
+        const onVisible = () => { if (document.visibilityState === 'visible') poll(); };
+        document.addEventListener('visibilitychange', onVisible);
+
         poll();
         const id = setInterval(poll, POLL_INTERVAL);
-        return () => clearInterval(id);
+        return () => {
+            clearInterval(id);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [symbolKey]);
 }
