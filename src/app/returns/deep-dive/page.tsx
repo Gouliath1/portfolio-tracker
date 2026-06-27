@@ -31,7 +31,7 @@ function MiniTable({
 }) {
     return (
         <div className="flex-1 min-w-[160px]">
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+            <p className="text-xs font-semibold uppercase tracking-widest mb-2"
                 style={{ color: 'var(--text-muted)' }}>
                 {title}
             </p>
@@ -39,9 +39,9 @@ function MiniTable({
                 <table className="w-full">
                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                         <tr>
-                            <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest"
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-widest"
                                 style={{ color: 'var(--text-muted)' }}>Date</th>
-                            <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-widest"
+                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-widest"
                                 style={{ color: 'var(--text-muted)' }}>Amount</th>
                         </tr>
                     </thead>
@@ -267,7 +267,7 @@ export default function DeepDivePage() {
                                     <div className="flex gap-3 flex-wrap sm:flex-nowrap items-stretch">
                                         <div className="flex-shrink-0 w-full sm:w-[160px] rounded-xl px-5 py-4 flex flex-col justify-between"
                                             style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
-                                            <p className="text-[10px] font-semibold uppercase tracking-widest"
+                                            <p className="text-xs font-semibold uppercase tracking-widest"
                                                 style={{ color: 'var(--accent)' }}>
                                                 Portfolio XIRR
                                             </p>
@@ -295,7 +295,7 @@ export default function DeepDivePage() {
                                                     { label: 'Open Value',     sub: 'current',              value: openValue },
                                                 ] as const).map(({ label, sub, value }) => (
                                                     <div key={label} className="glass rounded-xl px-4 py-3">
-                                                        <p className="text-[10px] font-semibold uppercase tracking-widest"
+                                                        <p className="text-xs font-semibold uppercase tracking-widest"
                                                             style={{ color: 'var(--text-muted)' }}>{label}</p>
                                                         <p className="text-[9px] mb-2" style={{ color: 'var(--text-muted)', opacity: 0.65 }}>{sub}</p>
                                                         <p className="text-base font-semibold tabular-nums"
@@ -308,7 +308,7 @@ export default function DeepDivePage() {
 
                                             <div className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-4">
                                                 <div>
-                                                    <p className="text-[10px] font-semibold uppercase tracking-widest"
+                                                    <p className="text-xs font-semibold uppercase tracking-widest"
                                                         style={{ color: 'var(--text-muted)' }}>Net Gain</p>
                                                     <p className="text-[9px]" style={{ color: 'var(--text-muted)', opacity: 0.65 }}>
                                                         open value + proceeds + dividends − total invested

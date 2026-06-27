@@ -114,7 +114,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant,
                     </p>
                     {info && <InfoTooltip text={info} />}
                 </div>
-                <div className={`tabular-nums leading-none ${large ? 'text-3xl sm:text-4xl font-bold' : 'text-2xl sm:text-3xl font-semibold'}`}
+                <div className={`tabular-nums leading-none ${large ? 'text-3xl sm:text-4xl font-semibold' : 'text-xl sm:text-2xl font-semibold'}`}
                     style={{ color: valueColor }}>
                     {value}
                 </div>
