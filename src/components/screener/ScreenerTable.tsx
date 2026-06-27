@@ -680,6 +680,7 @@ export function ScreenerTable({
                             <span><strong>Refresh page</strong> — live Yahoo fetch for 50 visible rows</span>
                             <span><strong>Refresh all</strong> — all rows in Show all mode</span>
                             <span><strong>⟳ per row</strong> — single stock on demand</span>
+                            <span><strong>Cart icon</strong> — open Add Position pre-filled with ticker &amp; name</span>
                             <span><strong>Loaded tab</strong> — rows with data, no pagination</span>
                             <span><strong>Show all</strong> — full list, one page</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
