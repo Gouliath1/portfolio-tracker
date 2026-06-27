@@ -32,6 +32,7 @@ const DONE_ENTRY = {
         dividendYield: 0.02,
         priceToBook: 1.5,
         marketCap: 1e11,
+        sector: null,
     },
     fetchedAt: NOW,
     ratiosFetchedAt: NOW,

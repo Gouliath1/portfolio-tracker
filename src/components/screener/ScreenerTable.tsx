@@ -92,7 +92,7 @@ export function ScreenerTable({
     const refreshRef = useRef<(symbol: string) => void>(() => {});
     const nameCacheRef = useRef<Map<string, string>>(new Map());
 
-    const { map: fundMap, refresh, loadMany, loadCached, progress } = useScreenerFundamentals();
+    const { map: fundMap, refresh, loadMany, loadCached, backfillSector, progress } = useScreenerFundamentals();
     mapRef.current = fundMap;
     refreshRef.current = refresh;
 
@@ -286,7 +286,12 @@ export function ScreenerTable({
             }),
             columnHelper.accessor('sector', {
                 header: 'Sector', size: 150, minSize: 80,
-                cell: props => props.getValue() ?? muted('—'),
+                cell: props => {
+                    const sym = props.row.original.symbol;
+                    const e = mapRef.current.get(sym);
+                    const fetchedSector = e?.status === 'done' ? e.data.sector : undefined;
+                    return (fetchedSector ?? props.getValue()) ?? muted('—');
+                },
             }),
             columnHelper.accessor(() => null, {
                 id: 'price', header: 'Price', size: 110, minSize: 72,
@@ -404,13 +409,34 @@ export function ScreenerTable({
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
     const pageLoading = progress !== null;
 
-    // On mount (and when the universe changes), restore ALL constituents from DB.
-    // This means a hard page refresh recovers the full loaded set, not just page 1.
-    // cacheChecked in the hook prevents re-fetching within the same session.
+    // Restore from DB cache for all constituents on mount and universe changes.
     useEffect(() => {
         loadCached(constituents.map(c => c.symbol));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [constituents.length, loadCached]);
+
+    // Auto-ensure custom-added symbols have complete data whenever the set changes.
+    // Fires after page.tsx loads persisted symbols from localStorage (they arrive async,
+    // so this cannot be a mount-only effect). Uses mapRef snapshot — not fundMap state —
+    // to avoid a render loop.
+    //   - No entry or ratiosPending → full fetch (loadMany shows loading, like Refresh)
+    //   - Has full data but no sector → silent backfill (keeps existing data visible)
+    useEffect(() => {
+        if (!removableSymbols || removableSymbols.size === 0) return;
+        const toFetch: string[] = [];
+        const toBackfill: string[] = [];
+        for (const s of removableSymbols) {
+            const e = mapRef.current.get(s);
+            if (!e || (e.status === 'done' && e.ratiosPending)) {
+                toFetch.push(s);
+            } else if (e.status === 'done' && !e.ratiosPending && e.data.sector == null) {
+                toBackfill.push(s);
+            }
+        }
+        if (toFetch.length > 0) loadMany(toFetch);
+        if (toBackfill.length > 0) backfillSector(toBackfill);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [removableSymbols]);
 
     // Per-page cache probe — skipped in show-all mode (all already loaded above).
     useEffect(() => { if (!showAll) loadCached(pageSymbols); }, [pageSymbols, loadCached, showAll]);

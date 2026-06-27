@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 import { fetchChartMeta } from '@portfolio/core';
 import { fetchTwelveDataRatios } from '../../../../lib/server/twelveDataApi';
 import { fetchJQuantsRatios } from '../../../../lib/server/jquantsApi';
-import { fetchQuoteSummary } from '../../../../lib/server/yahooAuth';
+import { fetchQuoteSummary, fetchYahooSector } from '../../../../lib/server/yahooAuth';
 import { getCachedFundamentals, setCachedPriceInfo, setCachedRatios } from '../../../../lib/server/marketDataDb';
 import type { StockFundamentals } from '@portfolio/types/screener';
 
@@ -61,6 +61,7 @@ export async function GET(request: Request) {
     let result: StockFundamentals = cached?.data ?? {
         symbol, name: null, price: null, currency: null,
         trailingPE: null, forwardPE: null, dividendYield: null, priceToBook: null, marketCap: null,
+        sector: null,
     };
     const priceFresh = !forceFresh && withinAge(cached?.fetchedAt, PRICE_MAX_AGE_MS) && result.price != null;
     let ratiosOk = !forceFresh && withinAge(cached?.ratiosFetchedAt, RATIO_MAX_AGE_MS);
@@ -75,40 +76,71 @@ export async function GET(request: Request) {
         }
     }
 
-    // Tier 2 — valuation ratios. Provider routing by ticker type:
-    //   JP (.T)  → J-Quants (official JPX data, free plan, no crumb)
-    //   US       → Twelve Data (free plan covers /statistics for US)
-    //   Fallback → Yahoo quoteSummary (for any market, needs crumb)
+    // Tier 2 — valuation ratios + sector. Provider routing by ticker type:
+    //   JP (.T)  → J-Quants (ratios) + Yahoo summaryProfile (sector) in parallel
+    //   US       → Twelve Data (ratios) + Yahoo summaryProfile (sector) in parallel
+    //   Fallback → Yahoo quoteSummary (ratios AND sector, single call)
     // Skipped entirely for price-only (bulk) loads.
     const isJpTicker = symbol.toUpperCase().endsWith('.T');
     const isUsTicker = !symbol.includes('.');
+    // Sector: fetch whenever it's missing from cache (doesn't expire like ratios).
+    let sector: string | null = result.sector ?? null;
+    const shouldFetchSector = !priceOnly && sector == null;
+
     if (!ratiosOk && !priceOnly) {
         try {
             let ratios: { trailingPE: number | null; forwardPE: number | null; dividendYield: number | null; priceToBook: number | null; marketCap: number | null; } | null = null;
 
             const hasJQuants = process.env.JQUANTS_API_KEY || (process.env.JQUANTS_EMAIL && process.env.JQUANTS_PASSWORD);
             if (isJpTicker && hasJQuants) {
-                ratios = await fetchJQuantsRatios(symbol, result.price);
+                const [r, s] = await Promise.all([
+                    fetchJQuantsRatios(symbol, result.price),
+                    shouldFetchSector ? fetchYahooSector(symbol).catch(() => null) : Promise.resolve(null),
+                ]);
+                ratios = r;
+                if (s != null) sector = s;
             } else if (isUsTicker && process.env.TWELVE_DATA_API_KEY) {
-                ratios = await fetchTwelveDataRatios(symbol);
+                const [r, s] = await Promise.all([
+                    fetchTwelveDataRatios(symbol),
+                    shouldFetchSector ? fetchYahooSector(symbol).catch(() => null) : Promise.resolve(null),
+                ]);
+                ratios = r;
+                if (s != null) sector = s;
             }
 
             if (!ratios) {
                 // Yahoo quoteSummary fallback: covers all markets when crumb is available.
+                // summaryProfile module is included in MODULES so sector comes for free.
                 const qs = await fetchQuoteSummary(symbol);
                 ratios = {
                     trailingPE: qs.trailingPE, forwardPE: qs.forwardPE,
                     dividendYield: qs.dividendYield, priceToBook: qs.priceToBook,
                     marketCap: qs.marketCap,
                 };
+                if (shouldFetchSector && qs.sector != null) sector = qs.sector;
             }
 
-            await setCachedRatios(symbol, ratios);
-            result = { ...result, ...ratios };
+            await setCachedRatios(symbol, ratios, sector);
+            result = { ...result, ...ratios, sector };
             ratiosOk = true;
         } catch (error) {
             ratiosError = error instanceof Error ? error.message : 'ratios fetch failed';
         }
+    } else if (shouldFetchSector) {
+        // Ratios are already fresh but sector was never cached (stocks fetched before this
+        // feature landed). Fetch sector standalone so the UI can show it immediately.
+        try {
+            const s = await fetchYahooSector(symbol);
+            if (s != null) {
+                sector = s;
+                result = { ...result, sector };
+                await setCachedRatios(symbol, {
+                    trailingPE: result.trailingPE, forwardPE: result.forwardPE,
+                    dividendYield: result.dividendYield, priceToBook: result.priceToBook,
+                    marketCap: result.marketCap,
+                }, sector);
+            }
+        } catch { /* sector is non-fatal */ }
     }
 
     // Total failure (no price, no ratios, nothing cached) → surface the reason.
