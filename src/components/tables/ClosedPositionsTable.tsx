@@ -71,22 +71,22 @@ export const ClosedPositionsTable = ({
 
             {expanded && (
                 <div className="overflow-x-auto overscroll-none">
-                    <table className="w-full text-sm tabular-nums">
+                    <table className="w-full tabular-nums">
                         <thead>
                             <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                                <th className="text-left font-medium py-2 pr-3">Sold</th>
-                                <th className="text-left font-medium py-2 pr-3">Ticker</th>
-                                <th className="text-left font-medium py-2 pr-3">Name</th>
-                                <th className="text-left font-medium py-2 pr-3">Account</th>
-                                <th className="text-right font-medium py-2 pr-3">Qty</th>
-                                <th className="text-right font-medium py-2 pr-3">Cost/u</th>
-                                <th className="text-right font-medium py-2 pr-3">Sale/u</th>
-                                <th className="text-right font-medium py-2 pr-3">Cost</th>
-                                <th className="text-right font-medium py-2 pr-3">Proceeds</th>
-                                <th className="text-right font-medium py-2 pr-3">Realized P&amp;L</th>
-                                <th className="text-right font-medium py-2 pr-3">%</th>
-                                <th className="text-right font-medium py-2 pr-3">Total Dividends</th>
-                                <th className="text-left font-medium py-2 pr-3">Acquired</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Sold</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Ticker</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Name</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Account</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Qty</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Cost/u</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Sale/u</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Cost</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Proceeds</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Realized P&amp;L</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">%</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Total Dividends</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Acquired</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -97,33 +97,33 @@ export const ClosedPositionsTable = ({
                                 const isPos = realizedPnl >= 0;
                                 return (
                                     <tr key={i} style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                                        <td className="py-2 pr-3">{p.saleDate}</td>
-                                        <td className="py-2 pr-3" style={{ color: 'var(--text-primary)' }}>{String(p.ticker)}</td>
-                                        <td className="py-2 pr-3">{p.fullName}</td>
-                                        <td className="py-2 pr-3">{p.account}</td>
-                                        <td className="py-2 pr-3 text-right">
+                                        <td className="text-xs sm:text-sm py-2 pr-3">{p.saleDate}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3" style={{ color: 'var(--text-primary)' }}>{String(p.ticker)}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3">{p.fullName}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3">{p.account}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {showValues ? p.quantity.toLocaleString() : getHiddenValue(p.quantity)}
                                         </td>
-                                        <td className="py-2 pr-3 text-right">
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {showValues ? p.costPerUnit.toFixed(4) : getHiddenValue(p.costPerUnit)}
                                         </td>
-                                        <td className="py-2 pr-3 text-right">
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {showValues ? (p.salePricePerUnit ?? 0).toFixed(4) : getHiddenValue(p.salePricePerUnit ?? 0)}
                                         </td>
-                                        <td className="py-2 pr-3 text-right">{formatCurrencyValue(p.costInJPY, baseCurrency, showValues)}</td>
-                                        <td className="py-2 pr-3 text-right">{formatCurrencyValue(proceeds, baseCurrency, showValues)}</td>
-                                        <td className="py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(p.costInJPY, baseCurrency, showValues)}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(proceeds, baseCurrency, showValues)}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                                             {formatCurrencyValue(realizedPnl, baseCurrency, showValues)}
                                         </td>
-                                        <td className="py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                                             {showValues ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(2)}%` : getHiddenValue(realizedPct)}
                                         </td>
-                                        <td className="py-2 pr-3 text-right">
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {p.dividendIncomeJPY
                                                 ? formatCurrencyValue(p.dividendIncomeJPY, baseCurrency, showValues)
                                                 : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                                         </td>
-                                        <td className="py-2 pr-3">{p.transactionDate}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3">{p.transactionDate}</td>
                                     </tr>
                                 );
                             })}

@@ -166,7 +166,6 @@ body {
 /* ── Number formatting ─────────────────────────────────────── */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-geist-mono), monospace;
 }
 
 /* ── Opaque overlay surface (dropdowns, popovers) ──────────── */
