@@ -618,7 +618,7 @@ export function ScreenerTable({
                 </div>
             </div>
 
-            {/* Info panel — 3-column layout with vertical dividers */}
+            {/* Info panel — 4-column layout */}
             {infoOpen && (
                 <div className="rounded-xl px-4 py-3 text-xs flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
@@ -626,29 +626,28 @@ export function ScreenerTable({
                         <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>How it works</span>
                         <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)' }}><MdClose size={15} /></button>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0' }}>
                         {/* Col 1 — Metrics */}
                         <div className="flex flex-col gap-0.5" style={{ paddingRight: '1.25rem', borderRight: '1px solid var(--border)' }}>
                             <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Metrics</p>
-                            <span><strong>Price</strong> — live from Yahoo Finance</span>
-                            <span><strong>P/E</strong> — price ÷ last 12 months EPS</span>
-                            <span><strong>Fwd P/E</strong> — price ÷ next-year EPS forecast</span>
-                            <span><strong>P/B</strong> — price ÷ book value per share</span>
-                            <span><strong>Div %</strong> — annual dividend ÷ current price</span>
-                            <span><strong>Mkt Cap</strong> — shares × current price</span>
+                            <span><strong>Price</strong> — live, Yahoo Finance</span>
+                            <span><strong>P/E</strong> — price ÷ trailing EPS</span>
+                            <span><strong>Fwd P/E</strong> — price ÷ next-year EPS</span>
+                            <span><strong>P/B</strong> — price ÷ book value</span>
+                            <span><strong>Div %</strong> — annual dividend yield</span>
+                            <span><strong>Mkt Cap</strong> — shares × price</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Ratios sourced from J-Quants (JP tickers) or Yahoo Finance (all others). Earnings update quarterly — ratios may lag real-time sources by one quarter.
+                                JP ratios from J-Quants, others from Yahoo. Update quarterly.
                             </p>
                         </div>
-                        {/* Col 2 — Universe + Data refresh level */}
+                        {/* Col 2 — Universe + Dot legend */}
                         <div className="flex flex-col gap-3" style={{ padding: '0 1.25rem', borderRight: '1px solid var(--border)' }}>
                             <div>
                                 <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Universe</p>
-                                <p>The stock list comes from the BlackRock iShares ETF 1475 holdings file — <strong>names only</strong>, not market data. The date in the header is when that list was extracted, not when prices or ratios were fetched.</p>
+                                <p>BlackRock iShares 1475 ETF holdings — <strong>names only</strong>. Header date is the list snapshot, not data freshness.</p>
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Data refresh level</p>
-                                <p className="mb-2">Reflects the worst freshness across price and ratios — hover for exact ages.</p>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Row dot</p>
                                 <div className="flex flex-col gap-1">
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
@@ -660,35 +659,35 @@ export function ScreenerTable({
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--border-strong)', opacity: 0.45, display: 'inline-block' }} />
-                                        Not loaded yet
+                                        Not loaded
                                     </span>
                                 </div>
+                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Hover the dot for exact ages.</p>
                             </div>
                         </div>
-                        {/* Col 3 — Loading mechanism + Alerts */}
-                        <div className="flex flex-col gap-3" style={{ paddingLeft: '1.25rem' }}>
-                            <div className="flex flex-col gap-0.5">
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading mechanism</p>
-                                <span><strong>On open / page refresh</strong> — restores instantly from browser storage (localStorage); falls back to DB if not cached locally</span>
-                                <span><strong>Refresh page</strong> — fetches live data from Yahoo for the 50 visible rows (price + ratios)</span>
-                                <span><strong>Refresh all</strong> — same, but for all rows when "Show all" is active</span>
-                                <span><strong>⟳ per row</strong> — refreshes a single stock on demand</span>
-                                <span><strong>Loaded tab</strong> — shows all rows that have data, no pagination</span>
-                                <span><strong>Show all</strong> — renders the full list on one page</span>
-                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                    Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is always shown immediately — use Refresh page/all or ⟳ to get live values.
-                                </p>
-                            </div>
-                            <div className="flex flex-col gap-0.5" style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Price alerts</p>
-                                <span><strong>Bell icon</strong> — set an above and/or below threshold on any row</span>
-                                <span><strong>Polling</strong> — while this page is open, alerted stocks are re-fetched every hour</span>
-                                <span><strong>Notification</strong> — a browser notification fires the first time a threshold is crossed; edit the alert to reset it</span>
-                                <span><strong>Alerts tab</strong> — filters the table to only rows with an alert set</span>
-                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                    Checks only run while the screener tab is open. Browser notification permission is requested when you save your first alert.
-                                </p>
-                            </div>
+                        {/* Col 3 — Loading */}
+                        <div className="flex flex-col gap-0.5" style={{ padding: '0 1.25rem', borderRight: '1px solid var(--border)' }}>
+                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading</p>
+                            <span><strong>On open</strong> — restores from localStorage, falls back to DB</span>
+                            <span><strong>Refresh page</strong> — live Yahoo fetch for 50 visible rows</span>
+                            <span><strong>Refresh all</strong> — all rows in Show all mode</span>
+                            <span><strong>⟳ per row</strong> — single stock on demand</span>
+                            <span><strong>Loaded tab</strong> — rows with data, no pagination</span>
+                            <span><strong>Show all</strong> — full list, one page</span>
+                            <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                Prices expire after 24 h, ratios after 7 d. Stale data shows immediately.
+                            </p>
+                        </div>
+                        {/* Col 4 — Price alerts */}
+                        <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
+                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Price alerts</p>
+                            <span><strong>Bell icon</strong> — set above/below thresholds on any row</span>
+                            <span><strong>Polling</strong> — alerted stocks re-fetched every hour while page is open</span>
+                            <span><strong>Notification</strong> — browser push when threshold crossed; edit alert to reset</span>
+                            <span><strong>Alerts tab</strong> — filter to rows with an alert set</span>
+                            <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                Checks require this tab to be open. Permission requested on first save.
+                            </p>
                         </div>
                     </div>
                 </div>
