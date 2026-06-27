@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
-    MdHome, MdAccountBalance, MdTune,
+    MdHome, MdAccountBalance, MdSwapHoriz, MdAccountBalanceWallet,
     MdTrendingUp, MdSettings, MdManageSearch,
 } from 'react-icons/md';
 
@@ -67,13 +67,6 @@ export function MobileBottomNav({
                 <MdTrendingUp size={20} /><span>Analysis</span>
             </button>
             <button
-                onClick={() => activePage === 'screener' ? handleCurrentPage() : router.push('/screener')}
-                className={BTN}
-                style={c(noSettings && activePage === 'screener')}
-            >
-                <MdManageSearch size={20} /><span>Screener</span>
-            </button>
-            <button
                 onClick={() => goHomeView('assets')}
                 className={BTN}
                 style={c(noSettings && activePage === 'home' && activeView === 'assets')}
@@ -81,11 +74,21 @@ export function MobileBottomNav({
                 <MdAccountBalance size={20} /><span>Assets</span>
             </button>
             <button
+                onClick={() => activePage === 'screener' ? handleCurrentPage() : router.push('/screener')}
+                className={BTN}
+                style={c(noSettings && activePage === 'screener')}
+            >
+                <MdManageSearch size={20} /><span>Screener</span>
+            </button>
+            <button
                 onClick={() => goHomeView('data')}
                 className={BTN}
                 style={c(noSettings && activePage === 'home' && activeView === 'data')}
             >
-                <MdTune size={20} /><span>Data</span>
+                <span className="inline-flex items-center" style={{ gap: 1 }}>
+                    <MdAccountBalanceWallet size={20} />
+                    <MdSwapHoriz size={15} />
+                </span><span>Portfolios</span>
             </button>
             <button
                 onClick={onSettingsToggle}

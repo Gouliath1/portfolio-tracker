@@ -439,8 +439,17 @@ export default function Home() {
                             {/* Assets: open + closed positions in one place, toggled */}
                             {!loading && portfolioSummary && activeView === 'assets' && (
                                 <div className="flex-1 min-h-0 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
-                                        {/* Open / Closed toggle */}
+                                    {/* Title row */}
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                        <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
+                                            Assets
+                                        </h1>
+                                        <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+                                            Open and closed positions · {(portfolioSummary.positions.length + portfolioSummary.closedPositions.length).toLocaleString()} total
+                                        </span>
+                                    </div>
+                                    {/* Open / Closed strip */}
+                                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                                         <div className="inline-flex rounded-lg p-0.5 text-sm font-medium"
                                             style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                                             {([
@@ -460,14 +469,16 @@ export default function Home() {
                                             ))}
                                         </div>
                                         {assetsTab === 'open' && (
-                                            <button
-                                                onClick={() => setAddPositionOpen(true)}
-                                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0"
-                                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                                            >
-                                                <MdAdd size={15} />
-                                                Add position
-                                            </button>
+                                            <div className="ml-auto">
+                                                <button
+                                                    onClick={() => setAddPositionOpen(true)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                                                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                                >
+                                                    <MdAdd size={15} />
+                                                    Add position
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <div className="flex-1 min-h-0 overflow-auto">

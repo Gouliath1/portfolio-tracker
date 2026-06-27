@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
-    MdHome, MdAccountBalance, MdTune,
+    MdHome, MdAccountBalance, MdSwapHoriz,
     MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
 } from 'react-icons/md';
 
@@ -21,11 +21,18 @@ interface AppSidebarProps {
     activeSetName?: string;
 }
 
+const PortfoliosIcon = ({ size = 17 }: { size?: number }) => (
+    <span className="inline-flex items-center" style={{ gap: 1 }}>
+        <MdAccountBalanceWallet size={size} />
+        <MdSwapHoriz size={Math.round(size * 0.75)} />
+    </span>
+);
+
 const OVERVIEW_ITEM = { id: 'overview' as const, label: 'Overview', icon: MdHome };
-// Assets and Data sit after the Analysis link; Data is last as a utility view.
+const ASSETS_ITEM = { id: 'assets' as const, label: 'Assets', icon: MdAccountBalance };
+// Data is last as a utility view.
 const VIEW_ITEMS: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: 'assets', label: 'Assets', icon: MdAccountBalance },
-    { id: 'data',   label: 'Data',   icon: MdTune },
+    { id: 'data', label: 'Portfolios', icon: PortfoliosIcon },
 ];
 
 const activeStyle  = { background: 'var(--accent-dim)', color: 'var(--accent)' } as const;
@@ -77,7 +84,7 @@ export function AppSidebar({
                 </div>
             )}
 
-            {/* Nav — Overview · Analysis · Assets · Data */}
+            {/* Nav — Overview · Analysis · Assets · Screener · Data */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">
                 {(() => {
                     const viewButton = ({ id, label, icon: Icon }: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }) => {
@@ -114,6 +121,8 @@ export function AppSidebar({
                                     Analysis
                                 </button>
                             )}
+
+                            {viewButton(ASSETS_ITEM)}
 
                             {/* Screener — separate page for researching stocks before buying */}
                             {activePage === 'screener' ? (

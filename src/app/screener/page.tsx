@@ -22,6 +22,7 @@ const STORAGE_KEY = 'screener:state';
 
 interface ScreenerState {
     index: string;
+    indexLoaded: boolean;
     added: IndexConstituent[];
     pinned: string[];
     alerts: Record<string, PriceAlert>;
@@ -77,6 +78,7 @@ export default function ScreenerPage() {
 
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [indexKey, setIndexKey] = useState('topix');
+    const [indexLoaded, setIndexLoaded] = useState(true);
     const [added, setAdded] = useState<IndexConstituent[]>([]);
     const [pinned, setPinned] = useState<string[]>([]);
     const [alerts, setAlerts] = useState<Record<string, PriceAlert>>({});
@@ -92,6 +94,7 @@ export default function ScreenerPage() {
             if (raw) {
                 const parsed = JSON.parse(raw) as Partial<ScreenerState>;
                 if (parsed.index && INDICES[parsed.index]) setIndexKey(parsed.index);
+                if (typeof parsed.indexLoaded === 'boolean') setIndexLoaded(parsed.indexLoaded);
                 if (Array.isArray(parsed.added)) setAdded(parsed.added);
                 if (Array.isArray(parsed.pinned)) setPinned(parsed.pinned);
                 if (parsed.alerts && typeof parsed.alerts === 'object') setAlerts(parsed.alerts);
@@ -102,17 +105,19 @@ export default function ScreenerPage() {
 
     useEffect(() => {
         if (!loaded) return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: indexKey, added, pinned, alerts }));
-    }, [loaded, indexKey, added, pinned, alerts]);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: indexKey, indexLoaded, added, pinned, alerts }));
+    }, [loaded, indexKey, indexLoaded, added, pinned, alerts]);
 
     const file = INDICES[indexKey];
     const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
 
     const { allRows, addedSymbols } = useMemo(() => {
         const addedSet = new Set(added.map(a => a.symbol));
-        const merged = [...added, ...file.constituents.filter(c => !addedSet.has(c.symbol))];
+        const merged = indexLoaded
+            ? [...added, ...file.constituents.filter(c => !addedSet.has(c.symbol))]
+            : [...added];
         return { allRows: merged, addedSymbols: addedSet };
-    }, [added, file]);
+    }, [added, file, indexLoaded]);
 
     const handleAdd = useCallback((c: IndexConstituent) => {
         setAdded(prev => (prev.some(p => p.symbol === c.symbol) ? prev : [c, ...prev]));
@@ -159,33 +164,36 @@ export default function ScreenerPage() {
                     <div className="max-w-screen-xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5 pb-4 h-full flex flex-col gap-3">
 
                         {/* Title row — no separate sticky header */}
-                        <div className="flex items-center justify-between gap-3 flex-shrink-0">
-                            <div className="flex items-baseline gap-2 min-w-0">
-                                <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
-                                    {file.index}
-                                </h1>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                            <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
+                                {file.index}
+                            </h1>
+                            {indexLoaded && (
                                 <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
                                     Constituent names · {file.source}{file.asOf ? ` · list snapshot ${file.asOf}` : ''}
                                 </span>
-                            </div>
-                            <AddMenu
-                                indices={INDICES}
-                                currentIndexKey={indexKey}
-                                onLoadIndex={setIndexKey}
-                                onAddTicker={handleAdd}
-                                onAddMany={handleAddMany}
-                            />
+                            )}
                         </div>
 
                         {/* Universe strip */}
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                             <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Universe:</span>
-                            <span
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
-                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
-                            >
-                                {file.index} · {file.count.toLocaleString()}
-                            </span>
+                            {indexLoaded && (
+                                <span
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                >
+                                    {file.index} · {file.count.toLocaleString()}
+                                    <button
+                                        onClick={() => setIndexLoaded(false)}
+                                        className="hover:opacity-70 leading-none"
+                                        style={{ color: 'var(--accent)', opacity: 0.6 }}
+                                        title={`Remove ${file.index} universe`}
+                                    >
+                                        <MdClose size={11} />
+                                    </button>
+                                </span>
+                            )}
                             {visibleAdded.map(c => (
                                 <span
                                     key={c.symbol}
@@ -206,9 +214,15 @@ export default function ScreenerPage() {
                             {overflowAdded.length > 0 && (
                                 <OverflowPill added={overflowAdded} onRemove={handleRemove} />
                             )}
-                            <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
-                                {allRows.length.toLocaleString()} names
-                            </span>
+                            <div className="ml-auto">
+                                <AddMenu
+                                    indices={INDICES}
+                                    currentIndexKey={indexLoaded ? indexKey : null}
+                                    onLoadIndex={key => { setIndexKey(key); setIndexLoaded(true); }}
+                                    onAddTicker={handleAdd}
+                                    onAddMany={handleAddMany}
+                                />
+                            </div>
                         </div>
 
                         {/* Table — fills remaining height */}
