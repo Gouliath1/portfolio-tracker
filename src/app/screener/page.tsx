@@ -12,6 +12,8 @@ import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
 import { useAlertPoller } from '../../hooks/useAlertPoller';
 import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
+import AddPositionModal from '../../components/management/AddPositionModal';
+import { getActiveSetId } from '../../utils/localPositions';
 import topix from '../../data/indices/topix.json';
 import type { IndexConstituent, IndexConstituentsFile, PriceAlert } from '../../types/screener';
 
@@ -105,6 +107,7 @@ export default function ScreenerPage() {
     const [alertTarget, setAlertTarget] = useState<IndexConstituent | null>(null);
     const [chartTarget, setChartTarget] = useState<IndexConstituent | null>(null);
     const [chartCurrency, setChartCurrency] = useState<string | null>(null);
+    const [buyTarget, setBuyTarget] = useState<IndexConstituent | null>(null);
 
     useEffect(() => {
         try {
@@ -163,6 +166,7 @@ export default function ScreenerPage() {
     useAlertPoller(alerts);
 
     const handleEditAlert = useCallback((c: IndexConstituent) => setAlertTarget(c), []);
+    const handleBuy = useCallback((c: IndexConstituent) => setBuyTarget(c), []);
     const handleOpenChart = useCallback((c: IndexConstituent, cur: string | null) => {
         setChartTarget(c);
         setChartCurrency(cur);
@@ -266,6 +270,7 @@ export default function ScreenerPage() {
                                 alerts={alerts}
                                 onEditAlert={handleEditAlert}
                                 onOpenChart={handleOpenChart}
+                                onBuy={handleBuy}
                             />
                         </div>
 
@@ -281,6 +286,16 @@ export default function ScreenerPage() {
                     onSave={saveAlert}
                     onClear={clearAlert}
                     onClose={() => setAlertTarget(null)}
+                />
+            )}
+
+            {buyTarget && (
+                <AddPositionModal
+                    setId={getActiveSetId()}
+                    initialTicker={buyTarget.symbol}
+                    initialName={buyTarget.name}
+                    onSaved={() => setBuyTarget(null)}
+                    onClose={() => setBuyTarget(null)}
                 />
             )}
 

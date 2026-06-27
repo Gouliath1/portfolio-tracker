@@ -11,6 +11,8 @@ interface AddPositionModalProps {
     setId: string;
     onSaved: () => void;
     onClose: () => void;
+    initialTicker?: string;
+    initialName?: string;
 }
 
 const CURRENCIES = ['USD', 'JPY', 'EUR', 'GBP', 'HKD', 'SGD', 'AUD', 'CAD', 'CHF', 'CNY', 'KRW'];
@@ -89,10 +91,15 @@ function useKnownValues(setId: string) {
     return { brokers, accounts };
 }
 
-export default function AddPositionModal({ setId, onSaved, onClose }: AddPositionModalProps) {
-    const [form, setForm] = useState<FormState>({ ...EMPTY, transactionDate: todayIso() });
+export default function AddPositionModal({ setId, onSaved, onClose, initialTicker, initialName }: AddPositionModalProps) {
+    const [form, setForm] = useState<FormState>({
+        ...EMPTY,
+        transactionDate: todayIso(),
+        ticker: initialTicker ?? '',
+        fullName: initialName ?? '',
+    });
     const [error, setError] = useState<string | null>(null);
-    const [nameOverridden, setNameOverridden] = useState(false);
+    const [nameOverridden, setNameOverridden] = useState(!!initialName);
 
     const { brokers, accounts } = useKnownValues(setId);
 
