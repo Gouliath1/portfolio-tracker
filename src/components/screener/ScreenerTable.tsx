@@ -16,7 +16,7 @@ import {
 import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
     MdStar, MdStarBorder, MdNotificationsActive, MdNotificationsNone,
-    MdShowChart, MdInfoOutline, MdDownload, MdFilterList, MdExpandMore, MdCheck,
+    MdShowChart, MdInfoOutline, MdDownload, MdFilterList, MdExpandMore, MdCheck, MdAddShoppingCart,
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
@@ -71,11 +71,12 @@ interface ScreenerTableProps {
     alerts: Record<string, PriceAlert>;
     onEditAlert: (c: IndexConstituent) => void;
     onOpenChart: (c: IndexConstituent, currency: string | null) => void;
+    onBuy?: (c: IndexConstituent) => void;
 }
 
 export function ScreenerTable({
     constituents, onRemove, removableSymbols,
-    pinnedSymbols, onTogglePin, alerts, onEditAlert, onOpenChart,
+    pinnedSymbols, onTogglePin, alerts, onEditAlert, onOpenChart, onBuy,
 }: ScreenerTableProps) {
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
@@ -339,7 +340,7 @@ export function ScreenerTable({
                     d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap)}</span>, true),
             }),
             columnHelper.display({
-                id: 'actions', header: 'Actions', size: 88, minSize: 80, maxSize: 88, enableResizing: false,
+                id: 'actions', header: 'Actions', size: 110, minSize: 96, maxSize: 110, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
@@ -371,12 +372,19 @@ export function ScreenerTable({
                                 style={{ color: 'var(--text-secondary)' }} title="Refresh data">
                                 <MdRefresh size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
+                            {onBuy && (
+                                <button onClick={stop(() => onBuy(c))}
+                                    className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
+                                    style={{ color: 'var(--pnl-green)' }} title="Buy — add to portfolio">
+                                    <MdAddShoppingCart size={15} />
+                                </button>
+                            )}
                         </div>
                     );
                 },
             }),
         ];
-    }, [onRemove, removableSymbols, onTogglePin, onEditAlert]);
+    }, [onRemove, removableSymbols, onTogglePin, onEditAlert, onBuy]);
 
     const columnVisibility = useMemo(() => ({
         remove: (removableSymbols?.size ?? 0) > 0,
