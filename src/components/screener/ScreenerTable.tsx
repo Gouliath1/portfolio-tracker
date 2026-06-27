@@ -665,18 +665,30 @@ export function ScreenerTable({
                                 </div>
                             </div>
                         </div>
-                        {/* Col 3 — Loading mechanism */}
-                        <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
-                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading mechanism</p>
-                            <span><strong>On open / page refresh</strong> — restores instantly from browser storage (localStorage); falls back to DB if not cached locally</span>
-                            <span><strong>Refresh page</strong> — fetches live data from Yahoo for the 50 visible rows (price + ratios)</span>
-                            <span><strong>Refresh all</strong> — same, but for all rows when "Show all" is active</span>
-                            <span><strong>⟳ per row</strong> — refreshes a single stock on demand</span>
-                            <span><strong>Loaded tab</strong> — shows all rows that have data, no pagination</span>
-                            <span><strong>Show all</strong> — renders the full list on one page</span>
-                            <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is always shown immediately — use Refresh page/all or ⟳ to get live values.
-                            </p>
+                        {/* Col 3 — Loading mechanism + Alerts */}
+                        <div className="flex flex-col gap-3" style={{ paddingLeft: '1.25rem' }}>
+                            <div className="flex flex-col gap-0.5">
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading mechanism</p>
+                                <span><strong>On open / page refresh</strong> — restores instantly from browser storage (localStorage); falls back to DB if not cached locally</span>
+                                <span><strong>Refresh page</strong> — fetches live data from Yahoo for the 50 visible rows (price + ratios)</span>
+                                <span><strong>Refresh all</strong> — same, but for all rows when "Show all" is active</span>
+                                <span><strong>⟳ per row</strong> — refreshes a single stock on demand</span>
+                                <span><strong>Loaded tab</strong> — shows all rows that have data, no pagination</span>
+                                <span><strong>Show all</strong> — renders the full list on one page</span>
+                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                    Cache policy: prices refresh after 24 h, ratios after 7 days. Stale data is always shown immediately — use Refresh page/all or ⟳ to get live values.
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-0.5" style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Price alerts</p>
+                                <span><strong>Bell icon</strong> — set an above and/or below threshold on any row</span>
+                                <span><strong>Polling</strong> — while this page is open, alerted stocks are re-fetched every hour</span>
+                                <span><strong>Notification</strong> — a browser notification fires the first time a threshold is crossed; edit the alert to reset it</span>
+                                <span><strong>Alerts tab</strong> — filters the table to only rows with an alert set</span>
+                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                    Checks only run while the screener tab is open. Browser notification permission is requested when you save your first alert.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
