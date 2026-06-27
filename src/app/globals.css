@@ -18,10 +18,10 @@
   --accent-dim:       oklch(52% 0.22 275 / 0.12);
   --accent-glow:      oklch(52% 0.22 275 / 0.28);
 
-  --pnl-green:        oklch(50% 0.19 158);
-  --pnl-green-dim:    oklch(50% 0.19 158 / 0.08);
-  --pnl-red:          oklch(48% 0.19 22);
-  --pnl-red-dim:      oklch(48% 0.19 22 / 0.14);
+  --pnl-green:        oklch(54% 0.16 158);
+  --pnl-green-dim:    oklch(54% 0.16 158 / 0.09);
+  --pnl-red:          oklch(47% 0.16 16);
+  --pnl-red-dim:      oklch(47% 0.16 16 / 0.11);
 
   --text-primary:     oklch(16% 0.010 275);
   --text-secondary:   oklch(40% 0.010 275);
@@ -66,10 +66,10 @@
   --accent-dim:       oklch(68% 0.24 275 / 0.15);
   --accent-glow:      oklch(68% 0.24 275 / 0.35);
 
-  --pnl-green:        oklch(66% 0.19 158);
-  --pnl-green-dim:    oklch(66% 0.19 158 / 0.12);
-  --pnl-red:          oklch(64% 0.19 22);
-  --pnl-red-dim:      oklch(64% 0.19 22 / 0.18);
+  --pnl-green:        oklch(63% 0.14 158);
+  --pnl-green-dim:    oklch(63% 0.14 158 / 0.11);
+  --pnl-red:          oklch(64% 0.16 16);
+  --pnl-red-dim:      oklch(64% 0.16 16 / 0.16);
 
   --text-primary:     oklch(94% 0.006 275);
   --text-secondary:   oklch(65% 0.008 275);

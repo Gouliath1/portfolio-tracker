@@ -8,7 +8,7 @@ interface TableContentProps {
 
 export const TableContent: React.FC<TableContentProps> = ({ table }) => {
     return (
-        <div className="overflow-auto overscroll-none rounded-xl max-h-[calc(100vh-320px)]">
+        <div className="overflow-auto overscroll-none rounded-xl h-full">
             <table
                 className="min-w-full table-fixed data-table"
                 style={{ width: table.getCenterTotalSize() }}

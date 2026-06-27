@@ -285,7 +285,7 @@ export default function Home() {
 
     return (
         <>
-            <div className="flex min-h-screen" style={{ background: 'var(--bg-base)' }}>
+            <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
                 <AppSidebar
                     activePage="home"
@@ -297,11 +297,11 @@ export default function Home() {
                 />
 
                 {/* ── Content column ───────────────────────────────── */}
-                <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
+                <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
 
                     {/* ── Main content ─────────────────────────────── */}
-                    <main className="flex-1 pb-20 md:pb-0">
-                        <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+                    <main className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden flex flex-col">
+                        <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
 
                             {/* Portfolio controls — portfolio name shown only on mobile (sidebar has it on desktop) */}
                             <div className="flex items-center gap-3 flex-shrink-0">
@@ -360,11 +360,11 @@ export default function Home() {
                                 </div>
                             </div>
 
-                            <DemoBanner refreshTrigger={demoBannerRefresh} />
+                            <div className="flex-shrink-0"><DemoBanner refreshTrigger={demoBannerRefresh} /></div>
 
                             {/* Loading state (overview renders chrome immediately; other views show spinner) */}
                             {loading && activeView !== 'overview' && (
-                                <div className="flex items-center justify-center py-24">
+                                <div className="flex-1 min-h-0 flex items-center justify-center">
                                     <div className="text-center space-y-4">
                                         <div className="w-8 h-8 rounded-full border-2 border-t-transparent mx-auto animate-spin"
                                             style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
@@ -375,7 +375,7 @@ export default function Home() {
 
                             {/* Error state */}
                             {!loading && error && (
-                                <div className="flex items-center justify-center py-24 px-8">
+                                <div className="flex-1 min-h-0 flex items-center justify-center px-8">
                                     <div className="rounded-xl p-8 max-w-md text-center space-y-3"
                                         style={{ background: 'var(--surface)', border: '1px solid var(--pnl-red)' }}>
                                         <p className="font-semibold" style={{ color: 'var(--pnl-red)' }}>Error</p>
@@ -386,7 +386,8 @@ export default function Home() {
 
                             {/* Overview: KPIs render immediately with placeholder; chart waits for data */}
                             {activeView === 'overview' && (
-                                <>
+                                <div className="flex-1 min-h-0 overflow-y-auto">
+                                <div className="space-y-4 sm:space-y-6">
                                     {!loading && portfolioSummary && (
                                         <AssetClassFilter
                                             present={presentClasses}
@@ -431,13 +432,14 @@ export default function Home() {
                                             </div>
                                         </>
                                     )}
-                                </>
+                                </div>
+                                </div>
                             )}
 
                             {/* Assets: open + closed positions in one place, toggled */}
                             {!loading && portfolioSummary && activeView === 'assets' && (
-                                <>
-                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex-1 min-h-0 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
                                         {/* Open / Closed toggle */}
                                         <div className="inline-flex rounded-lg p-0.5 text-sm font-medium"
                                             style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
@@ -468,29 +470,32 @@ export default function Home() {
                                             </button>
                                         )}
                                     </div>
-                                    {assetsTab === 'open' ? (
-                                        <PositionsTable
-                                            positions={portfolioSummary.positions}
-                                            showValues={showValues}
-                                            baseCurrency={currency}
-                                            onDeletePosition={handleDeletePosition}
-                                            onSellPosition={handleSellPosition}
-                                        />
-                                    ) : (
-                                        <ClosedPositionsTable
-                                            positions={portfolioSummary.closedPositions}
-                                            showValues={showValues}
-                                            baseCurrency={currency}
-                                            realizedPnlJPY={portfolioSummary.realizedPnlJPY}
-                                            realizedCostJPY={portfolioSummary.realizedCostJPY}
-                                            realizedPnlPercentage={portfolioSummary.realizedPnlPercentage}
-                                        />
-                                    )}
-                                </>
+                                    <div className="flex-1 min-h-0 overflow-auto">
+                                        {assetsTab === 'open' ? (
+                                            <PositionsTable
+                                                positions={portfolioSummary.positions}
+                                                showValues={showValues}
+                                                baseCurrency={currency}
+                                                onDeletePosition={handleDeletePosition}
+                                                onSellPosition={handleSellPosition}
+                                            />
+                                        ) : (
+                                            <ClosedPositionsTable
+                                                positions={portfolioSummary.closedPositions}
+                                                showValues={showValues}
+                                                baseCurrency={currency}
+                                                realizedPnlJPY={portfolioSummary.realizedPnlJPY}
+                                                realizedCostJPY={portfolioSummary.realizedCostJPY}
+                                                realizedPnlPercentage={portfolioSummary.realizedPnlPercentage}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
                             )}
 
                             {/* Data: portfolio management */}
                             {!loading && portfolioSummary && activeView === 'data' && (
+                                <div className="flex-1 min-h-0 overflow-y-auto">
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
@@ -513,6 +518,7 @@ export default function Home() {
                                         onPositionSetChanged={handlePositionSetChanged}
                                         refreshTrigger={demoBannerRefresh}
                                     />
+                                </div>
                                 </div>
                             )}
                         </div>

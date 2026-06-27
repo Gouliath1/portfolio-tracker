@@ -1,8 +1,7 @@
 /**
  * Per-symbol screener data, sourced in two tiers (see project_screener_flow):
  *   - Price / name / currency  → no-auth Yahoo chart endpoint (reliable, always tried)
- *   - PE / Fwd PE / div / P/B / mkt cap → Twelve Data /statistics (primary) or
- *     Yahoo quoteSummary fallback when TWELVE_DATA_API_KEY is not set.
+ *   - PE / Fwd PE / div / P/B / mkt cap → Yahoo quoteSummary (JP: J-Quants primary)
  *
  * Each tier has its own freshness in the DB cache. The response carries
  * `ratiosPending` so the UI can show price now and "…" for the ratios.
@@ -12,7 +11,6 @@
 
 import { NextResponse } from 'next/server';
 import { fetchChartMeta } from '@portfolio/core';
-import { fetchTwelveDataRatios } from '../../../../lib/server/twelveDataApi';
 import { fetchJQuantsRatios } from '../../../../lib/server/jquantsApi';
 import { fetchQuoteSummary, fetchYahooSector } from '../../../../lib/server/yahooAuth';
 import { getCachedFundamentals, setCachedPriceInfo, setCachedRatios } from '../../../../lib/server/marketDataDb';
@@ -76,13 +74,11 @@ export async function GET(request: Request) {
         }
     }
 
-    // Tier 2 — valuation ratios + sector. Provider routing by ticker type:
-    //   JP (.T)  → J-Quants (ratios) + Yahoo summaryProfile (sector) in parallel
-    //   US       → Twelve Data (ratios) + Yahoo summaryProfile (sector) in parallel
-    //   Fallback → Yahoo quoteSummary (ratios AND sector, single call)
+    // Tier 2 — valuation ratios + sector.
+    //   JP (.T) with J-Quants → J-Quants (ratios) + Yahoo summaryProfile (sector) in parallel
+    //   All others            → Yahoo quoteSummary (ratios AND sector, single call)
     // Skipped entirely for price-only (bulk) loads.
     const isJpTicker = symbol.toUpperCase().endsWith('.T');
-    const isUsTicker = !symbol.includes('.');
     // Sector: fetch whenever it's missing from cache (doesn't expire like ratios).
     let sector: string | null = result.sector ?? null;
     const shouldFetchSector = !priceOnly && sector == null;
@@ -93,19 +89,14 @@ export async function GET(request: Request) {
 
             const hasJQuants = process.env.JQUANTS_API_KEY || (process.env.JQUANTS_EMAIL && process.env.JQUANTS_PASSWORD);
             if (isJpTicker && hasJQuants) {
-                const [r, s] = await Promise.all([
-                    fetchJQuantsRatios(symbol, result.price),
-                    shouldFetchSector ? fetchYahooSector(symbol).catch(() => null) : Promise.resolve(null),
-                ]);
-                ratios = r;
-                if (s != null) sector = s;
-            } else if (isUsTicker && process.env.TWELVE_DATA_API_KEY) {
-                const [r, s] = await Promise.all([
-                    fetchTwelveDataRatios(symbol),
-                    shouldFetchSector ? fetchYahooSector(symbol).catch(() => null) : Promise.resolve(null),
-                ]);
-                ratios = r;
-                if (s != null) sector = s;
+                try {
+                    const [r, s] = await Promise.all([
+                        fetchJQuantsRatios(symbol, result.price),
+                        shouldFetchSector ? fetchYahooSector(symbol).catch(() => null) : Promise.resolve(null),
+                    ]);
+                    ratios = r;
+                    if (s != null) sector = s;
+                } catch { /* fall through to Yahoo */ }
             }
 
             if (!ratios) {
