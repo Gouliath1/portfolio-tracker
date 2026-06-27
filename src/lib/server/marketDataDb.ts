@@ -127,14 +127,19 @@ async function ensureInit(): Promise<boolean> {
                     dividend_yield REAL,
                     price_to_book REAL,
                     market_cap REAL,
+                    sector TEXT,
                     fetched_at TEXT NOT NULL,
                     ratios_fetched_at TEXT
                 )
             `);
-            // Existing DBs predate ratios_fetched_at — add it if missing.
+            // Migrate existing DBs: add columns introduced after the initial schema.
             const fcols = await c.execute('PRAGMA table_info(security_fundamentals)');
-            if (!fcols.rows.some(r => String(r.name) === 'ratios_fetched_at')) {
+            const colNames = fcols.rows.map(r => String(r.name));
+            if (!colNames.includes('ratios_fetched_at')) {
                 await c.execute('ALTER TABLE security_fundamentals ADD COLUMN ratios_fetched_at TEXT');
+            }
+            if (!colNames.includes('sector')) {
+                await c.execute('ALTER TABLE security_fundamentals ADD COLUMN sector TEXT');
             }
             // Persisted Yahoo cookie+crumb (single row) so the rare successful
             // acquisition survives restarts and is reused for hours.
@@ -318,6 +323,7 @@ async function loadFundamentalsForTicker(ticker: string): Promise<void> {
                     dividendYield: num(row.dividend_yield),
                     priceToBook: num(row.price_to_book),
                     marketCap: num(row.market_cap),
+                    sector: (row.sector as string) ?? null,
                 },
             });
         }
@@ -374,6 +380,7 @@ export async function getCachedFundamentalsBatch(
                             dividendYield: num(row.dividend_yield),
                             priceToBook: num(row.price_to_book),
                             marketCap: num(row.market_cap),
+                            sector: (row.sector as string) ?? null,
                         },
                     };
                     _memFundamentals.set(ticker, entry);
@@ -407,6 +414,7 @@ function mergeMem(ticker: string, patch: Partial<StockFundamentals>, stamp: { pr
     const base: StockFundamentals = prev?.data ?? {
         symbol: ticker, name: null, price: null, currency: null,
         trailingPE: null, forwardPE: null, dividendYield: null, priceToBook: null, marketCap: null,
+        sector: null,
     };
     _memFundamentals.set(ticker, {
         data: { ...base, ...patch, symbol: ticker },
@@ -437,23 +445,24 @@ export async function setCachedPriceInfo(ticker: string, info: PriceInfo): Promi
     }
 }
 
-/** Upsert valuation ratios, stamping ratios_fetched_at. */
-export async function setCachedRatios(ticker: string, info: RatioInfo): Promise<void> {
+/** Upsert valuation ratios (and optionally sector), stamping ratios_fetched_at. */
+export async function setCachedRatios(ticker: string, info: RatioInfo, sector?: string | null): Promise<void> {
     const now = new Date().toISOString();
-    mergeMem(ticker, info, { ratios: now });
+    mergeMem(ticker, { ...info, sector: sector ?? undefined }, { ratios: now });
     if (!(await ensureInit())) return;
     const c = getClient();
     if (!c) return;
     try {
-        // Ensure a row exists (price may not have been written first), then update ratios.
         await c.execute({
-            sql: `INSERT INTO security_fundamentals (ticker, fetched_at, trailing_pe, forward_pe, dividend_yield, price_to_book, market_cap, ratios_fetched_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            sql: `INSERT INTO security_fundamentals (ticker, fetched_at, trailing_pe, forward_pe, dividend_yield, price_to_book, market_cap, sector, ratios_fetched_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                   ON CONFLICT (ticker) DO UPDATE SET
                     trailing_pe = excluded.trailing_pe, forward_pe = excluded.forward_pe,
                     dividend_yield = excluded.dividend_yield, price_to_book = excluded.price_to_book,
-                    market_cap = excluded.market_cap, ratios_fetched_at = excluded.ratios_fetched_at`,
-            args: [ticker, now, info.trailingPE, info.forwardPE, info.dividendYield, info.priceToBook, info.marketCap, now],
+                    market_cap = excluded.market_cap,
+                    sector = COALESCE(excluded.sector, security_fundamentals.sector),
+                    ratios_fetched_at = excluded.ratios_fetched_at`,
+            args: [ticker, now, info.trailingPE, info.forwardPE, info.dividendYield, info.priceToBook, info.marketCap, sector ?? null, now],
         });
     } catch (err) {
         console.warn(`[marketDataDb] Write ratios failed for ${ticker}:`, err);

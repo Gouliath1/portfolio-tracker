@@ -124,7 +124,7 @@ function raw(node: any): number | null {
     return typeof node.raw === 'number' ? node.raw : null;
 }
 
-const MODULES = 'summaryDetail,defaultKeyStatistics,price';
+const MODULES = 'summaryDetail,defaultKeyStatistics,price,summaryProfile';
 
 /**
  * Fetch and normalize fundamentals for one symbol. Returns null on hard
@@ -157,6 +157,7 @@ export async function fetchQuoteSummary(symbol: string): Promise<StockFundamenta
         const sd = result.summaryDetail ?? {};
         const ks = result.defaultKeyStatistics ?? {};
         const pr = result.price ?? {};
+        const sp = result.summaryProfile ?? {};
 
         return {
             symbol,
@@ -169,6 +170,35 @@ export async function fetchQuoteSummary(symbol: string): Promise<StockFundamenta
             dividendYield: raw(sd.dividendYield) ?? raw(sd.trailingAnnualDividendYield),
             priceToBook: raw(ks.priceToBook),
             marketCap: raw(sd.marketCap) ?? raw(pr.marketCap),
+            sector: typeof sp.sector === 'string' ? sp.sector : null,
         };
+    });
+}
+
+/**
+ * Lightweight variant — fetches only the summaryProfile module to get sector.
+ * Used when ratios come from a different provider (Twelve Data, J-Quants) so we
+ * avoid a redundant full quoteSummary call. Returns null on any failure so the
+ * caller can treat missing sector as non-fatal.
+ */
+export async function fetchYahooSector(symbol: string): Promise<string | null> {
+    const call = async (auth: Auth): Promise<Response> => {
+        const url =
+            `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}` +
+            `?modules=summaryProfile&crumb=${encodeURIComponent(auth.crumb)}`;
+        return fetch(url, { headers: { 'User-Agent': UA, Cookie: auth.cookie } });
+    };
+
+    return serialized(async () => {
+        let auth = await getAuth();
+        let res = await call(auth);
+        if (res.status === 401) {
+            auth = await getAuth(true);
+            res = await call(auth);
+        }
+        if (!res.ok) return null;
+        const data = await res.json();
+        const sp = data?.quoteSummary?.result?.[0]?.summaryProfile ?? {};
+        return typeof sp.sector === 'string' ? sp.sector : null;
     });
 }

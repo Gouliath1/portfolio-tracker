@@ -15,6 +15,9 @@ export interface FundamentalsApi {
     refresh: (symbol: string) => void;
     loadMany: (symbols: string[]) => void;
     loadCached: (symbols: string[]) => void;
+    /** Silently re-fetch symbols that have existing data but are missing sector.
+     *  Does NOT set loading state so the existing price/ratio data stays visible. */
+    backfillSector: (symbols: string[]) => void;
     progress: LoadProgress | null;
 }
 
@@ -205,5 +208,15 @@ export function useScreenerFundamentals(): FundamentalsApi {
         })();
     }, [setEntry]);
 
-    return { map, refresh, loadMany, loadCached, progress };
+    const backfillSector = useCallback((symbols: string[]) => {
+        if (symbols.length === 0) return;
+        // Fetch without touching the existing map entry so the UI keeps showing
+        // current price/ratio data while sector is resolved in the background.
+        symbols.forEach(s => {
+            requested.current.add(s);
+            void fetchOne(s); // no opts.fresh — server will use cached price/ratios, only fetch sector
+        });
+    }, [fetchOne]);
+
+    return { map, refresh, loadMany, loadCached, backfillSector, progress };
 }

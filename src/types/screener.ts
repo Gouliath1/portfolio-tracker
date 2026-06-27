@@ -46,4 +46,5 @@ export interface StockFundamentals {
     dividendYield: number | null;
     priceToBook: number | null;
     marketCap: number | null;
+    sector: string | null;
 }
