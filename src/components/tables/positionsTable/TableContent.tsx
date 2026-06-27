@@ -71,7 +71,6 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                         <tr
                             key={row.id}
                             className="group"
-                            style={{ borderBottom: '1px solid var(--border)' }}
                         >
                             {row.getVisibleCells().map(cell => {
                                 const isAction = cell.column.id === 'sell' || cell.column.id === 'delete';
@@ -79,17 +78,20 @@ export const TableContent: React.FC<TableContentProps> = ({ table }) => {
                                 return (
                                     <td
                                         key={cell.id}
-                                        className={isAction
-                                            ? 'px-1 py-1.5 sm:py-2 text-xs sm:text-sm'
-                                            : 'px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm truncate'}
+                                        className={[
+                                            isAction
+                                                ? 'px-1 py-1.5 sm:py-2 text-xs sm:text-sm'
+                                                : 'px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm truncate',
+                                            isPinned ? 'pinned-cell' : '',
+                                        ].join(' ')}
                                         style={{
                                             color: 'var(--text-primary)',
                                             width: cell.column.getSize(),
+                                            borderBottom: '1px solid var(--border)',
                                             ...(isPinned && {
                                                 position: 'sticky',
                                                 left: cell.column.getStart('left'),
                                                 zIndex: 1,
-                                                background: 'var(--surface-popover)',
                                             }),
                                         }}
                                     >

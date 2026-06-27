@@ -9,7 +9,7 @@ import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
-import { MdDelete } from 'react-icons/md';
+import { MdDeleteOutline } from 'react-icons/md';
 
 const columnHelper = createColumnHelper<Position>();
 
@@ -485,11 +485,11 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                     <button
                         onClick={e => { e.stopPropagation(); onDelete?.(props.row.original); }}
                         className="flex items-center justify-center p-2 rounded transition-all hover:opacity-70"
-                        style={{ color: 'var(--pnl-red)' }}
+                        style={{ color: 'var(--text-muted, #6b7280)' }}
                         aria-label="Delete position"
                         title="Delete position"
                     >
-                        <MdDelete size={18} />
+                        <MdDeleteOutline size={18} />
                     </button>
                 );
             },
