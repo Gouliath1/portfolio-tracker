@@ -626,7 +626,7 @@ export function ScreenerTable({
                             <span><strong>Div %</strong> — annual dividend ÷ current price</span>
                             <span><strong>Mkt Cap</strong> — shares × current price</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Ratios sourced from official JPX data (J-Quants) or Twelve Data for non-JP tickers. Earnings update quarterly — ratios may lag real-time sources by one quarter.
+                                Ratios sourced from J-Quants (JP tickers) or Yahoo Finance (all others). Earnings update quarterly — ratios may lag real-time sources by one quarter.
                             </p>
                         </div>
                         {/* Col 2 — Universe + Data refresh level */}
