@@ -115,7 +115,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
     });
 
     return (
-        <div className="glass rounded-2xl p-3 sm:p-6 space-y-4 h-full">
+        <div className="glass rounded-2xl p-3 sm:p-6 flex flex-col gap-4 h-full">
             {/* Table Controls */}
             <TableControls
                 table={table}
@@ -127,7 +127,9 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
             />
 
             {/* Table Content */}
-            <TableContent table={table} />
+            <div className="flex-1 min-h-0">
+                <TableContent table={table} />
+            </div>
         </div>
     );
 };

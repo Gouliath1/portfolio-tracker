@@ -189,20 +189,20 @@ export default function DeepDivePage() {
     if (!mounted) return null;
 
     return (
-        <div className="flex min-h-screen" style={{ background: 'var(--bg-base)' }}>
+        <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
             <AppSidebar activePage="deep-dive" currency={currency} activeSetName={activeSetName} />
 
             {/* ── Content column ───────────────────────────────── */}
-            <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col min-h-screen">
+            <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
 
                 {/* ── Main content ─────────────────────────────── */}
-                <main className="flex-1 pb-20 md:pb-0">
-                    <div className="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
+                <main className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden flex flex-col">
+                    <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
 
                         {/* Page header — scopes this page to returns so the broad
                             "Analysis" tab doesn't imply a full analysis suite. */}
-                        <div>
+                        <div className="flex-shrink-0">
                             <p className="text-xs font-semibold uppercase tracking-widest mb-1"
                                 style={{ color: 'var(--text-muted)' }}>Analysis</p>
                             <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -214,7 +214,7 @@ export default function DeepDivePage() {
                         </div>
 
                         {loading && (
-                            <div className="flex items-center justify-center py-24">
+                            <div className="flex-1 min-h-0 flex items-center justify-center">
                                 <span className="text-sm animate-pulse" style={{ color: 'var(--text-muted)' }}>Loading…</span>
                             </div>
                         )}
@@ -227,9 +227,9 @@ export default function DeepDivePage() {
                         )}
 
                         {!loading && summary && (
-                            <>
+                            <div className="flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
                                 {/* ── What is XIRR? ─────────────────────────────── */}
-                                <div className="glass rounded-xl overflow-hidden">
+                                <div className="glass rounded-xl overflow-hidden flex-shrink-0">
                                     <button
                                         onClick={() => setXirrExpanded(v => !v)}
                                         className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-left"
@@ -259,7 +259,7 @@ export default function DeepDivePage() {
                                 </div>
 
                                 {/* ── Headline reconciliation ───────────────────── */}
-                                <div>
+                                <div className="flex-shrink-0">
                                     <p className="text-xs font-semibold uppercase tracking-widest mb-3"
                                         style={{ color: 'var(--text-muted)' }}>
                                         Headline Reconciliation
@@ -324,7 +324,7 @@ export default function DeepDivePage() {
                                 </div>
 
                                 {/* ── Tab bar ──────────────────────────────────── */}
-                                <div className="flex gap-1 rounded-xl p-1"
+                                <div className="flex gap-1 rounded-xl p-1 flex-shrink-0"
                                     style={{ background: 'var(--glass-hover)', border: '1px solid var(--border)', width: 'fit-content' }}>
                                     {([
                                         { id: 'lifetime', label: 'Lifetime XIRR' },
@@ -343,15 +343,15 @@ export default function DeepDivePage() {
 
                                 {/* ── Per-position Lifetime XIRR table ─────────── */}
                                 {activeTab === 'lifetime' && (
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-widest mb-3"
+                                    <div className="flex-1 min-h-0 flex flex-col">
+                                        <p className="text-xs font-semibold uppercase tracking-widest mb-3 flex-shrink-0"
                                             style={{ color: 'var(--text-muted)' }}>
                                             Returns by position
                                             <span className="ml-2 normal-case font-normal" style={{ opacity: 0.6 }}>
                                                 — click a row to see its cash flows
                                             </span>
                                         </p>
-                                        <div className="glass rounded-xl overflow-auto overscroll-none">
+                                        <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-none">
                                             <table className="min-w-full data-table xirr-table">
                                                 <thead className="sticky top-0 z-20"
                                                     style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
@@ -512,8 +512,8 @@ export default function DeepDivePage() {
 
                                 {/* ── Per-position per-year return ─────────────── */}
                                 {activeTab === 'annual' && allYears.length > 0 && (
-                                    <div>
-                                        <p className="text-xs font-semibold uppercase tracking-widest mb-3"
+                                    <div className="flex-1 min-h-0 flex flex-col">
+                                        <p className="text-xs font-semibold uppercase tracking-widest mb-3 flex-shrink-0"
                                             style={{ color: 'var(--text-muted)' }}>
                                             Per-Position Annual Returns
                                             <span className="ml-2 normal-case font-normal" style={{ opacity: 0.6 }}>
@@ -521,11 +521,11 @@ export default function DeepDivePage() {
                                             </span>
                                         </p>
                                         {loadingPrices ? (
-                                            <p className="text-sm animate-pulse py-4" style={{ color: 'var(--text-muted)' }}>
+                                            <p className="text-sm animate-pulse py-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                                                 Loading price history…
                                             </p>
                                         ) : (
-                                            <div className="glass rounded-xl overflow-auto overscroll-none">
+                                            <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-none">
                                                 <table className="min-w-full data-table xirr-table xirr-annual">
                                                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                         <tr>
@@ -609,7 +609,7 @@ export default function DeepDivePage() {
                                         )}
                                     </div>
                                 )}
-                            </>
+                            </div>
                         )}
                     </div>
                 </main>
