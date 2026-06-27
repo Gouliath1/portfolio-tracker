@@ -139,6 +139,12 @@ body {
 .data-table tbody tr:nth-child(even) { background: var(--table-row-alt); }
 .data-table tbody tr:hover { background: var(--glass-hover) !important; }
 
+/* Sticky (frozen) cells need an explicit background so scrolled content */
+/* doesn't bleed through — but must match the row's alternating color.   */
+.data-table tbody tr td.pinned-cell { background: var(--surface-popover); }
+.data-table tbody tr:nth-child(even) td.pinned-cell { background: var(--table-row-alt); }
+.data-table tbody tr:hover td.pinned-cell { background: var(--glass-hover) !important; }
+
 /* Compact the XIRR deep-dive tables on narrow screens so more columns fit. */
 @media (max-width: 767px) {
   .xirr-table th,
