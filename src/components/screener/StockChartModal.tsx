@@ -140,7 +140,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div
-                className="relative w-full sm:max-w-4xl rounded-t-2xl sm:rounded-2xl flex flex-col"
+                className="relative w-full sm:max-w-[1008px] rounded-t-2xl sm:rounded-2xl flex flex-col"
                 style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', maxHeight: '90dvh' }}
             >
                 {/* Header */}
@@ -183,7 +183,7 @@ export function StockChartModal({ symbol, name, currency = null, onClose }: Stoc
                 </div>
 
                 {/* Chart */}
-                <div className="px-6 pb-6 pt-4 flex-1 min-h-0 relative" style={{ minHeight: 360 }}>
+                <div className="px-6 pb-6 pt-4 flex-1 min-h-0 relative" style={{ minHeight: 495 }}>
                     {state === 'loading' && (
                         <div className="h-full flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</div>
                     )}
