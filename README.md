@@ -1,43 +1,46 @@
 # Portfolio Tracker
 
-A modern, responsive portfolio tracking application built with Next.js that helps you monitor your stock investments with real-time price updates and performance analytics.
+A personal investment dashboard built with Next.js for tracking stock positions (US and Japanese equities), monitoring real-time P&L, and researching new stocks before buying. All portfolio data lives in your browser's `localStorage` — nothing is uploaded anywhere.
 
 ## ✨ Features
 
-- 📊 **Real-time Portfolio Tracking** - Monitor your stock positions with live price updates
-- 📈 **Performance Analytics** - Visualize your portfolio performance over time
-- 💰 **P&L Calculations** - Track profit/loss for individual positions and overall portfolio
-- 🌐 **Multi-Currency Support** - Support for USD and JPY stocks
-- 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
-- 🔒 **Privacy First** - Your portfolio data stays local and private
-- ⚡ **Smart Caching** - Efficient price caching to minimize API calls
+### Portfolio dashboard (Overview)
+- Live position values, cost basis, and P&L in your chosen base currency (USD or JPY), with per-position and total figures
+- Asset allocation donut by asset class (auto-classified from Yahoo Finance instrument type)
+- Benchmark card comparing your money-weighted return (XIRR) against MSCI ACWI, replaying your actual cash flows into the index
+- Portfolio health card — concentration, broker count, currency count
+- Top holdings card
+- Show/hide values toggle for screen-privacy, light/dark theme
+
+### Analysis (deep-dive)
+- Lifetime and annualized return breakdowns (XIRR) with expandable cash-flow detail
+- Per-position and portfolio-level return calculations
+
+### Assets
+- Full position table with allocation by asset class
+
+### Portfolios (multi-portfolio support)
+- Switch between multiple named position sets, each stored independently in `localStorage`
+- Add / sell positions via modal forms (buy/sell transactions, FIFO lot matching for realized P&L)
+- Import a portfolio from a pasted CSV/file, or export the current one
+- A demo portfolio ships out of the box so the app is usable before you add real data
+
+### Screener
+- Research universe: TOPIX/iShares 1475 ETF constituents (~1,475 Japanese stocks), loaded from a static BlackRock holdings list
+- Fundamentals per stock — price, P/E, forward P/E, P/B, dividend yield, market cap, sector — sourced live from J-Quants (Japan) and Yahoo Finance/Twelve Data (fallback), fetched on demand and cached
+- Freshness indicator dot per row (fresh / stale / not loaded) with hover tooltip
+- Filter tabs: All / Loaded / Not loaded / Alerts; sortable, resizable columns; Excel export
+- Line and candlestick price charts in a modal, per stock
+- One-click buy — opens the Add Position modal pre-filled with the selected ticker
+- Price alerts — set above/below thresholds per stock; alerted rows are polled hourly while the tab is open, with browser push notifications when a threshold is crossed
+- Full horizontal scroll on mobile instead of hiding columns
+
+### General
+- Responsive design with a dedicated mobile bottom nav
+- Multi-currency support (USD/JPY) with live FX conversion, settings panel to change base currency
+- Local-first: portfolio data never leaves your browser; no backend database required for normal use
 
 ## 🚀 Quick Setup
-
-We provide cross-platform setup scripts to get you started quickly:
-
-### Automatic Setup (Recommended)
-
-**For Windows:**
-```cmd
-utils/setup.bat
-```
-
-**For macOS/Linux:**
-```bash
-./utils/setup.sh
-```
-
-**Cross-platform (Node.js):**
-```bash
-node utils/setup.js
-# or
-npm run setup
-```
-
-### Manual Setup
-
-If you prefer to set up manually:
 
 1. **Clone the repository:**
    ```bash
@@ -50,24 +53,20 @@ If you prefer to set up manually:
    npm install
    ```
 
-3. **Set up your portfolio data:**
-   ```bash
-   cp data/positions.template.json data/positions.json
-   ```
-   Edit `data/positions.json` with your actual portfolio data.
-
-4. **Create environment file (optional):**
+3. **(Optional) Create an environment file** for the screener's data providers and the production market-data cache:
    ```bash
    cp .env.example .env.local
    ```
+   See `.env.example` for details — J-Quants and Twelve Data keys are optional and only needed for screener fundamentals; without them the app falls back to Yahoo Finance.
 
-5. **Start the development server:**
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser:**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+5. **Open your browser:** navigate to [http://localhost:3000](http://localhost:3000)
+
+On first load you'll see a demo portfolio and a welcome prompt to import your own data (via the Settings panel → Portfolios), or you can add positions manually with the Add Position modal.
 
 ## 📋 Prerequisites
 
@@ -78,113 +77,61 @@ If you prefer to set up manually:
 ## 🛠️ Available Scripts
 
 - `npm run dev` - Start development server with Turbopack
+- `npm run dev:clean` - Start dev server via `scripts/startDev.sh`
 - `npm run build` - Build the application for production
 - `npm run start` - Start the production server
 - `npm run lint` - Run ESLint for code quality
-- `npm run setup` - Run the cross-platform setup script
+- `npm test` / `npm run test:watch` / `npm run test:coverage` / `npm run test:ci` - Run the Jest test suite
 
 ## 📁 Project Structure
 
 ```
 portfolio-tracker/
-├── packages/
-│   ├── server/            # Shared database + service layer (Next & mobile)
-│   │   ├── src/database/  # Schema, startup, and operations
-│   │   └── src/services/  # High-level portfolio services for web & mobile
-│   ├── types/             # Shared TypeScript models
-│   └── core/              # Shared business logic (currency, return calculations, …)
 ├── src/
-│   ├── app/               # Next.js app directory
-│   │   ├── api/           # API routes (thin wrappers around shared services)
-│   │   └── page.tsx       # Main dashboard page
-│   ├── components/        # React components
-│   └── utils/             # Web-specific utilities and hooks
-├── data/                  # Data files & database
-│   ├── portfolio.db       # SQLite database
-│   ├── positions.template.json  # Template for portfolio data
-│   ├── positions.json     # Your portfolio data (gitignored)
-│   └── positionsPrices.json     # Price cache
-├── scripts/               # Development utilities and setup scripts
-│   ├── setup.js          # Cross-platform setup script
-│   ├── setup.sh          # Unix/macOS setup script
-│   └── gitPush.sh        # Git push utility
-├── instrumentation.ts    # Server startup hook
-└── ...                   # Other config files
+│   ├── app/                # Next.js app directory
+│   │   ├── api/            # API routes (prices, pnl, dividends, screener, fx-rates, …)
+│   │   ├── screener/       # Stock screener page
+│   │   ├── returns/deep-dive/  # Analysis (XIRR) page
+│   │   └── page.tsx        # Main dashboard page (Overview / Assets / Portfolios)
+│   ├── components/         # React components (layout, overview, screener, management, tables, charts)
+│   ├── hooks/               # Shared React hooks (base currency, alert polling, ticker names, …)
+│   ├── lib/
+│   │   ├── core/            # Shared business logic (currency, XIRR/return calculations) — aliased as @portfolio/core
+│   │   └── server/          # Server-side services (Yahoo/J-Quants fetchers, market-data cache) — aliased as @portfolio/server
+│   ├── types/                # Shared TypeScript models — aliased as @portfolio/types
+│   ├── data/                 # Demo portfolio data
+│   └── utils/                # localStorage-backed position store, caches, hooks helpers
+├── data/                   # Server-side SQLite caches (market data, screener), gitignored
+├── scripts/                # Dev/deploy utilities (fetch-constituents, startDev, gitPush)
+├── instrumentation.ts      # Server startup hook (no-op — data is client-side)
+└── ...                     # Other config files
 ```
 
-## 💼 Portfolio Data Setup
+## 💼 Managing Your Portfolio Data
 
-1. **Copy the template:**
-   ```bash
-   cp data/positions.template.json data/positions.json
-   ```
+Portfolio positions are **not** stored in a checked-in file — they live in your browser's `localStorage`, one entry per portfolio ("position set"). To get your real data in:
 
-2. **Edit your positions:**
-   Open `data/positions.json` and replace the template data with your actual portfolio positions.
+- **Manually:** use the ➕ Add Position button to record a buy transaction (ticker, quantity, cost, date, account, currency); use the sell action on a position to record a sale.
+- **Bulk import:** open Settings → Portfolios → Import, and paste/upload a CSV of transactions. Imported sets are auto-migrated to the internal transaction format.
+- **Multiple portfolios:** create, rename, switch between, or delete named position sets from the same panel; export any set back out as a file.
 
-3. **Data format example:**
-   ```json
-   [
-     {
-       "ticker": "AAPL",
-       "quantity": 100,
-       "costPerUnit": 150.00,
-       "transactionDate": "2024-01-15",
-       "transactionCcy": "USD",
-       "transactionFx": 149.50,
-       "account": "Brokerage"
-     }
-   ]
-   ```
-
-**Note:** Your `positions.json` file is automatically gitignored to keep your financial data private.
+Since everything is local to the browser, clearing site data / a different browser / a different device won't carry your portfolio over — export before doing so if you need to move it.
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-Create a `.env.local` file for any environment-specific configuration:
+See `.env.example` for the full list. Nothing is required for basic use; these enable extra data sources:
 
-```env
-# Add your environment variables here if needed
-# API_KEY=your_api_key_here
-# DATABASE_URL=your_database_url_here
-```
+- `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` - cloud SQLite for the market-data cache in production (Vercel's filesystem is read-only); local dev uses `data/marketCache.db` automatically
+- `JQUANTS_API_KEY` (or `JQUANTS_EMAIL` / `JQUANTS_PASSWORD`) - official JPX fundamentals (P/E, P/B, dividend yield) for Japanese screener stocks
+- `TWELVE_DATA_API_KEY` - fundamentals for US/JP stocks via Twelve Data (free tier); falls back to Yahoo Finance when unset
+- `YAHOO_COOKIE` / `YAHOO_CRUMB` - manual override if Yahoo's crumb endpoint is rate-limited
 
 ### Supported Stock Markets
 
 - **US Stocks** - Use ticker symbols (e.g., AAPL, GOOGL, TSLA)
 - **Japanese Stocks** - Use ticker + ".T" format (e.g., 7203.T, 6758.T)
-
-## 🎯 Features Overview
-
-### Portfolio Dashboard
-- Real-time portfolio value and P&L
-- Individual position tracking
-- Performance metrics and analytics
-
-### Database Architecture
-- SQLite database with automatic initialization
-- Shared service layer in `packages/server` for API and mobile reuse
-- Portfolio service helpers (see `packages/server/src/services`) centralize portfolio calculations
-- Dedicated service modules (`priceService`, `fxRateService`, `positionsAdminService`, `positionSetsService`, `historicalDataService`) expose typed operations for both web and mobile clients
-- Cache-first API approach for optimal performance
-- Automatic server startup initialization
-
-### Shared Service Layer
-- Located in `packages/server/src/services`
-- Encapsulates database access, validation, and orchestration logic shared by Next.js routes and the upcoming Expo client
-- Covered by Jest unit tests (`packages/server/__tests__/*Service.test.ts`) to ensure regressions are caught early
-
-### Price Caching
-- Smart caching system to minimize API calls
-- Automatic daily price updates
-- Manual refresh capability
-
-### Data Privacy
-- All portfolio data stored locally
-- No sensitive data transmitted to external services
-- Your financial information stays private
 
 ## 🌐 Infrastructure
 
@@ -207,128 +154,11 @@ To point `tracker.julienguille.com` to Vercel, a CNAME record is set in GoDaddy:
 
 Vercel project → **Settings → Billing → Spending Limit** is set to **$0** — Vercel will pause the project rather than charge anything if free-tier limits are ever exceeded.
 
----
+## 🔒 Data Privacy
 
-## 🚀 Production Deployment
-
-### Building for Production
-
-The application uses Next.js standalone build for production-ready deployments:
-
-```bash
-# Build the application
-npm run build
-
-# The standalone build will be created in .next/standalone/
-```
-
-### Production Structure
-
-The standalone build creates a self-contained production package:
-
-```
-.next/standalone/
-├── .next/            # Compiled Next.js application
-├── data/             # Data files & database (copied from source)
-├── node_modules/     # Runtime dependencies only
-├── package.json      # Production dependencies
-└── server.js         # Production server entry point
-```
-
-### Deployment Options
-
-#### Option 1: Direct Deployment
-
-```bash
-# Deploy the standalone folder to your server
-rsync -av .next/standalone/ user@server:/path/to/app/
-
-# Ensure data directory exists and copy your data
-rsync -av data/ user@server:/path/to/app/data/
-
-# Start the production server
-ssh user@server 'cd /path/to/app && node server.js'
-```
-
-#### Option 2: Docker Deployment
-
-Create a `Dockerfile`:
-
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Copy the standalone build
-COPY .next/standalone ./
-COPY data ./data
-
-# Expose port
-EXPOSE 3000
-
-# Start the server
-CMD ["node", "server.js"]
-```
-
-Build and run:
-
-```bash
-npm run build
-docker build -t portfolio-tracker .
-docker run -p 3000:3000 -v $(pwd)/data:/app/data portfolio-tracker
-```
-
-#### Option 3: PM2 Process Manager
-
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Deploy and start with PM2
-pm2 start .next/standalone/server.js --name portfolio-tracker
-pm2 startup
-pm2 save
-```
-
-### Environment Configuration
-
-For production, create environment variables:
-
-```bash
-# Production environment
-NODE_ENV=production
-PORT=3000
-# Add any other production-specific variables
-```
-
-### Database Considerations
-
-- The SQLite database (`data/portfolio.db`) is automatically created on first startup
-- Your portfolio data (`data/positions.json`) should be deployed alongside the app
-- Database initialization happens automatically via `instrumentation.ts`
-
-### Security Notes
-
-- No database management endpoints are exposed in production
-- All database operations happen at server startup or through internal APIs
-- Your portfolio data remains local to your server
-
-## 🎯 Features Overview
-
-### Portfolio Dashboard
-- Real-time portfolio value and P&L
-- Individual position tracking
-- Performance metrics and analytics
-
-### Price Caching
-- Smart caching system to minimize API calls
-- Automatic daily price updates
-- Manual refresh capability
-
-### Data Privacy
-- All portfolio data stored locally
-- No sensitive data transmitted to external services
-- Your financial information stays private
+- Portfolio positions and transactions are stored entirely in browser `localStorage` — they are never sent to a server for persistence.
+- Server-side SQLite (`data/`) only caches market data (prices, FX rates, screener fundamentals) — public information, not your holdings.
+- No portfolio data is transmitted to third parties beyond the price/fundamentals lookups (Yahoo Finance, J-Quants, Twelve Data) needed to fetch quotes for your tickers.
 
 ## 🤝 Contributing
 
@@ -344,43 +174,21 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Troubleshooting
 
-### Common Development Issues
-
-**Setup script fails:**
-- Ensure Node.js 18+ is installed
-- Check that you're in the correct directory
-- Verify npm is working: `npm --version`
-
 **Price updates not working:**
 - Check your internet connection
-- Verify ticker symbols are correct
-- Try manual refresh using the refresh button
+- Verify ticker symbols are correct (Japanese tickers need the `.T` suffix)
+- Use the manual refresh button, or per-row refresh on the screener
 
-**Data not showing:**
-- Ensure `positions.json` exists in the `data/` directory and contains valid data
-- Check browser console for any errors
-- Verify the data format matches the template
+**My portfolio disappeared:**
+- Portfolio data lives in browser `localStorage`. Clearing browser data, using a different browser, or private/incognito mode will not show previously entered positions. Export your position set beforehand if you need to move or back it up.
 
-### Production Deployment Issues
-
-**Database not initializing:**
-- Check server logs for database connection errors
-- Ensure the `data/` directory exists and is writable
-- Verify that `instrumentation.ts` is being executed
-
-**Missing data files:**
-- Ensure `data/positions.json` and templates are deployed
-- Check file permissions on the production server
-- Verify data directory structure matches development
-
-**Port conflicts:**
-- Default port is 3000, set `PORT` environment variable to change
-- Check if port is already in use: `lsof -i :3000`
+**Screener fundamentals missing or stale:**
+- Fundamentals are fetched on demand and cached; use "Refresh page" / "Refresh all" or the per-row ⟳ to force a refetch
+- Without `JQUANTS_API_KEY` or `TWELVE_DATA_API_KEY` set, the app falls back to Yahoo Finance, which can be rate-limited — see `.env.example` for the manual crumb override
 
 **Build fails:**
 - Run `npm run build` locally first to test
 - Check for TypeScript errors or missing dependencies
-- Ensure all required environment variables are set
 
 For more help, please open an issue on GitHub.
 
