@@ -7,6 +7,7 @@ import { SettingsPanel } from '../../components/layout/SettingsPanel';
 import { ScreenerTable } from '../../components/screener/ScreenerTable';
 import { AddMenu } from '../../components/screener/AddMenu';
 import { AlertModal } from '../../components/screener/AlertModal';
+import { NoteModal } from '../../components/screener/NoteModal';
 import { StockChartModal } from '../../components/screener/StockChartModal';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
@@ -29,6 +30,7 @@ interface ScreenerState {
     added: IndexConstituent[];
     pinned: string[];
     alerts: Record<string, PriceAlert>;
+    notes: Record<string, string>;
 }
 
 function migrateAlert(raw: unknown): PriceAlert | null {
@@ -102,9 +104,11 @@ export default function ScreenerPage() {
     const [added, setAdded] = useState<IndexConstituent[]>([]);
     const [pinned, setPinned] = useState<string[]>([]);
     const [alerts, setAlerts] = useState<Record<string, PriceAlert>>({});
+    const [notes, setNotes] = useState<Record<string, string>>({});
     const [loaded, setLoaded] = useState(false);
 
     const [alertTarget, setAlertTarget] = useState<IndexConstituent | null>(null);
+    const [noteTarget, setNoteTarget] = useState<IndexConstituent | null>(null);
     const [chartTarget, setChartTarget] = useState<IndexConstituent | null>(null);
     const [chartCurrency, setChartCurrency] = useState<string | null>(null);
     const [buyTarget, setBuyTarget] = useState<IndexConstituent | null>(null);
@@ -126,6 +130,13 @@ export default function ScreenerPage() {
                     }
                     setAlerts(migrated);
                 }
+                if (parsed.notes && typeof parsed.notes === 'object') {
+                    const cleaned: Record<string, string> = {};
+                    for (const [sym, note] of Object.entries(parsed.notes)) {
+                        if (typeof note === 'string' && note.trim()) cleaned[sym] = note;
+                    }
+                    setNotes(cleaned);
+                }
             }
         } catch { /* ignore corrupt state */ }
         setLoaded(true);
@@ -133,8 +144,8 @@ export default function ScreenerPage() {
 
     useEffect(() => {
         if (!loaded) return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: indexKey, indexLoaded, added, pinned, alerts }));
-    }, [loaded, indexKey, indexLoaded, added, pinned, alerts]);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: indexKey, indexLoaded, added, pinned, alerts, notes }));
+    }, [loaded, indexKey, indexLoaded, added, pinned, alerts, notes]);
 
     const file = INDICES[indexKey];
     const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
@@ -166,6 +177,7 @@ export default function ScreenerPage() {
     useAlertPoller(alerts);
 
     const handleEditAlert = useCallback((c: IndexConstituent) => setAlertTarget(c), []);
+    const handleEditNote = useCallback((c: IndexConstituent) => setNoteTarget(c), []);
     const handleBuy = useCallback((c: IndexConstituent) => setBuyTarget(c), []);
     const handleOpenChart = useCallback((c: IndexConstituent, cur: string | null) => {
         setChartTarget(c);
@@ -184,6 +196,17 @@ export default function ScreenerPage() {
         if (!alertTarget) return;
         setAlerts(prev => { const next = { ...prev }; delete next[alertTarget.symbol]; return next; });
         setAlertTarget(null);
+    };
+
+    const saveNote = (note: string) => {
+        if (!noteTarget) return;
+        setNotes(prev => ({ ...prev, [noteTarget.symbol]: note }));
+        setNoteTarget(null);
+    };
+    const clearNote = () => {
+        if (!noteTarget) return;
+        setNotes(prev => { const next = { ...prev }; delete next[noteTarget.symbol]; return next; });
+        setNoteTarget(null);
     };
 
     const visibleAdded = added.slice(0, 2);
@@ -269,6 +292,8 @@ export default function ScreenerPage() {
                                 onTogglePin={handleTogglePin}
                                 alerts={alerts}
                                 onEditAlert={handleEditAlert}
+                                notes={notes}
+                                onEditNote={handleEditNote}
                                 onOpenChart={handleOpenChart}
                                 onBuy={handleBuy}
                             />
@@ -286,6 +311,17 @@ export default function ScreenerPage() {
                     onSave={saveAlert}
                     onClear={clearAlert}
                     onClose={() => setAlertTarget(null)}
+                />
+            )}
+
+            {noteTarget && (
+                <NoteModal
+                    symbol={noteTarget.symbol}
+                    name={noteTarget.name}
+                    existing={notes[noteTarget.symbol] ?? null}
+                    onSave={saveNote}
+                    onClear={clearNote}
+                    onClose={() => setNoteTarget(null)}
                 />
             )}
 

@@ -79,3 +79,6 @@ src/app/api/*/*/route-new.ts
 
 # VSCode workspace settings (local only)
 .vscode/
+
+# Private personal notes
+/notes/

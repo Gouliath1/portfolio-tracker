@@ -17,6 +17,7 @@ import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
     MdStar, MdStarBorder, MdNotificationsActive, MdNotificationsNone,
     MdShowChart, MdInfoOutline, MdDownload, MdFilterList, MdExpandMore, MdCheck, MdAddShoppingCart,
+    MdStickyNote2, MdOutlineStickyNote2,
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
@@ -24,7 +25,7 @@ import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreener
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
 
-type View = 'all' | 'loaded' | 'unloaded' | 'pinned' | 'alerts';
+type View = 'all' | 'loaded' | 'unloaded' | 'pinned' | 'alerts' | 'notes';
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
@@ -70,13 +71,15 @@ interface ScreenerTableProps {
     onTogglePin: (symbol: string) => void;
     alerts: Record<string, PriceAlert>;
     onEditAlert: (c: IndexConstituent) => void;
+    notes: Record<string, string>;
+    onEditNote: (c: IndexConstituent) => void;
     onOpenChart: (c: IndexConstituent, currency: string | null) => void;
     onBuy?: (c: IndexConstituent) => void;
 }
 
 export function ScreenerTable({
     constituents, onRemove, removableSymbols,
-    pinnedSymbols, onTogglePin, alerts, onEditAlert, onOpenChart, onBuy,
+    pinnedSymbols, onTogglePin, alerts, onEditAlert, notes, onEditNote, onOpenChart, onBuy,
 }: ScreenerTableProps) {
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
@@ -92,6 +95,7 @@ export function ScreenerTable({
     const sortingRef = useRef(sorting); sortingRef.current = sorting;
     const pinnedRef = useRef(pinnedSymbols); pinnedRef.current = pinnedSymbols;
     const alertsRef = useRef(alerts); alertsRef.current = alerts;
+    const notesRef = useRef(notes); notesRef.current = notes;
     const refreshRef = useRef<(symbol: string) => void>(() => {});
     const nameCacheRef = useRef<Map<string, string>>(new Map());
 
@@ -111,8 +115,9 @@ export function ScreenerTable({
         if (view === 'unloaded') return constituents.filter(c => fundMap.get(c.symbol)?.status !== 'done');
         if (view === 'pinned') return constituents.filter(c => pinnedSymbols.has(c.symbol));
         if (view === 'alerts') return constituents.filter(c => alerts[c.symbol] != null);
+        if (view === 'notes') return constituents.filter(c => notes[c.symbol] != null);
         return constituents;
-    }, [view, constituents, pinnedSymbols, fundMap, alerts]);
+    }, [view, constituents, pinnedSymbols, fundMap, alerts, notes]);
 
     const allSectors = useMemo(() => {
         const s = new Set(constituents.map(c => c.sector).filter(Boolean) as string[]);
@@ -130,6 +135,7 @@ export function ScreenerTable({
     );
     const unloadedCount = constituents.length - loadedCount;
     const alertsCount = useMemo(() => Object.keys(alerts).length, [alerts]);
+    const notesCount = useMemo(() => Object.keys(notes).length, [notes]);
 
     const toggleSector = (s: string) => {
         setSelectedSectors(prev => {
@@ -348,6 +354,7 @@ export function ScreenerTable({
                     const currency = e?.status === 'done' ? e.data.currency : null;
                     const alert = alertsRef.current[c.symbol];
                     const triggered = alert ? isAlertTriggered(alert, priceOf(c.symbol)) : false;
+                    const note = notesRef.current[c.symbol];
                     return (
                         <div className="flex items-center gap-0.5 pr-2">
                             <button onClick={stop(() => onEditAlert(c))}
@@ -361,6 +368,12 @@ export function ScreenerTable({
                                     return `Alert ${parts.join(' · ')}${triggered ? ' · triggered' : ''}`;
                                 })()}>
                                 {alert ? <MdNotificationsActive size={15} /> : <MdNotificationsNone size={15} />}
+                            </button>
+                            <button onClick={stop(() => onEditNote(c))}
+                                className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
+                                style={{ color: note ? 'var(--accent)' : 'var(--text-muted)' }}
+                                title={note ? `Note: ${note}` : 'Add note'}>
+                                {note ? <MdStickyNote2 size={15} /> : <MdOutlineStickyNote2 size={15} />}
                             </button>
                             <button onClick={stop(() => onOpenChart(c, currency))}
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
@@ -384,7 +397,7 @@ export function ScreenerTable({
                 },
             }),
         ];
-    }, [onRemove, removableSymbols, onTogglePin, onEditAlert, onBuy]);
+    }, [onRemove, removableSymbols, onTogglePin, onEditAlert, onEditNote, onBuy]);
 
     const columnVisibility = useMemo(() => ({
         remove: (removableSymbols?.size ?? 0) > 0,
@@ -578,6 +591,7 @@ export function ScreenerTable({
                     {viewTab('unloaded', 'Not loaded', unloadedCount)}
                     {viewTab('pinned', 'Pinned', pinnedSymbols.size)}
                     {viewTab('alerts', 'Alerts', alertsCount)}
+                    {viewTab('notes', 'Notes', notesCount)}
                 </div>
 
                 {/* Actions — pushed to the right */}
@@ -697,6 +711,11 @@ export function ScreenerTable({
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
                                 Checks require this tab to be open. Permission requested on first save.
                             </p>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Notes</p>
+                                <span><strong>Note icon</strong> — free-text note per row, saved locally</span>
+                                <span><strong>Notes tab</strong> — filter to rows with a note</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -785,6 +804,7 @@ export function ScreenerTable({
                             view === 'unloaded' ? 'All names have been loaded' :
                             view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
                             view === 'alerts' ? 'No price alerts set — click the bell icon on any row' :
+                            view === 'notes' ? 'No notes yet — click the note icon on any row' :
                                 'No names match your filter'}
                     </div>
                 )}
@@ -799,6 +819,7 @@ export function ScreenerTable({
                     {view === 'unloaded' && `${totalCount.toLocaleString()} rows without data`}
                     {view === 'pinned' && `${totalCount.toLocaleString()} pinned`}
                     {view === 'alerts' && `${totalCount.toLocaleString()} with alerts`}
+                    {view === 'notes' && `${totalCount.toLocaleString()} with notes`}
                     {loadedCount > 0 && view === 'all' && (
                         <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
                             · {loadedCount.toLocaleString()} loaded
