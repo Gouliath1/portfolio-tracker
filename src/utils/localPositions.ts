@@ -254,6 +254,13 @@ function touchSet(id: string): void {
 }
 
 /**
+ * Display name given to the set auto-created when the user edits the demo.
+ * Not translated: once written it is stored user data, so the UI that
+ * announces the promotion quotes this exact name in every language.
+ */
+export const MY_PORTFOLIO_NAME = 'My Portfolio';
+
+/**
  * Append a transaction to a set. If acting on the demo set, promotes it to
  * a real "My Portfolio" set first. Returns the id of the set written to.
  */
@@ -266,7 +273,7 @@ export function addTransactionToSet(setId: string, tx: Transaction): string {
     }
     const newSet = importPositionSet(
         'my-portfolio',
-        uniqueDisplayName('My Portfolio'),
+        uniqueDisplayName(MY_PORTFOLIO_NAME),
         'Started from demo data',
         [...DEMO_TRANSACTIONS, tx],
         true,
@@ -286,7 +293,7 @@ export function removeTransactionFromSet(setId: string, index: number): { remove
         const remaining = [...demo.slice(0, index), ...demo.slice(index + 1)];
         const newSet = importPositionSet(
             'my-portfolio',
-            uniqueDisplayName('My Portfolio'),
+            uniqueDisplayName(MY_PORTFOLIO_NAME),
             'Started from demo data',
             remaining,
             true,

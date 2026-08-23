@@ -3,6 +3,10 @@
 import { useEffect, useRef } from 'react';
 import type { PriceAlert } from '../types/screener';
 import type { StockFundamentals } from '../types/screener';
+import { useTranslation } from '../i18n';
+import type { TranslationKey, TranslationParams } from '../i18n';
+
+type Translator = (key: TranslationKey, params?: TranslationParams) => string;
 
 const POLL_INTERVAL = 60 * 60 * 1000;
 
@@ -17,25 +21,39 @@ async function fetchPrice(symbol: string): Promise<{ price: number | null; curre
     }
 }
 
-function fmtAlertPrice(v: number, currency: string | null) {
+function fmtAlertPrice(v: number, currency: string | null, locale: string) {
     return currency === 'JPY'
-        ? `¥${v.toLocaleString('en', { maximumFractionDigits: 0 })}`
-        : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        ? `¥${v.toLocaleString(locale, { maximumFractionDigits: 0 })}`
+        : v.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function sendNotification(symbol: string, side: 'above' | 'below', price: number, target: number, currency: string | null) {
+function sendNotification(
+    symbol: string,
+    side: 'above' | 'below',
+    price: number,
+    target: number,
+    currency: string | null,
+    t: Translator,
+    locale: string,
+) {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const priceFmt = fmtAlertPrice(price, currency);
-    const targetFmt = fmtAlertPrice(target, currency);
-    const body = side === 'above'
-        ? `Crossed above ${targetFmt} — now ${priceFmt}`
-        : `Dropped below ${targetFmt} — now ${priceFmt}`;
+    const params = {
+        target: fmtAlertPrice(target, currency, locale),
+        price: fmtAlertPrice(price, currency, locale),
+    };
+    const body = t(side === 'above' ? 'alert.notifyAbove' : 'alert.notifyBelow', params);
     new Notification(symbol, { body, icon: '/favicon.ico' });
 }
 
 export function useAlertPoller(alerts: Record<string, PriceAlert>) {
+    const { t, locale } = useTranslation();
     const alertsRef = useRef(alerts);
     alertsRef.current = alerts;
+
+    // Held in a ref so the poll interval isn't torn down and restarted every
+    // time the language changes — notifications simply use the latest one.
+    const i18nRef = useRef({ t, locale });
+    i18nRef.current = { t, locale };
 
     const firedRef = useRef<Set<string>>(new Set());
     const prevAlertsJsonRef = useRef('');
@@ -67,14 +85,14 @@ export function useAlertPoller(alerts: Record<string, PriceAlert>) {
                     const key = `${symbol}:above`;
                     if (!firedRef.current.has(key)) {
                         firedRef.current.add(key);
-                        sendNotification(symbol, 'above', price, alert.targetAbove, currency);
+                        sendNotification(symbol, 'above', price, alert.targetAbove, currency, i18nRef.current.t, i18nRef.current.locale);
                     }
                 }
                 if (alert.targetBelow != null && price <= alert.targetBelow) {
                     const key = `${symbol}:below`;
                     if (!firedRef.current.has(key)) {
                         firedRef.current.add(key);
-                        sendNotification(symbol, 'below', price, alert.targetBelow, currency);
+                        sendNotification(symbol, 'below', price, alert.targetBelow, currency, i18nRef.current.t, i18nRef.current.locale);
                     }
                 }
             }));
@@ -89,6 +107,7 @@ export function useAlertPoller(alerts: Record<string, PriceAlert>) {
             clearInterval(id);
             document.removeEventListener('visibilitychange', onVisible);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Everything the poll reads lives in a ref, so `symbolKey` is the only
+        // real dependency — the interval survives language and alert edits.
     }, [symbolKey]);
 }

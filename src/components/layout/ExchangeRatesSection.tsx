@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getActivePositions } from '../../utils/localPositions';
 import { BaseCurrency } from '../../hooks/useBaseCurrency';
+import { useTranslation } from '../../i18n';
 
 interface ExchangeRatesSectionProps {
     /** Whether the settings drawer is open — rates are (re)fetched on open. */
@@ -19,8 +20,8 @@ interface RateRow {
     date?: string;
 }
 
-const formatRate = (n: number) =>
-    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const formatRate = (n: number, locale: string) =>
+    n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
 /**
  * Read-only list of the current FX rates used to value the portfolio. Shows one
@@ -29,6 +30,7 @@ const formatRate = (n: number) =>
  * close — so this doubles as an audit surface for the close-vs-spot behaviour.
  */
 export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionProps) => {
+    const { t, locale } = useTranslation();
     const [rows, setRows] = useState<RateRow[] | null>(null);
     const [asOf, setAsOf] = useState<string | null>(null);
 
@@ -77,23 +79,21 @@ export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionPro
         <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-muted)' }}>
-                Exchange Rates
+                {t('fx.title')}
             </h3>
 
             <div className="glass rounded-xl p-4 space-y-3">
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Rates used to convert your holdings into {currency} — the previous settled daily
-                    close (≈ yesterday), not today&apos;s live spot, so values stay reproducible.
-                    Security prices are live. Updates when you press Refresh.
+                    {t('fx.explainer', { currency })}
                 </p>
 
                 {rows === null && (
-                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading rates…</p>
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('fx.loading')}</p>
                 )}
 
                 {rows && rows.length === 0 && (
                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        All holdings are already in {currency} — no conversion needed.
+                        {t('fx.noConversionNeeded', { currency })}
                     </p>
                 )}
 
@@ -106,7 +106,7 @@ export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionPro
                                 </span>
                                 <span className="font-medium tabular-nums"
                                     style={{ color: 'var(--text-primary)' }}>
-                                    {r.rate !== null ? formatRate(r.rate) : '—'}
+                                    {r.rate !== null ? formatRate(r.rate, locale) : '—'}
                                 </span>
                             </li>
                         ))}
@@ -115,7 +115,7 @@ export const ExchangeRatesSection = ({ open, currency }: ExchangeRatesSectionPro
 
                 {asOf && rows && rows.length > 0 && (
                     <p className="text-xs pt-1" style={{ color: 'var(--text-muted)' }}>
-                        previous settled close · fetched {asOf}
+                        {t('fx.asOf', { date: asOf })}
                     </p>
                 )}
             </div>

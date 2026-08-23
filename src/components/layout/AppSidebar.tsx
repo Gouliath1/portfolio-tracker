@@ -5,6 +5,8 @@ import {
     MdHome, MdAccountBalance, MdSwapHoriz,
     MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
 } from 'react-icons/md';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
@@ -28,11 +30,13 @@ const PortfoliosIcon = ({ size = 17 }: { size?: number }) => (
     </span>
 );
 
-const OVERVIEW_ITEM = { id: 'overview' as const, label: 'Overview', icon: MdHome };
-const ASSETS_ITEM = { id: 'assets' as const, label: 'Assets', icon: MdAccountBalance };
+type NavItem = { id: SidebarViewId; labelKey: TranslationKey; icon: React.ComponentType<{ size?: number }> };
+
+const OVERVIEW_ITEM: NavItem = { id: 'overview', labelKey: 'nav.overview', icon: MdHome };
+const ASSETS_ITEM: NavItem = { id: 'assets', labelKey: 'nav.assets', icon: MdAccountBalance };
 // Data is last as a utility view.
-const VIEW_ITEMS: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: 'data', label: 'Portfolios', icon: PortfoliosIcon },
+const VIEW_ITEMS: NavItem[] = [
+    { id: 'data', labelKey: 'nav.portfolios', icon: PortfoliosIcon },
 ];
 
 const activeStyle  = { background: 'var(--accent-dim)', color: 'var(--accent)' } as const;
@@ -49,6 +53,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
     const onHome = activePage === 'home';
     const router = useRouter();
+    const { t } = useTranslation();
 
     return (
         <aside
@@ -74,7 +79,7 @@ export function AppSidebar({
                     <div className="min-w-0">
                         <div className="text-[10px] font-semibold uppercase tracking-widest"
                             style={{ color: 'var(--text-muted)' }}>
-                            Portfolio
+                            {t('sidebar.activePortfolio')}
                         </div>
                         <div className="text-sm font-medium truncate" title={activeSetName}
                             style={{ color: 'var(--text-primary)' }}>
@@ -87,7 +92,7 @@ export function AppSidebar({
             {/* Nav — Overview · Analysis · Assets · Screener · Data */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">
                 {(() => {
-                    const viewButton = ({ id, label, icon: Icon }: { id: SidebarViewId; label: string; icon: React.ComponentType<{ size?: number }> }) => {
+                    const viewButton = ({ id, labelKey, icon: Icon }: NavItem) => {
                         const isActive = onHome && activeView === id;
                         return (
                             <button key={id}
@@ -98,7 +103,7 @@ export function AppSidebar({
                                 className={itemClass}
                                 style={isActive ? activeStyle : defaultStyle}>
                                 <Icon size={17} />
-                                {label}
+                                {t(labelKey)}
                             </button>
                         );
                     };
@@ -110,7 +115,7 @@ export function AppSidebar({
                             {activePage === 'deep-dive' ? (
                                 <div className={itemClass} style={activeStyle}>
                                     <MdTrendingUp size={17} />
-                                    Analysis
+                                    {t('nav.analysis')}
                                 </div>
                             ) : (
                                 <button
@@ -118,7 +123,7 @@ export function AppSidebar({
                                     className={itemClass}
                                     style={defaultStyle}>
                                     <MdTrendingUp size={17} />
-                                    Analysis
+                                    {t('nav.analysis')}
                                 </button>
                             )}
 
@@ -128,7 +133,7 @@ export function AppSidebar({
                             {activePage === 'screener' ? (
                                 <div className={itemClass} style={activeStyle}>
                                     <MdManageSearch size={17} />
-                                    Screener
+                                    {t('nav.screener')}
                                 </div>
                             ) : (
                                 <button
@@ -136,7 +141,7 @@ export function AppSidebar({
                                     className={itemClass}
                                     style={defaultStyle}>
                                     <MdManageSearch size={17} />
-                                    Screener
+                                    {t('nav.screener')}
                                 </button>
                             )}
 
@@ -153,16 +158,16 @@ export function AppSidebar({
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
                         {currency}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>base currency</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('sidebar.baseCurrency')}</span>
                 </div>
                 {onHome && onSettingsClick ? (
                     <button
                         onClick={onSettingsClick}
                         className={itemClass}
                         style={defaultStyle}
-                        aria-label="Open settings">
+                        aria-label={t('settings.open')}>
                         <MdSettings size={17} />
-                        Settings
+                        {t('nav.settings')}
                     </button>
                 ) : (
                     <button
@@ -170,7 +175,7 @@ export function AppSidebar({
                         className={itemClass}
                         style={defaultStyle}>
                         <MdSettings size={17} />
-                        Settings
+                        {t('nav.settings')}
                     </button>
                 )}
             </div>

@@ -10,21 +10,43 @@ import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core'
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
 import { MdDeleteOutline } from 'react-icons/md';
+import { translate, DEFAULT_LANGUAGE, localeTag } from '../../../i18n';
+import type { TranslationKey, TranslationParams } from '../../../i18n';
 
 const columnHelper = createColumnHelper<Position>();
+
+/** Translator signature, so callers can hand in the one from `useTranslation`. */
+type Translator = (key: TranslationKey, params?: TranslationParams) => string;
+
+interface CreateTableColumnsOptions {
+    showDelete?: boolean;
+    showSell?: boolean;
+    /** Defaults to English so non-React callers (and tests) work unchanged. */
+    t?: Translator;
+    /** BCP 47 tag for number formatting inside cells. */
+    locale?: string;
+}
 
 /**
  * Creates the table column definitions with proper formatting and cell renderers
  * Each column includes header, size, and custom cell rendering logic
+ *
+ * Column headers are resolved eagerly with the translator passed in, so they
+ * stay plain strings — the column-visibility menu stringifies them.
  * @returns Array of column definitions for react-table
  */
-export function createTableColumns({ showDelete = false, showSell = false }: { showDelete?: boolean; showSell?: boolean } = {}) {
+export function createTableColumns({
+    showDelete = false,
+    showSell = false,
+    t = (key, params) => translate(DEFAULT_LANGUAGE, key, params),
+    locale = localeTag(DEFAULT_LANGUAGE),
+}: CreateTableColumnsOptions = {}) {
     const cols = [
         /**
          * Transaction date column - shows when the position was acquired
          */
         columnHelper.accessor('transactionDate', {
-            header: 'Date',
+            header: t('column.date'),
             size: 100,
         }),
 
@@ -33,7 +55,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Clickable link that opens in new tab for detailed stock information
          */
         columnHelper.accessor('ticker', {
-            header: 'Ticker',
+            header: t('column.ticker'),
             size: 100,
             cell: (props) => {
                 const ticker = props.getValue();
@@ -53,7 +75,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const count = props.table.getRowModel().rows.length;
                 return (
                     <span style={{ color: 'var(--text-muted)' }}>
-                        Total ({count})
+                        {t('table.totalCount', { count })}
                     </span>
                 );
             },
@@ -63,7 +85,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Company full name column
          */
         columnHelper.accessor('fullName', {
-            header: 'Name',
+            header: t('column.name'),
             size: 150,
         }),
 
@@ -72,7 +94,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Uses broker information mapping for user-friendly display
          */
         columnHelper.accessor('broker', {
-            header: 'Broker',
+            header: t('column.broker'),
             size: 140,
             cell: props => {
                 const brokerName = props.row.original.broker;
@@ -84,7 +106,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Account type column (e.g., JP General, JP NISA)
          */
         columnHelper.accessor('account', {
-            header: 'Account',
+            header: t('column.account'),
             size: 100,
         }),
 
@@ -93,12 +115,12 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Shows number of shares/units or hidden dots based on showValues setting
          */
         columnHelper.accessor('quantity', {
-            header: 'Quantity',
+            header: t('column.quantity'),
             size: 100,
             cell: props => {
                 const value = props.getValue();
                 return props.table.options.meta?.showValues
-                    ? value.toLocaleString()
+                    ? value.toLocaleString(locale)
                     : getHiddenValue(value);
             },
         }),
@@ -108,13 +130,13 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Calculates and displays the unit price at time of purchase
          */
         columnHelper.accessor('costPerUnit', {
-            header: 'Orig Unit Price',
+            header: t('column.origUnitPrice'),
             size: 120,
             cell: props => {
                 const row = props.row.original;
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 const costPerUnitBase = row.costInJPY / row.quantity;
-                return formatCurrencyValue(costPerUnitBase, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(costPerUnitBase, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
         }),
 
@@ -123,17 +145,17 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          */
         columnHelper.accessor(row => row.costPerUnit * row.quantity, {
             id: 'totalCost',
-            header: 'Orig Position',
+            header: t('column.origPosition'),
             size: 120,
             cell: props => {
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 const value = props.row.original.costInJPY;
-                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
             footer: props => {
                 const total = props.table.getRowModel().rows.reduce((sum, row) => sum + row.original.costInJPY, 0);
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
-                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
         }),
 
@@ -142,7 +164,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Shows the FX rate from transaction currency to JPY for non-JPY positions
          */
         columnHelper.accessor('transactionFxRate', {
-            header: 'Orig FX Rate',
+            header: t('column.origFxRate'),
             size: 140,
             cell: props => {
                 const value = props.getValue();
@@ -152,7 +174,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
 
                 // Show N/A when transaction currency matches base currency (no FX conversion)
                 if (row.transactionCcy === baseCcy) {
-                    return <span style={{ color: 'var(--text-muted)' }}>N/A</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.notApplicable')}</span>;
                 }
 
                 // Create Yahoo Finance historical FX rate URL
@@ -178,7 +200,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:opacity-80 transition-opacity flex-shrink-0"
-                            title={`View ${fxPair} historical rate on ${row.transactionDate}`}
+                            title={t('column.viewHistoricalFx', { pair: fxPair, date: row.transactionDate })}
                         >
                             <FxRateIcon currencyPair={fxPair} className="w-6 h-6" />
                         </a>
@@ -192,18 +214,18 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Color-coded to show gains (green) or losses (red)
          */
         columnHelper.accessor('currentPrice', {
-            header: 'Curr Price (Stock Ccy)',
+            header: t('column.currPriceStockCcy'),
             size: 120,
             cell: props => {
                 const value = props.getValue();
                 const row = props.row.original;
                 
                 if (value === null) {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 
                 const currencyCode = row.stockCcy;
-                const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false);
+                const displayValue = formatCurrencyValue(value, currencyCode, props.table.options.meta?.showValues ?? false, locale);
                     
                 return (
                     <span className="tabular-nums" style={{ color: value >= row.costPerUnit ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
@@ -220,11 +242,11 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
         columnHelper.accessor('currentFxRate', {
             header: () => (
                 <span
-                    title="FX uses the previous settled daily close (≈ yesterday) so portfolio values stay reproducible. Prices are live."
+                    title={t('column.currFxRateTooltip')}
                     className="inline-flex items-center gap-1 cursor-help"
                 >
-                    Curr FX Rate (Stock-Base)
-                    <span style={{ color: 'var(--text-muted)' }}>· prev close</span>
+                    {t('column.currFxRate')}
+                    <span style={{ color: 'var(--text-muted)' }}>· {t('column.prevClose')}</span>
                 </span>
             ),
             size: 140,
@@ -234,7 +256,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
 
                 if (row.stockCcy === baseCcy) {
-                    return <span style={{ color: 'var(--text-muted)' }}>N/A</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.notApplicable')}</span>;
                 }
 
                 if (!props.table.options.meta?.showValues) {
@@ -252,7 +274,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                             target="_blank"
                             rel="noopener noreferrer"
                             className="hover:opacity-80 transition-opacity flex-shrink-0"
-                            title={`View current ${fxPair} rate on Yahoo Finance`}
+                            title={t('column.viewCurrentFx', { pair: fxPair })}
                         >
                             <FxRateIcon currencyPair={fxPair} className="w-6 h-6" />
                         </a>
@@ -266,21 +288,21 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Shows the current market value of the position
          */
         columnHelper.accessor('currentValueJPY', {
-            header: 'Curr Value',
+            header: t('column.currValue'),
             size: 130,
             cell: props => {
                 if (props.row.original.currentPrice === null) {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
-                return formatCurrencyValue(props.getValue(), baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(props.getValue(), baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
             footer: props => {
                 const rows = props.table.getRowModel().rows.filter(r => r.original.currentPrice !== null);
                 if (rows.length === 0) return null;
                 const total = rows.reduce((sum, row) => sum + row.original.currentValueJPY, 0);
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
-                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
         }),
 
@@ -290,15 +312,15 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * lots roll dividends into realized P&L; see ClosedPositionsTable.
          */
         columnHelper.accessor('pnlJPY', {
-            header: 'Unrealized P&L',
+            header: t('column.unrealizedPnl'),
             size: 140,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
-                const displayValue = formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
+                const displayValue = formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false, locale);
                 return (
                     <span className="tabular-nums" style={{ color: value >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {displayValue}
@@ -310,7 +332,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 if (rows.length === 0) return null;
                 const total = rows.reduce((sum, row) => sum + row.original.pnlJPY, 0);
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
-                const displayValue = formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+                const displayValue = formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false, locale);
                 return (
                     <span className="tabular-nums" style={{ color: total >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                         {displayValue}
@@ -323,12 +345,12 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * Unrealized P&L %, mirroring the column above.
          */
         columnHelper.accessor('pnlPercentage', {
-            header: 'Unrealized P&L %',
+            header: t('column.unrealizedPnlPct'),
             size: 130,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null) {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 
                 if (!props.table.options.meta?.showValues) {
@@ -337,7 +359,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 
                 return (
                     <span className="tabular-nums" style={{ color: value >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
-                        {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                        {value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                     </span>
                 );
             },
@@ -349,12 +371,12 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          *   closed: (proceeds      + dividends − cost) / cost × 100
          */
         columnHelper.accessor('totalReturnPercentage', {
-            header: 'Total Return %',
+            header: t('column.totalReturnPct'),
             size: 110,
             cell: props => {
                 const value = props.getValue();
                 if (props.row.original.currentPrice === null && props.row.original.status === 'open') {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 if (!props.table.options.meta?.showValues) {
                     return getHiddenValue(value);
@@ -384,7 +406,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             };
         }, {
             id: 'annualizedReturn',
-            header: 'Annual Return %',
+            header: t('column.annualReturnPct'),
             size: 100,
             sortingFn: (rowA, rowB) => {
                 const a = (rowA.getValue('annualizedReturn') as { sortValue: number }).sortValue;
@@ -393,7 +415,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
             },
             cell: props => {
                 if (props.row.original.currentPrice === null) {
-                    return <span style={{ color: 'var(--text-muted)' }}>Loading...</span>;
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
                 }
                 
                 const value = props.getValue();
@@ -402,7 +424,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                     return (
                         <span 
                             style={{ color: 'var(--text-muted)' }} 
-                            title={`Position held for ${value.days} days. Annual return will be calculated after 1 year (${remainingDays} days remaining).`}
+                            title={t('column.annualReturnPending', { days: value.days, remaining: remainingDays })}
                         >
                             -
                         </span>
@@ -413,7 +435,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                     <span
                         className="tabular-nums"
                         style={{ color: value.return >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)' }}
-                        title={`Annualized based on ${value.days} days holding period (${(value.days / 365).toFixed(1)} years)`}
+                        title={t('column.annualReturnBasis', { days: value.days, years: (value.days / 365).toFixed(1) })}
                     >
                         {value.return.toFixed(2)}%
                     </span>
@@ -427,7 +449,7 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
          * visually separate from price-only P&L numbers.
          */
         columnHelper.accessor('dividendIncomeJPY', {
-            header: 'Total Dividends',
+            header: t('column.totalDividends'),
             size: 130,
             cell: props => {
                 const value = props.getValue();
@@ -435,13 +457,13 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                 if (!value) {
                     return <span style={{ color: 'var(--text-muted)' }}>—</span>;
                 }
-                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(value, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
             footer: props => {
                 const total = props.table.getRowModel().rows.reduce((sum, row) => sum + (row.original.dividendIncomeJPY ?? 0), 0);
                 const baseCcy = props.table.options.meta?.baseCurrency ?? 'JPY';
                 if (!total) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false);
+                return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
         }),
     ];
@@ -462,10 +484,10 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                             color: 'var(--accent)',
                             border: '1px solid var(--accent-glow)',
                         }}
-                        aria-label="Sell position"
-                        title="Record a sell transaction"
+                        aria-label={t('table.sellPosition')}
+                        title={t('table.sellPositionTitle')}
                     >
-                        Sell
+                        {t('table.sell')}
                     </button>
                 );
             },
@@ -486,8 +508,8 @@ export function createTableColumns({ showDelete = false, showSell = false }: { s
                         onClick={e => { e.stopPropagation(); onDelete?.(props.row.original); }}
                         className="flex items-center justify-center p-2 rounded transition-all hover:opacity-70"
                         style={{ color: 'var(--text-muted, #6b7280)' }}
-                        aria-label="Delete position"
-                        title="Delete position"
+                        aria-label={t('table.deletePosition')}
+                        title={t('table.deletePosition')}
                     >
                         <MdDeleteOutline size={18} />
                     </button>

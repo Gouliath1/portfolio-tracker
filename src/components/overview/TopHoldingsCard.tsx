@@ -2,6 +2,7 @@
 
 import { Position } from '@portfolio/types';
 import { Card } from './Card';
+import { useTranslation } from '../../i18n';
 
 interface TopHoldingsCardProps {
     positions: Position[];
@@ -14,15 +15,16 @@ interface TopHoldingsCardProps {
 export const TopHoldingsCard = ({
     positions, totalValueJPY, formatValue, showValues, limit = 5,
 }: TopHoldingsCardProps) => {
+    const { t } = useTranslation();
     const top = [...positions]
         .filter(p => p.currentValueJPY > 0)
         .sort((a, b) => b.currentValueJPY - a.currentValueJPY)
         .slice(0, limit);
 
     return (
-        <Card title="Top Holdings">
+        <Card title={t('overview.topHoldings')}>
             {top.length === 0 ? (
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No open holdings.</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('overview.noOpenHoldings')}</p>
             ) : (
                 <div className="space-y-3">
                     {top.map(p => {

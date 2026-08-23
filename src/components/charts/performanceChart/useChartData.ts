@@ -3,6 +3,14 @@ import { Position } from '@portfolio/types';
 import { calculateHistoricalPortfolioValues, createLiveSnapshot, HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, generateDateIntervals } from './chartUtils';
 import { readCachedChart, writeCachedChart } from '../../../utils/pnlCache';
+import type { TranslationKey } from '../../../i18n';
+
+/**
+ * The hook surfaces a translation key rather than a message: the component that
+ * renders it owns the active language, and a key keeps the error correct if the
+ * user switches language while it is on screen.
+ */
+export const HISTORICAL_DATA_ERROR_KEY: TranslationKey = 'chart.errHistoricalData';
 
 // `currency` must be the same base currency the `positions` were computed in
 // (passed down from the page). Reading currency from a separate useBaseCurrency()
@@ -13,7 +21,7 @@ import { readCachedChart, writeCachedChart } from '../../../utils/pnlCache';
 export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter, currency: string) => {
     const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
 
     // The last interval is "now", but historical series only have the last
     // close (monthly/daily depending on timeline). Anchor the final point to
@@ -58,7 +66,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
             writeCachedChart(positions, currency, selectedTimeline, snapshots);
         } catch (err) {
             console.error('Error calculating historical data:', err);
-            setError('Failed to calculate historical portfolio data');
+            setError(HISTORICAL_DATA_ERROR_KEY);
             if (!cached) setHistoricalData([]); // keep stale cache if recompute fails
         } finally {
             setIsLoading(false);

@@ -1,10 +1,11 @@
 import { Position } from '@portfolio/types';
 import { HistoricalSnapshot } from '@portfolio/core';
 import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { defaultTranslator, DEFAULT_LOCALE, type Translator } from './chartData';
 
-function formatBase(value: number, symbol: string, currency: string): string {
-    if (currency === 'JPY') return `${symbol}${Math.round(value).toLocaleString()}`;
-    return `${symbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatBase(value: number, symbol: string, currency: string, locale: string): string {
+    if (currency === 'JPY') return `${symbol}${Math.round(value).toLocaleString(locale)}`;
+    return `${symbol}${value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export const createCustomTooltip = (
@@ -14,7 +15,9 @@ export const createCustomTooltip = (
     selectedTimeline: TimelineFilter,
     showValues: boolean,
     symbol: string = '¥',
-    currency: string = 'JPY'
+    currency: string = 'JPY',
+    t: Translator = defaultTranslator,
+    locale: string = DEFAULT_LOCALE,
 ) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (context: any) => {
@@ -56,10 +59,10 @@ export const createCustomTooltip = (
             const date = dateIntervals[index];
             const snapshot = historicalData[index];
             
-            let innerHTML = createTooltipHeader(date);
-            innerHTML += createTooltipMainContent(tooltip, snapshot, showValues, symbol, currency);
-            innerHTML += createTooltipPositionBreakdown(snapshot, showValues, symbol, currency);
-            innerHTML += createTooltipTransactions(date, positions, selectedTimeline, showValues, symbol, currency);
+            let innerHTML = createTooltipHeader(date, locale);
+            innerHTML += createTooltipMainContent(tooltip, snapshot, showValues, symbol, currency, t, locale);
+            innerHTML += createTooltipPositionBreakdown(snapshot, showValues, symbol, currency, t, locale);
+            innerHTML += createTooltipTransactions(date, positions, selectedTimeline, showValues, symbol, currency, t, locale);
             
             tooltipEl.innerHTML = innerHTML;
         }
@@ -70,14 +73,14 @@ export const createCustomTooltip = (
 
 const cssVarStr = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-const createTooltipHeader = (date: Date): string => {
+const createTooltipHeader = (date: Date, locale: string): string => {
     return `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid ${cssVarStr('--border')}; padding-bottom: 4px;">
-        ${date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        ${date.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })}
     </div>`;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | undefined, showValues: boolean, symbol: string, currency: string): string => {
+const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | undefined, showValues: boolean, symbol: string, currency: string, t: Translator, locale: string): string => {
     const mainValue = tooltip.dataPoints[0].raw as number;
     const label = tooltip.dataPoints[0].dataset.label;
 
@@ -85,7 +88,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
         ${label}: `;
 
     if (showValues) {
-        innerHTML += `${formatBase(mainValue, symbol, currency)}
+        innerHTML += `${formatBase(mainValue, symbol, currency, locale)}
     </div>`;
 
         if (snapshot) {
@@ -95,10 +98,10 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
             const pnlSign = isPositive ? '+' : '-';
 
             innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
-                <div>Total Value: ${formatBase(snapshot.totalValueJPY, symbol, currency)}</div>
-                <div>Total Cost: ${formatBase(snapshot.totalCostJPY, symbol, currency)}</div>
+                <div>${t('summary.totalValue')}: ${formatBase(snapshot.totalValueJPY, symbol, currency, locale)}</div>
+                <div>${t('chart.totalCost')}: ${formatBase(snapshot.totalCostJPY, symbol, currency, locale)}</div>
                 <div style="color: ${pnlColor}; font-weight: 600;">
-                    P&L: ${pnlSign}${formatBase(pnlAbs, symbol, currency)} (${snapshot.pnlPercentage >= 0 ? '+' : ''}${snapshot.pnlPercentage.toFixed(2)}%)
+                    ${t('chart.pnl')}: ${pnlSign}${formatBase(pnlAbs, symbol, currency, locale)} (${snapshot.pnlPercentage >= 0 ? '+' : ''}${snapshot.pnlPercentage.toFixed(2)}%)
                 </div>
             </div>`;
         }
@@ -113,7 +116,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
             
             innerHTML += `<div style="margin-bottom: 12px; font-size: 13px;">
                 <div style="color: ${pnlColor}; font-weight: 600;">
-                    Portfolio P&L: ${pnlSign}${snapshot.pnlPercentage.toFixed(2)}%
+                    ${t('chart.portfolioPnl')}: ${pnlSign}${snapshot.pnlPercentage.toFixed(2)}%
                 </div>
             </div>`;
         }
@@ -122,7 +125,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
     return innerHTML;
 };
 
-const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined, showValues: boolean, symbol: string, currency: string): string => {
+const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined, showValues: boolean, symbol: string, currency: string, t: Translator, locale: string): string => {
     if (!snapshot?.positionDetails || snapshot.positionDetails.length === 0) {
         return '';
     }
@@ -132,8 +135,8 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
     const MAX_VISIBLE = 5;
     const visiblePositions = sortedPositions.slice(0, MAX_VISIBLE);
 
-    let innerHTML = `<div style="margin-bottom: 6px; font-weight: 500;">Portfolio Breakdown${
-        sortedPositions.length > MAX_VISIBLE ? ` (top ${MAX_VISIBLE})` : ''
+    let innerHTML = `<div style="margin-bottom: 6px; font-weight: 500;">${t('chart.breakdown')}${
+        sortedPositions.length > MAX_VISIBLE ? ` ${t('chart.breakdownTop', { count: MAX_VISIBLE })}` : ''
     }:</div>`;
 
     visiblePositions.forEach((position) => {
@@ -142,10 +145,10 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
         const pnlPercentSign = position.pnlPercentage >= 0 ? '+' : '';
         
         if (showValues) {
-            const valueStr = formatBase(position.valueInJPY, symbol, currency);
-            const pnlStr = formatBase(Math.abs(position.pnlJPY), symbol, currency);
+            const valueStr = formatBase(position.valueInJPY, symbol, currency, locale);
+            const pnlStr = formatBase(Math.abs(position.pnlJPY), symbol, currency, locale);
             const pnlSign = isPositive ? '+' : '-';
-            const quantityInfo = `${position.quantity} shares`;
+            const quantityInfo = t('chart.shares', { count: position.quantity.toLocaleString(locale) });
 
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
                 • ${position.fullName}: ${valueStr} | ${quantityInfo} |
@@ -172,7 +175,9 @@ const createTooltipTransactions = (
     selectedTimeline: TimelineFilter,
     showValues: boolean,
     symbol: string,
-    currency: string
+    currency: string,
+    t: Translator,
+    locale: string,
 ): string => {
     const currentInterval = getIntervalForTimeline(selectedTimeline);
     const transactions = getTransactionsNearDate(positions, date, currentInterval);
@@ -182,18 +187,19 @@ const createTooltipTransactions = (
     }
     
     let innerHTML = `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid ${cssVarStr('--border')};">`;
-    innerHTML += '<div style="margin-bottom: 6px; font-weight: 500;">Transactions on this date:</div>';
-    
+    innerHTML += `<div style="margin-bottom: 6px; font-weight: 500;">${t('chart.transactionsOnDate')}:</div>`;
+
     transactions.forEach((transaction: Position) => {
+        const shares = t('chart.shares', { count: transaction.quantity.toLocaleString(locale) });
         if (showValues) {
             const totalCostNum = transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1);
-            const totalCostStr = formatBase(totalCostNum, symbol, currency);
+            const totalCostStr = formatBase(totalCostNum, symbol, currency, locale);
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${transaction.fullName}: ${transaction.quantity} shares @ ${totalCostStr}
+                • ${transaction.fullName}: ${shares} @ ${totalCostStr}
             </div>`;
         } else {
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${transaction.fullName}: ${transaction.quantity} shares
+                • ${transaction.fullName}: ${shares}
             </div>`;
         }
     });

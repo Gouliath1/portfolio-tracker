@@ -5,6 +5,7 @@ import {
     MdHome, MdAccountBalance, MdSwapHoriz, MdAccountBalanceWallet,
     MdTrendingUp, MdSettings, MdManageSearch,
 } from 'react-icons/md';
+import { useTranslation } from '../../i18n';
 
 export type MobileNavPage = 'home' | 'deep-dive' | 'screener';
 export type HomeView = 'overview' | 'assets' | 'data';
@@ -29,6 +30,7 @@ export function MobileBottomNav({
     onSettingsToggle,
 }: MobileBottomNavProps) {
     const router = useRouter();
+    const { t } = useTranslation();
 
     const c = (active: boolean) => ({ color: active ? 'var(--accent)' : 'var(--text-muted)' });
     const noSettings = !settingsOpen;
@@ -57,28 +59,28 @@ export function MobileBottomNav({
                 className={BTN}
                 style={c(noSettings && activePage === 'home' && activeView === 'overview')}
             >
-                <MdHome size={20} /><span>Overview</span>
+                <MdHome size={20} /><span>{t('nav.overview')}</span>
             </button>
             <button
                 onClick={() => activePage === 'deep-dive' ? handleCurrentPage() : router.push('/returns/deep-dive')}
                 className={BTN}
                 style={c(noSettings && activePage === 'deep-dive')}
             >
-                <MdTrendingUp size={20} /><span>Analysis</span>
+                <MdTrendingUp size={20} /><span>{t('nav.analysis')}</span>
             </button>
             <button
                 onClick={() => goHomeView('assets')}
                 className={BTN}
                 style={c(noSettings && activePage === 'home' && activeView === 'assets')}
             >
-                <MdAccountBalance size={20} /><span>Assets</span>
+                <MdAccountBalance size={20} /><span>{t('nav.assets')}</span>
             </button>
             <button
                 onClick={() => activePage === 'screener' ? handleCurrentPage() : router.push('/screener')}
                 className={BTN}
                 style={c(noSettings && activePage === 'screener')}
             >
-                <MdManageSearch size={20} /><span>Screener</span>
+                <MdManageSearch size={20} /><span>{t('nav.screener')}</span>
             </button>
             <button
                 onClick={() => goHomeView('data')}
@@ -88,15 +90,15 @@ export function MobileBottomNav({
                 <span className="inline-flex items-center" style={{ gap: 1 }}>
                     <MdAccountBalanceWallet size={20} />
                     <MdSwapHoriz size={15} />
-                </span><span>Portfolios</span>
+                </span><span>{t('nav.portfolios')}</span>
             </button>
             <button
                 onClick={onSettingsToggle}
-                aria-label="Settings"
+                aria-label={t('nav.settings')}
                 className={BTN}
                 style={{ ...c(settingsOpen), borderLeft: '1px solid var(--border)' }}
             >
-                <MdSettings size={20} /><span>Settings</span>
+                <MdSettings size={20} /><span>{t('nav.settings')}</span>
             </button>
         </nav>
     );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../../../i18n';
 
 interface ChartLegendProps {
     showValues: boolean;
@@ -33,31 +34,35 @@ const Item = ({ children }: { children: React.ReactNode }) => (
     <span className="inline-flex items-center gap-2">{children}</span>
 );
 
-export const ChartLegend: React.FC<ChartLegendProps> = ({ showValues }) => (
-    <div
-        className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-2.5"
-        style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)' }}
-    >
-        {showValues ? (
-            <>
-                <Item>
-                    <Dot color="var(--chart-line1)" />
-                    Portfolio Value
-                </Item>
-                <Item>
-                    <Dash color="var(--chart-line2)" />
-                    Cost Basis
-                </Item>
+export const ChartLegend: React.FC<ChartLegendProps> = ({ showValues }) => {
+    const { t } = useTranslation();
+
+    return (
+        <div
+            className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-2.5"
+            style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)' }}
+        >
+            {showValues ? (
+                <>
+                    <Item>
+                        <Dot color="var(--chart-line1)" />
+                        {t('chart.legendValue')}
+                    </Item>
+                    <Item>
+                        <Dash color="var(--chart-line2)" />
+                        {t('chart.legendCostBasis')}
+                    </Item>
+                    <Item>
+                        <Dot color="var(--chart-line3)" />
+                        {t('chart.legendPnl')}
+                    </Item>
+                </>
+            ) : (
                 <Item>
                     <Dot color="var(--chart-line3)" />
-                    P&amp;L
+                    {t('chart.legendPnlPct')}
                 </Item>
-            </>
-        ) : (
-            <Item>
-                <Dot color="var(--chart-line3)" />
-                Portfolio P&amp;L %
-            </Item>
-        )}
-    </div>
-);
+            )}
+        </div>
+    );
+};

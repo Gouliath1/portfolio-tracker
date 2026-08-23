@@ -1,6 +1,7 @@
 'use client';
 
 import { colorForAssetClass } from './assetClassColors';
+import { useTranslation, assetClassKey } from '../../i18n';
 
 interface AssetClassFilterProps {
     // Asset classes present in the portfolio, in display order.
@@ -13,6 +14,8 @@ interface AssetClassFilterProps {
 // Toggle-chip row that scopes the whole overview to a subset of asset classes.
 // Hidden when there's nothing to choose between (0 or 1 class present).
 export const AssetClassFilter = ({ present, selected, onChange }: AssetClassFilterProps) => {
+    const { t } = useTranslation();
+
     if (present.length <= 1) return null;
 
     const allActive = selected === null;
@@ -29,7 +32,7 @@ export const AssetClassFilter = ({ present, selected, onChange }: AssetClassFilt
         <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium uppercase tracking-widest mr-1"
                 style={{ color: 'var(--text-muted)' }}>
-                Assets
+                {t('nav.assets')}
             </span>
 
             <button
@@ -39,7 +42,7 @@ export const AssetClassFilter = ({ present, selected, onChange }: AssetClassFilt
                     ? { background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }
                     : { color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
-                All
+                {t('common.all')}
             </button>
 
             {present.map(c => {
@@ -56,7 +59,7 @@ export const AssetClassFilter = ({ present, selected, onChange }: AssetClassFilt
                     >
                         <span className="w-2 h-2 rounded-full"
                             style={{ background: colorForAssetClass(c), opacity: on ? 1 : 0.4 }} />
-                        {c}
+                        {t(assetClassKey(c))}
                     </button>
                 );
             })}

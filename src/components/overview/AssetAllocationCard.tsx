@@ -3,6 +3,7 @@
 import { Position } from '@portfolio/types';
 import { Card } from './Card';
 import { ASSET_CLASS_ORDER, colorForAssetClass } from './assetClassColors';
+import { useTranslation, assetClassKey } from '../../i18n';
 
 interface AssetAllocationCardProps {
     positions: Position[];
@@ -38,6 +39,8 @@ const CIRC = 2 * Math.PI * RADIUS;
 export const AssetAllocationCard = ({
     positions, assetClasses, totalValueJPY, symbol, showValues, isLoading,
 }: AssetAllocationCardProps) => {
+    const { t } = useTranslation();
+
     // Sum current value per asset class. Tickers not yet classified bucket into
     // "Other" so the donut still renders while Yahoo lookups resolve.
     const totals = new Map<string, number>();
@@ -69,7 +72,7 @@ export const AssetAllocationCard = ({
     let offset = 0;
 
     return (
-        <Card title="Asset Allocation">
+        <Card title={t('overview.assetAllocation')}>
             <div className="flex items-center gap-4">
                 {/* Donut */}
                 <div className="relative flex-shrink-0" style={{ width: 124, height: 124 }}>
@@ -106,7 +109,7 @@ export const AssetAllocationCard = ({
                         </span>
                         <span className="text-[9px] uppercase tracking-widest mt-1"
                             style={{ color: 'var(--text-muted)' }}>
-                            Total Value
+                            {t('summary.totalValue')}
                         </span>
                     </div>
                 </div>
@@ -118,7 +121,7 @@ export const AssetAllocationCard = ({
                             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                                 style={{ background: seg.color }} />
                             <span className="flex-1 min-w-0 truncate" style={{ color: 'var(--text-secondary)' }}>
-                                {seg.label}
+                                {t(assetClassKey(seg.label))}
                             </span>
                             <span className="tabular-nums font-medium" style={{ color: 'var(--text-primary)' }}>
                                 {seg.pct.toFixed(1)}%
@@ -126,7 +129,7 @@ export const AssetAllocationCard = ({
                         </div>
                     )) : (
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                            {isLoading ? 'Classifying holdings…' : 'No holdings to allocate.'}
+                            {isLoading ? t('overview.classifying') : t('overview.noHoldings')}
                         </p>
                     )}
                 </div>

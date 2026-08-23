@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Position } from '@portfolio/types';
 import { formatCurrencyValue, getHiddenValue } from './positionsTable/currencyUtils';
 import { MdHistory, MdExpandMore, MdExpandLess } from 'react-icons/md';
+import { useTranslation } from '../../i18n';
 
 interface ClosedPositionsTableProps {
     positions: Position[];
@@ -22,6 +23,7 @@ export const ClosedPositionsTable = ({
     realizedCostJPY,
     realizedPnlPercentage,
 }: ClosedPositionsTableProps) => {
+    const { t, locale } = useTranslation();
     const [expanded, setExpanded] = useState(true);
 
     if (positions.length === 0) return null;
@@ -39,28 +41,28 @@ export const ClosedPositionsTable = ({
                 <div className="flex items-center gap-3">
                     <MdHistory size={18} style={{ color: 'var(--text-muted)' }} />
                     <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        Closed positions
+                        {t('closed.title')}
                     </h2>
                     <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {positions.length} {positions.length === 1 ? 'lot' : 'lots'}
+                        {t(positions.length === 1 ? 'closed.lotCount' : 'closed.lotCountPlural', { count: positions.length })}
                     </span>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="text-right">
                         <div className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                            Realized P&amp;L
+                            {t('closed.realizedPnl')}
                         </div>
                         <div
                             className="text-lg font-semibold tabular-nums"
                             style={{ color: positive ? 'var(--pnl-green)' : 'var(--pnl-red)' }}
                         >
                             {showValues
-                                ? `${sign}${formatCurrencyValue(realizedPnlJPY, baseCurrency, true)} · ${sign}${realizedPnlPercentage.toFixed(2)}%`
-                                : `${sign}${formatCurrencyValue(realizedPnlJPY, baseCurrency, false)}`}
+                                ? `${sign}${formatCurrencyValue(realizedPnlJPY, baseCurrency, true, locale)} · ${sign}${realizedPnlPercentage.toFixed(2)}%`
+                                : `${sign}${formatCurrencyValue(realizedPnlJPY, baseCurrency, false, locale)}`}
                         </div>
                         {showValues && (
                             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                on {formatCurrencyValue(realizedCostJPY, baseCurrency, true)} cost
+                                {t('closed.onCost', { cost: formatCurrencyValue(realizedCostJPY, baseCurrency, true, locale) })}
                             </div>
                         )}
                     </div>
@@ -74,19 +76,19 @@ export const ClosedPositionsTable = ({
                     <table className="w-full tabular-nums">
                         <thead>
                             <tr style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Sold</th>
-                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Ticker</th>
-                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Name</th>
-                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Account</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Qty</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Cost/u</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Sale/u</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Cost</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Proceeds</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Realized P&amp;L</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.sold')}</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('column.ticker')}</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('column.name')}</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('column.account')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.qty')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.costPerUnit')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.salePerUnit')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('summary.cost')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.proceeds')}</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.realizedPnl')}</th>
                                 <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">%</th>
-                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">Total Dividends</th>
-                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">Acquired</th>
+                                <th className="text-right text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('column.totalDividends')}</th>
+                                <th className="text-left text-xs font-semibold uppercase tracking-widest py-2 pr-3">{t('closed.acquired')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -102,7 +104,7 @@ export const ClosedPositionsTable = ({
                                         <td className="text-xs sm:text-sm py-2 pr-3">{p.fullName}</td>
                                         <td className="text-xs sm:text-sm py-2 pr-3">{p.account}</td>
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right">
-                                            {showValues ? p.quantity.toLocaleString() : getHiddenValue(p.quantity)}
+                                            {showValues ? p.quantity.toLocaleString(locale) : getHiddenValue(p.quantity)}
                                         </td>
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {showValues ? p.costPerUnit.toFixed(4) : getHiddenValue(p.costPerUnit)}
@@ -110,17 +112,17 @@ export const ClosedPositionsTable = ({
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {showValues ? (p.salePricePerUnit ?? 0).toFixed(4) : getHiddenValue(p.salePricePerUnit ?? 0)}
                                         </td>
-                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(p.costInJPY, baseCurrency, showValues)}</td>
-                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(proceeds, baseCurrency, showValues)}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(p.costInJPY, baseCurrency, showValues, locale)}</td>
+                                        <td className="text-xs sm:text-sm py-2 pr-3 text-right">{formatCurrencyValue(proceeds, baseCurrency, showValues, locale)}</td>
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
-                                            {formatCurrencyValue(realizedPnl, baseCurrency, showValues)}
+                                            {formatCurrencyValue(realizedPnl, baseCurrency, showValues, locale)}
                                         </td>
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right" style={{ color: isPos ? 'var(--pnl-green)' : 'var(--pnl-red)' }}>
                                             {showValues ? `${realizedPct >= 0 ? '+' : ''}${realizedPct.toFixed(2)}%` : getHiddenValue(realizedPct)}
                                         </td>
                                         <td className="text-xs sm:text-sm py-2 pr-3 text-right">
                                             {p.dividendIncomeJPY
-                                                ? formatCurrencyValue(p.dividendIncomeJPY, baseCurrency, showValues)
+                                                ? formatCurrencyValue(p.dividendIncomeJPY, baseCurrency, showValues, locale)
                                                 : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                                         </td>
                                         <td className="text-xs sm:text-sm py-2 pr-3">{p.transactionDate}</td>

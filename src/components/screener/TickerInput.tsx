@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MdAdd } from 'react-icons/md';
 import { useTickerName } from '../../hooks/useTickerName';
 import type { IndexConstituent } from '../../types/screener';
+import { useTranslation } from '../../i18n';
 
 interface TickerInputProps {
     onAdd: (constituent: IndexConstituent) => void;
@@ -15,6 +16,7 @@ interface TickerInputProps {
  * resolved name as confirmation, and emits an IndexConstituent on submit.
  */
 export function TickerInput({ onAdd }: TickerInputProps) {
+    const { t } = useTranslation();
     const [ticker, setTicker] = useState('');
     const [name, setName] = useState<string | null>(null);
 
@@ -41,9 +43,9 @@ export function TickerInput({ onAdd }: TickerInputProps) {
                     value={ticker}
                     onChange={e => { setTicker(e.target.value); setName(null); }}
                     onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-                    placeholder="Add ticker (e.g. 7203.T)"
+                    placeholder={t('tickerInput.placeholder')}
                     autoComplete="off"
-                    aria-label="Add a single ticker"
+                    aria-label={t('tickerInput.ariaLabel')}
                 />
                 <span
                     className="text-xs truncate max-w-[160px] h-4"
@@ -54,7 +56,7 @@ export function TickerInput({ onAdd }: TickerInputProps) {
                         visibility: (symbol && (lookupState === 'loading' || lookupState === 'found' || lookupState === 'not-found')) ? 'visible' : 'hidden',
                     }}
                 >
-                    {lookupState === 'loading' ? 'Looking up…' : name ?? 'Name not found'}
+                    {lookupState === 'loading' ? t('addPosition.lookingUp') : name ?? t('tickerInput.nameNotFound')}
                 </span>
             </div>
             <button
@@ -64,7 +66,7 @@ export function TickerInput({ onAdd }: TickerInputProps) {
                 style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
             >
                 <MdAdd size={15} />
-                Add
+                {t('common.add')}
             </button>
         </div>
     );

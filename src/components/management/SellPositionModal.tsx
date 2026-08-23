@@ -5,7 +5,15 @@ import { MdClose, MdRemoveCircleOutline, MdInfo } from 'react-icons/md';
 import { Position, Transaction } from '@portfolio/types';
 import { openQuantityFor } from '@portfolio/core';
 import { DEMO_SET_ID } from '../../data/demoPositions';
-import { getTransactionsForSet } from '../../utils/localPositions';
+import { getTransactionsForSet, MY_PORTFOLIO_NAME } from '../../utils/localPositions';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey, TranslationParams } from '../../i18n';
+
+/** A validation failure held as a key + params so it re-renders in the active language. */
+interface FormError {
+    key: TranslationKey;
+    params?: TranslationParams;
+}
 
 interface SellPositionModalProps {
     setId: string;
@@ -15,6 +23,7 @@ interface SellPositionModalProps {
 }
 
 export default function SellPositionModal({ setId, position, onSaved, onClose }: SellPositionModalProps) {
+    const { t, locale } = useTranslation();
     const transactions = useMemo(() => getTransactionsForSet(setId), [setId]);
     const availableQty = useMemo(
         () => openQuantityFor(transactions, position.ticker, position.account),
@@ -27,7 +36,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
     );
     const [fees, setFees] = useState<string>('');
     const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().slice(0, 10));
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<FormError | null>(null);
 
     const addCommas = (raw: string) => {
         if (!raw) return raw;
@@ -61,21 +70,21 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
     const zeroDecimalCcys = new Set(['JPY', 'KRW']);
     const fmtCcy = (n: number, ccy: string) => {
         const frac = zeroDecimalCcys.has(ccy) ? 0 : 2;
-        return n.toLocaleString(undefined, { minimumFractionDigits: frac, maximumFractionDigits: frac });
+        return n.toLocaleString(locale, { minimumFractionDigits: frac, maximumFractionDigits: frac });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isNaN(qtyNum) || qtyNum <= 0) return setError('Quantity must be a positive number');
-        if (isNaN(priceNum) || priceNum < 0) return setError('Sale price must be a non-negative number');
-        if (feesNum < 0) return setError('Fees must be non-negative');
-        if (!saleDate) return setError('Sale date is required');
+        if (isNaN(qtyNum) || qtyNum <= 0) return setError({ key: 'sell.errQuantity' });
+        if (isNaN(priceNum) || priceNum < 0) return setError({ key: 'sell.errSalePrice' });
+        if (feesNum < 0) return setError({ key: 'sell.errFees' });
+        if (!saleDate) return setError({ key: 'sell.errDateRequired' });
 
         // Re-check available qty against current storage right before append,
         // to avoid a stale-snapshot oversell if another tab/action changed state.
         const freshAvailable = openQuantityFor(getTransactionsForSet(setId), position.ticker, position.account);
         if (qtyNum > freshAvailable) {
-            return setError(`Only ${freshAvailable} available now — refresh and try again`);
+            return setError({ key: 'sell.errOversell', params: { available: freshAvailable } });
         }
 
         const tx: Transaction = {
@@ -118,9 +127,9 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
             >
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
                     <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        Sell {String(position.ticker)}
+                        {t('sell.title', { ticker: String(position.ticker) })}
                     </h2>
-                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}>
                         <MdClose size={18} />
                     </button>
                 </div>
@@ -130,40 +139,42 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                         <div className="flex gap-2 rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
                             <MdInfo size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                             <p style={{ color: 'var(--text-secondary)' }}>
-                                This will create a new <strong style={{ color: 'var(--text-primary)' }}>My Portfolio</strong> set with the demo positions and activate it.
+                                {t('sell.demoNoticeBefore')}
+                                <strong style={{ color: 'var(--text-primary)' }}>{MY_PORTFOLIO_NAME}</strong>
+                                {t('sell.demoNoticeAfter')}
                             </p>
                         </div>
                     )}
 
                     <div className="rounded-xl px-4 py-3" style={{ border: '1px solid var(--border)' }}>
                         <div className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                            Available to sell
+                            {t('sell.availableToSell')}
                         </div>
                         <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="text-2xl font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                                {availableQty.toLocaleString()}
+                                {availableQty.toLocaleString(locale)}
                             </span>
                             <span className="text-base font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {String(position.ticker)}
                             </span>
                             <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                in {position.account}
+                                {t('sell.inAccount', { account: position.account })}
                             </span>
                         </div>
                         <p className="text-xs mt-2 pt-2" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)' }}>
-                            Cost basis is allocated FIFO across earlier buys. Proceeds settle in {position.stockCcy}.
+                            {t('sell.fifoNote', { currency: position.stockCcy })}
                         </p>
                     </div>
 
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
-                            {error}
+                            {t(error.key, error.params)}
                         </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Sell quantity *</label>
+                            <label className="text-xs" style={labelStyle}>{t('sell.quantity')} *</label>
                             <input
                                 type="text" inputMode="decimal"
                                 className={inputClass} style={inputStyle}
@@ -172,7 +183,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Sale price/unit *</label>
+                            <label className="text-xs" style={labelStyle}>{t('sell.pricePerUnit')} *</label>
                             <input
                                 type="text" inputMode="decimal"
                                 className={inputClass} style={inputStyle}
@@ -181,7 +192,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                             />
                             {position.currentPrice !== null && (
                                 <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                                    mkt: {fmtCcy(position.currentPrice, position.stockCcy)} {position.stockCcy}
+                                    {t('sell.marketPrice')}: {fmtCcy(position.currentPrice, position.stockCcy)} {position.stockCcy}
                                 </p>
                             )}
                         </div>
@@ -189,7 +200,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Fees</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.fees')}</label>
                             <input
                                 type="text" inputMode="decimal"
                                 className={inputClass} style={inputStyle}
@@ -198,7 +209,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Sale date *</label>
+                            <label className="text-xs" style={labelStyle}>{t('sell.saleDate')} *</label>
                             <input
                                 type="date"
                                 className={inputClass} style={inputStyle}
@@ -209,8 +220,8 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
 
                     {netProceedsNum !== null && (
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Net proceeds: <span style={{ color: 'var(--text-secondary)' }}>{fmtCcy(netProceedsNum, position.stockCcy)} {position.stockCcy}</span>
-                            {isPartial && <span> &middot; Remaining: {(availableQty - qtyNum).toLocaleString()} {String(position.ticker)}</span>}
+                            {t('sell.netProceeds')}: <span style={{ color: 'var(--text-secondary)' }}>{fmtCcy(netProceedsNum, position.stockCcy)} {position.stockCcy}</span>
+                            {isPartial && <span> &middot; {t('sell.remaining')}: {(availableQty - qtyNum).toLocaleString(locale)} {String(position.ticker)}</span>}
                         </p>
                     )}
 
@@ -221,7 +232,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                             style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red)' }}
                         >
                             <MdRemoveCircleOutline size={16} />
-                            Record sale
+                            {t('sell.submit')}
                         </button>
                         <button
                             type="button"
@@ -229,7 +240,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                             className="px-4 py-2.5 rounded-xl text-sm font-medium glass glass-hover transition-all"
                             style={{ color: 'var(--text-secondary)' }}
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 </form>

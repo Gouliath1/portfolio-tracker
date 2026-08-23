@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import type { PositionSetLocal } from '../../utils/localPositions';
-import { DEMO_SET } from '../../data/demoPositions';
+import { DEMO_SET, DEMO_SET_ID } from '../../data/demoPositions';
+import { useTranslation } from '../../i18n';
 
 interface DemoBannerProps {
     refreshTrigger?: number;
 }
 
 export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
+    const { t } = useTranslation();
     const [activeSet, setActiveSet] = useState<PositionSetLocal | null>(null);
     const [isVisible, setIsVisible] = useState(true);
 
@@ -66,7 +68,11 @@ export default function DemoBanner({ refreshTrigger }: DemoBannerProps) {
                 )}
             </svg>
 
-            <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{activeSet.description}</p>
+            {/* The demo set's description is app copy, so it gets translated;
+                every other set carries a description the user typed on import. */}
+            <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>
+                {activeSet.id === DEMO_SET_ID ? t('demoBanner.message') : activeSet.description}
+            </p>
 
             {!isWarning && (
                 <button onClick={() => setIsVisible(false)}

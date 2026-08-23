@@ -26,6 +26,7 @@ import { TimelineFilterButtons } from './performanceChart/TimelineFilterButtons'
 import { ChartLegend } from './performanceChart/ChartLegend';
 import { LoadingState, ErrorState, NoDataState } from './performanceChart/ChartStates';
 import { useChartData } from './performanceChart/useChartData';
+import { useTranslation } from '../../i18n';
 
 ChartJS.register(
     CategoryScale, LinearScale, PointElement, LineElement,
@@ -41,6 +42,7 @@ interface PerformanceChartProps {
 
 export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symbol = '¥' }: PerformanceChartProps) => {
     const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
+    const { t, locale } = useTranslation();
     useTheme();
 
     // The custom tooltip lives on document.body, so it can outlive the chart when
@@ -53,7 +55,7 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
 
     const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline, currency);
     const dateIntervals = generateDateIntervals(selectedTimeline, positions);
-    const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues, currency);
+    const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues, currency, t, locale);
 
     // Frame the y-axis to the actual data range, padded by 10% top and bottom.
     const yValues = chartData.datasets
@@ -68,10 +70,10 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
         yBounds = { min: dataMin - pad, max: dataMax + pad };
     }
 
-    const options = createChartOptions(showValues, selectedTimeline, symbol, currency, yBounds);
+    const options = createChartOptions(showValues, selectedTimeline, symbol, currency, yBounds, locale);
     options.plugins!.tooltip = {
         enabled: false,
-        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues, symbol, currency),
+        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues, symbol, currency, t, locale),
     };
     // Config consumed by the latest-value pill badge plugin.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,7 +81,7 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
 
     const renderChart = () => {
         if (isLoading) return <LoadingState />;
-        if (error) return <ErrorState error={error} />;
+        if (error) return <ErrorState error={t(error)} />;
         if (dateIntervals.length === 0 || historicalData.length === 0) return <NoDataState />;
         return <Line data={chartData} options={options} />;
     };
@@ -99,7 +101,7 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
                     className="font-semibold"
                     style={{ color: 'var(--text-primary)', fontSize: '20px', letterSpacing: '-0.01em' }}
                 >
-                    Portfolio P&amp;L Over Time
+                    {t('chart.title')}
                 </h2>
                 <TimelineFilterButtons
                     selectedTimeline={selectedTimeline}

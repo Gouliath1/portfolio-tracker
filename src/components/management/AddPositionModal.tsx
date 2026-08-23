@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { MdClose, MdAdd, MdInfo } from 'react-icons/md';
 import { Transaction, Currency } from '@portfolio/types';
 import { DEMO_SET_ID } from '../../data/demoPositions';
-import { getTransactionsForSet } from '../../utils/localPositions';
+import { getTransactionsForSet, MY_PORTFOLIO_NAME } from '../../utils/localPositions';
 import { useTickerName } from '../../hooks/useTickerName';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 interface AddPositionModalProps {
     setId: string;
@@ -59,28 +61,29 @@ function toTransaction(f: FormState): Transaction {
     };
 }
 
-function validate(f: FormState): string | null {
-    if (!f.ticker.trim()) return 'Ticker is required';
-    if (!f.fullName.trim()) return 'Company name is required';
-    if (!f.account.trim()) return 'Account is required';
+/** Returns the key of the first failing rule, or null when the form is valid. */
+export function validate(f: FormState): TranslationKey | null {
+    if (!f.ticker.trim()) return 'addPosition.errTickerRequired';
+    if (!f.fullName.trim()) return 'addPosition.errNameRequired';
+    if (!f.account.trim()) return 'addPosition.errAccountRequired';
     const qty = parseFloat(f.quantity);
-    if (!f.quantity || isNaN(qty) || qty <= 0) return 'Quantity must be a positive number';
+    if (!f.quantity || isNaN(qty) || qty <= 0) return 'addPosition.errQuantity';
     const cpu = parseFloat(f.costPerUnit);
-    if (!f.costPerUnit || isNaN(cpu) || cpu < 0) return 'Cost per unit must be a non-negative number';
+    if (!f.costPerUnit || isNaN(cpu) || cpu < 0) return 'addPosition.errCostPerUnit';
     if (f.fees) {
         const fees = parseFloat(f.fees);
-        if (isNaN(fees) || fees < 0) return 'Fees must be a non-negative number';
+        if (isNaN(fees) || fees < 0) return 'addPosition.errFees';
     }
-    if (!f.transactionDate.trim()) return 'Transaction date is required';
+    if (!f.transactionDate.trim()) return 'addPosition.errDateRequired';
     const norm = f.transactionDate.trim().replace(/\//g, '-');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(norm)) return 'Date must be in YYYY-MM-DD format';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(norm)) return 'addPosition.errDateFormat';
     // Reject impossible dates like 2023-02-31 (Date silently rolls them over).
     const [y, m, day] = norm.split('-').map(Number);
     const d = new Date(`${norm}T00:00:00`);
     if (isNaN(d.getTime()) || d.getFullYear() !== y || d.getMonth() + 1 !== m || d.getDate() !== day) {
-        return 'That date does not exist';
+        return 'addPosition.errDateInvalid';
     }
-    if (d.getTime() > Date.now()) return 'Transaction date cannot be in the future';
+    if (d.getTime() > Date.now()) return 'addPosition.errDateFuture';
     return null;
 }
 
@@ -92,13 +95,14 @@ function useKnownValues(setId: string) {
 }
 
 export default function AddPositionModal({ setId, onSaved, onClose, initialTicker, initialName }: AddPositionModalProps) {
+    const { t } = useTranslation();
     const [form, setForm] = useState<FormState>({
         ...EMPTY,
         transactionDate: todayIso(),
         ticker: initialTicker ?? '',
         fullName: initialName ?? '',
     });
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
     const [nameOverridden, setNameOverridden] = useState(!!initialName);
 
     const { brokers, accounts } = useKnownValues(setId);
@@ -164,8 +168,8 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Add position</h2>
-                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('addPosition.title')}</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}>
                         <MdClose size={18} />
                     </button>
                 </div>
@@ -177,21 +181,23 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                         <div className="flex gap-2 rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
                             <MdInfo size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                             <p style={{ color: 'var(--text-secondary)' }}>
-                                This will create a new <strong style={{ color: 'var(--text-primary)' }}>My Portfolio</strong> set with the demo positions plus this one, and activate it.
+                                {t('addPosition.demoNoticeBefore')}
+                                <strong style={{ color: 'var(--text-primary)' }}>{MY_PORTFOLIO_NAME}</strong>
+                                {t('addPosition.demoNoticeAfter')}
                             </p>
                         </div>
                     )}
 
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
-                            {error}
+                            {t(error)}
                         </div>
                     )}
 
                     {/* Ticker + Company name */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Ticker *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.ticker')} *</label>
                             <input
                                 className={inputClass} style={inputStyle}
                                 value={form.ticker} onChange={set('ticker')}
@@ -202,12 +208,12 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                         </div>
                         <div className="space-y-1">
                             <div className="flex items-center justify-between h-4">
-                                <label className="text-xs" style={labelStyle}>Company name *</label>
+                                <label className="text-xs" style={labelStyle}>{t('addPosition.companyName')} *</label>
                                 {nameLookupState === 'loading' && (
-                                    <span className="text-xs" style={{ color: 'var(--accent)' }}>Looking up…</span>
+                                    <span className="text-xs" style={{ color: 'var(--accent)' }}>{t('addPosition.lookingUp')}</span>
                                 )}
                                 {nameLookupState === 'found' && !nameOverridden && (
-                                    <span className="text-xs" style={{ color: 'var(--pnl-green)' }}>Auto-filled</span>
+                                    <span className="text-xs" style={{ color: 'var(--pnl-green)' }}>{t('addPosition.autoFilled')}</span>
                                 )}
                             </div>
                             <input
@@ -221,7 +227,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                     {/* Quantity + Cost per unit + Fees */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Quantity *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.quantity')} *</label>
                             <input
                                 type="number" min="0" step="any"
                                 className={inputClass} style={inputStyle}
@@ -230,7 +236,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Cost per unit *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.costPerUnit')} *</label>
                             <input
                                 type="number" min="0" step="any"
                                 className={inputClass} style={inputStyle}
@@ -239,7 +245,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Fees</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.fees')}</label>
                             <input
                                 type="number" min="0" step="any"
                                 className={inputClass} style={inputStyle}
@@ -252,9 +258,11 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                     {/* Total cost hint */}
                     {totalCost && (
                         <p className="text-xs -mt-3" style={{ color: 'var(--text-muted)' }}>
-                            Total cost: <span style={{ color: 'var(--text-secondary)' }}>{totalCost} {form.transactionCcy}</span>
+                            {t('addPosition.totalCost')}: <span style={{ color: 'var(--text-secondary)' }}>{totalCost} {form.transactionCcy}</span>
                             {parseFloat(form.fees) > 0 && (
-                                <span> · effective cost/unit: {((parseFloat(form.quantity) * parseFloat(form.costPerUnit) + parseFloat(form.fees)) / parseFloat(form.quantity)).toFixed(4)}</span>
+                                <span> · {t('addPosition.effectiveCostPerUnit', {
+                                    value: ((parseFloat(form.quantity) * parseFloat(form.costPerUnit) + parseFloat(form.fees)) / parseFloat(form.quantity)).toFixed(4),
+                                })}</span>
                             )}
                         </p>
                     )}
@@ -262,13 +270,13 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                     {/* Currencies */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Transaction currency *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.transactionCurrency')} *</label>
                             <select className={inputClass} style={inputStyle} value={form.transactionCcy} onChange={set('transactionCcy')}>
                                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Stock currency *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.stockCurrency')} *</label>
                             <select className={inputClass} style={inputStyle} value={form.stockCcy} onChange={set('stockCcy')}>
                                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
@@ -277,7 +285,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
 
                     {/* Date — typed manually, defaults to today */}
                     <div className="space-y-1">
-                        <label className="text-xs" style={labelStyle}>Transaction date *</label>
+                        <label className="text-xs" style={labelStyle}>{t('addPosition.transactionDate')} *</label>
                         <input
                             type="text"
                             inputMode="numeric"
@@ -287,19 +295,19 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             value={form.transactionDate} onChange={set('transactionDate')}
                         />
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Type the date as YYYY-MM-DD (defaults to today). Used to look up the historical FX rate at time of purchase.
+                            {t('addPosition.dateHelp')}
                         </p>
                     </div>
 
                     {/* Broker + Account with datalist suggestions */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Broker</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.broker')}</label>
                             <input
                                 list="brokers-list"
                                 className={inputClass} style={inputStyle}
                                 value={form.broker} onChange={set('broker')}
-                                placeholder="My Broker"
+                                placeholder={t('addPosition.brokerPlaceholder')}
                                 autoComplete="off"
                             />
                             <datalist id="brokers-list">
@@ -307,12 +315,12 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             </datalist>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs" style={labelStyle}>Account *</label>
+                            <label className="text-xs" style={labelStyle}>{t('addPosition.account')} *</label>
                             <input
                                 list="accounts-list"
                                 className={inputClass} style={inputStyle}
                                 value={form.account} onChange={set('account')}
-                                placeholder="Main Account"
+                                placeholder={t('addPosition.accountPlaceholder')}
                                 autoComplete="off"
                             />
                             <datalist id="accounts-list">
@@ -329,7 +337,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                         >
                             <MdAdd size={16} />
-                            Add position
+                            {t('addPosition.submit')}
                         </button>
                         <button
                             type="button"
@@ -337,7 +345,7 @@ export default function AddPositionModal({ setId, onSaved, onClose, initialTicke
                             className="px-4 py-2.5 rounded-xl text-sm font-medium glass glass-hover transition-all"
                             style={{ color: 'var(--text-secondary)' }}
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 </form>

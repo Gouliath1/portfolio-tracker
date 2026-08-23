@@ -1,17 +1,22 @@
 import { Position } from '@portfolio/types';
+import type { TranslationKey } from '../../../i18n';
 
 export type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | 'All';
 
-export const TIMELINE_BUTTONS: { key: TimelineFilter; label: string }[] = [
-    { key: '1D', label: '1D' },
-    { key: '5D', label: '5D' },
-    { key: '1M', label: '1M' },
-    { key: '6M', label: '6M' },
-    { key: 'YTD', label: 'YTD' },
-    { key: '1Y', label: '1Y' },
-    { key: '2Y', label: '2Y' },
-    { key: '5Y', label: '5Y' },
-    { key: 'All', label: 'All' }
+/**
+ * The `key` is the internal timeline identity (never translated — it drives the
+ * date maths and cache keys); `labelKey` is what the button shows.
+ */
+export const TIMELINE_BUTTONS: { key: TimelineFilter; labelKey: TranslationKey }[] = [
+    { key: '1D', labelKey: 'timeline.1d' },
+    { key: '5D', labelKey: 'timeline.5d' },
+    { key: '1M', labelKey: 'timeline.1m' },
+    { key: '6M', labelKey: 'timeline.6m' },
+    { key: 'YTD', labelKey: 'timeline.ytd' },
+    { key: '1Y', labelKey: 'timeline.1y' },
+    { key: '2Y', labelKey: 'timeline.2y' },
+    { key: '5Y', labelKey: 'timeline.5y' },
+    { key: 'All', labelKey: 'timeline.all' }
 ];
 
 export const generateDateIntervals = (timeline: TimelineFilter, positions: Position[]): Date[] => {
@@ -81,22 +86,22 @@ export const generateDateIntervals = (timeline: TimelineFilter, positions: Posit
     return dates;
 };
 
-export const formatDateLabel = (date: Date, timeline: TimelineFilter): string => {
+export const formatDateLabel = (date: Date, timeline: TimelineFilter, locale = 'en-US'): string => {
     switch (timeline) {
         case '1D':
-            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
         case '5D':
         case '1M':
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
         case '6M':
         case 'YTD':
         case '1Y':
         case '2Y':
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
         case '5Y':
         case 'All':
         default:
-            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+            return date.toLocaleDateString(locale, { year: 'numeric', month: 'short' });
     }
 };
 

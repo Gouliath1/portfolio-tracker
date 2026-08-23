@@ -10,11 +10,12 @@ import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@port
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../../hooks/useActiveSetName';
 import { usePortfolioSummaryData } from '../../../hooks/usePortfolioSummaryData';
+import { useTranslation } from '../../../i18n';
 
 // ── Date helpers ─────────────────────────────────────────────
 const parseDate = (s: string) => new Date(s.replace(/\//g, '-'));
-const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-const fmtLong  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtShort = (d: Date, locale: string) => d.toLocaleDateString(locale, { month: 'short', year: '2-digit' });
+const fmtLong  = (d: Date, locale: string) => d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
 const holdYrs  = (a: Date, b: Date) => (b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 
 // ── Mini cash-flow table ─────────────────────────────────────
@@ -29,6 +30,8 @@ function MiniTable({
     formatValue: (n: number, show: boolean) => string;
     outflow?: boolean;
 }) {
+    const { t, locale } = useTranslation();
+
     return (
         <div className="flex-1 min-w-[160px]">
             <p className="text-xs font-semibold uppercase tracking-widest mb-2"
@@ -40,9 +43,9 @@ function MiniTable({
                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                         <tr>
                             <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-widest"
-                                style={{ color: 'var(--text-muted)' }}>Date</th>
+                                style={{ color: 'var(--text-muted)' }}>{t('column.date')}</th>
                             <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-widest"
-                                style={{ color: 'var(--text-muted)' }}>Amount</th>
+                                style={{ color: 'var(--text-muted)' }}>{t('deepDive.amount')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -53,7 +56,7 @@ function MiniTable({
                                 <tr key={j} style={{ borderTop: j === 0 ? 'none' : '1px solid var(--border)' }}>
                                     <td className="px-3 py-2 text-xs tabular-nums"
                                         style={{ color: 'var(--text-muted)' }}>
-                                        {isNaN(d.getTime()) ? '—' : fmtLong(d)}
+                                        {isNaN(d.getTime()) ? '—' : fmtLong(d, locale)}
                                     </td>
                                     <td className="px-3 py-2 text-xs font-semibold tabular-nums text-right"
                                         style={{ color }}>
@@ -71,6 +74,7 @@ function MiniTable({
 
 // ── Page ─────────────────────────────────────────────────────
 export default function DeepDivePage() {
+    const { t, locale } = useTranslation();
     const [mounted, setMounted] = useState(false);
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
     const [priceHistory, setPriceHistory] = useState<Map<string, Record<string, number>>>(new Map());
@@ -204,25 +208,25 @@ export default function DeepDivePage() {
                             "Analysis" tab doesn't imply a full analysis suite. */}
                         <div className="flex-shrink-0">
                             <p className="text-xs font-semibold uppercase tracking-widest mb-1"
-                                style={{ color: 'var(--text-muted)' }}>Analysis</p>
+                                style={{ color: 'var(--text-muted)' }}>{t('nav.analysis')}</p>
                             <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                Returns
+                                {t('deepDive.title')}
                             </h1>
                             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                                How your money has grown over time — annualised with XIRR, reconciled against every cash flow.
+                                {t('deepDive.subtitle')}
                             </p>
                         </div>
 
                         {loading && (
                             <div className="flex-1 min-h-0 flex items-center justify-center">
-                                <span className="text-sm animate-pulse" style={{ color: 'var(--text-muted)' }}>Loading…</span>
+                                <span className="text-sm animate-pulse" style={{ color: 'var(--text-muted)' }}>{t('common.loadingEllipsis')}</span>
                             </div>
                         )}
 
                         {error && (
                             <div className="rounded-xl px-4 py-3 text-sm"
                                 style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
-                                {error}
+                                {t(error.key)}{error.detail ? ` (${error.detail})` : ''}
                             </div>
                         )}
 
@@ -235,7 +239,7 @@ export default function DeepDivePage() {
                                         className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-left"
                                         style={{ color: 'var(--text-primary)' }}
                                     >
-                                        What is XIRR?
+                                        {t('deepDive.whatIsXirr')}
                                         <span style={{
                                             color: 'var(--text-muted)',
                                             display: 'inline-block',
@@ -249,10 +253,12 @@ export default function DeepDivePage() {
                                         <div className="px-5 pb-4 space-y-3 text-sm leading-relaxed"
                                             style={{ borderTop: '1px solid var(--border)' }}>
                                             <p className="pt-3" style={{ color: 'var(--text-secondary)' }}>
-                                                XIRR (extended internal rate of return) is the annualised return that ties together every cash flow — money you put in (each buy), money that came back out (each sale, each dividend), and the value still in the market today — placed on the actual dates they happened. It&apos;s the rate that makes the present value of everything balance to zero.
+                                                {t('deepDive.xirrPara1')}
                                             </p>
                                             <p style={{ color: 'var(--text-secondary)' }}>
-                                                A stock that doubled in 8 years has a far lower XIRR than one that doubled in 2, even though the percentage gain is identical. The <strong>Held</strong> column shows each position&apos;s window so you can read its XIRR in context.
+                                                {t('deepDive.xirrPara2Before')}
+                                                <strong>{t('deepDive.held')}</strong>
+                                                {t('deepDive.xirrPara2After')}
                                             </p>
                                         </div>
                                     )}
@@ -262,14 +268,14 @@ export default function DeepDivePage() {
                                 <div className="flex-shrink-0">
                                     <p className="text-xs font-semibold uppercase tracking-widest mb-3"
                                         style={{ color: 'var(--text-muted)' }}>
-                                        Headline Reconciliation
+                                        {t('deepDive.headlineReconciliation')}
                                     </p>
                                     <div className="flex gap-3 flex-wrap sm:flex-nowrap items-stretch">
                                         <div className="flex-shrink-0 w-full sm:w-[160px] rounded-xl px-5 py-4 flex flex-col justify-between"
                                             style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
                                             <p className="text-xs font-semibold uppercase tracking-widest"
                                                 style={{ color: 'var(--accent)' }}>
-                                                Portfolio XIRR
+                                                {t('overview.portfolioXirr')}
                                             </p>
                                             <div className="mt-3">
                                                 <div className="text-3xl font-semibold tabular-nums leading-none"
@@ -280,7 +286,8 @@ export default function DeepDivePage() {
                                                 </div>
                                                 {annualized && earliestDate && portfolioAge !== null && (
                                                     <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-                                                        since {earliestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} · {portfolioAge.toFixed(1)} yr
+                                                        {t('summary.since', { date: earliestDate.toLocaleDateString(locale, { month: 'short', year: 'numeric' }) })}
+                                                        {' · '}{t('deepDive.years', { years: portfolioAge.toFixed(1) })}
                                                     </p>
                                                 )}
                                             </div>
@@ -289,15 +296,15 @@ export default function DeepDivePage() {
                                         <div className="flex-1 min-w-0 flex flex-col gap-3">
                                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                 {([
-                                                    { label: 'Total Invested', sub: 'open + closed cost', value: totalInvested },
-                                                    { label: 'Proceeds',       sub: 'from sales',          value: proceeds },
-                                                    { label: 'Dividends',      sub: 'all-time',             value: totalDividends },
-                                                    { label: 'Open Value',     sub: 'current',              value: openValue },
-                                                ] as const).map(({ label, sub, value }) => (
-                                                    <div key={label} className="glass rounded-xl px-4 py-3">
+                                                    { labelKey: 'deepDive.totalInvested', subKey: 'deepDive.totalInvestedSub', value: totalInvested },
+                                                    { labelKey: 'deepDive.proceeds',      subKey: 'deepDive.proceedsSub',      value: proceeds },
+                                                    { labelKey: 'summary.dividends',      subKey: 'deepDive.dividendsSub',     value: totalDividends },
+                                                    { labelKey: 'deepDive.openValue',     subKey: 'deepDive.openValueSub',     value: openValue },
+                                                ] as const).map(({ labelKey, subKey, value }) => (
+                                                    <div key={labelKey} className="glass rounded-xl px-4 py-3">
                                                         <p className="text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)' }}>{label}</p>
-                                                        <p className="text-[9px] mb-2" style={{ color: 'var(--text-muted)', opacity: 0.65 }}>{sub}</p>
+                                                            style={{ color: 'var(--text-muted)' }}>{t(labelKey)}</p>
+                                                        <p className="text-[9px] mb-2" style={{ color: 'var(--text-muted)', opacity: 0.65 }}>{t(subKey)}</p>
                                                         <p className="text-base font-semibold tabular-nums"
                                                             style={{ color: 'var(--text-primary)' }}>
                                                             {formatValue(value, true)}
@@ -309,9 +316,9 @@ export default function DeepDivePage() {
                                             <div className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-4">
                                                 <div>
                                                     <p className="text-xs font-semibold uppercase tracking-widest"
-                                                        style={{ color: 'var(--text-muted)' }}>Net Gain</p>
+                                                        style={{ color: 'var(--text-muted)' }}>{t('deepDive.netGain')}</p>
                                                     <p className="text-[9px]" style={{ color: 'var(--text-muted)', opacity: 0.65 }}>
-                                                        open value + proceeds + dividends − total invested
+                                                        {t('deepDive.netGainFormula')}
                                                     </p>
                                                 </div>
                                                 <p className="text-xl font-semibold tabular-nums flex-shrink-0"
@@ -327,8 +334,8 @@ export default function DeepDivePage() {
                                 <div className="flex gap-1 rounded-xl p-1 flex-shrink-0"
                                     style={{ background: 'var(--glass-hover)', border: '1px solid var(--border)', width: 'fit-content' }}>
                                     {([
-                                        { id: 'lifetime', label: 'Lifetime XIRR' },
-                                        { id: 'annual',   label: 'Annual Returns' },
+                                        { id: 'lifetime', labelKey: 'deepDive.tabLifetime' },
+                                        { id: 'annual',   labelKey: 'deepDive.tabAnnual' },
                                     ] as const).map(tab => (
                                         <button key={tab.id}
                                             onClick={() => setActiveTab(tab.id)}
@@ -336,7 +343,7 @@ export default function DeepDivePage() {
                                             style={activeTab === tab.id
                                                 ? { background: 'var(--surface)', color: 'var(--text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
                                                 : { color: 'var(--text-muted)' }}>
-                                            {tab.label}
+                                            {t(tab.labelKey)}
                                         </button>
                                     ))}
                                 </div>
@@ -346,9 +353,9 @@ export default function DeepDivePage() {
                                     <div className="flex-1 min-h-0 flex flex-col">
                                         <p className="text-xs font-semibold uppercase tracking-widest mb-3 flex-shrink-0"
                                             style={{ color: 'var(--text-muted)' }}>
-                                            Returns by position
+                                            {t('deepDive.returnsByPosition')}
                                             <span className="ml-2 normal-case font-normal" style={{ opacity: 0.6 }}>
-                                                — click a row to see its cash flows
+                                                — {t('deepDive.returnsByPositionHint')}
                                             </span>
                                         </p>
                                         <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-none">
@@ -357,15 +364,15 @@ export default function DeepDivePage() {
                                                     style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                     <tr>
                                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest sticky left-0 z-30"
-                                                            style={{ color: 'var(--text-muted)', width: 180, background: 'var(--table-header-bg)' }}>Position</th>
+                                                            style={{ color: 'var(--text-muted)', width: 180, background: 'var(--table-header-bg)' }}>{t('deepDive.position')}</th>
                                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest whitespace-nowrap"
-                                                            style={{ color: 'var(--text-muted)', width: 140 }}>Held</th>
+                                                            style={{ color: 'var(--text-muted)', width: 140 }}>{t('deepDive.held')}</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 110 }}>Invested</th>
+                                                            style={{ color: 'var(--text-muted)', width: 110 }}>{t('deepDive.invested')}</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 110 }}>Value</th>
+                                                            style={{ color: 'var(--text-muted)', width: 110 }}>{t('deepDive.value')}</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
-                                                            style={{ color: 'var(--text-muted)', width: 110 }}>Dividends</th>
+                                                            style={{ color: 'var(--text-muted)', width: 110 }}>{t('summary.dividends')}</th>
                                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest"
                                                             style={{ color: 'var(--accent)', width: 110 }}>↓ XIRR</th>
                                                     </tr>
@@ -409,7 +416,7 @@ export default function DeepDivePage() {
                                                                                     {p.status === 'closed' && (
                                                                                         <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
                                                                                             style={{ background: 'var(--glass-hover)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                                                                                            CLOSED
+                                                                                            {t('deepDive.closedBadge')}
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
@@ -423,10 +430,10 @@ export default function DeepDivePage() {
                                                                     </td>
                                                                     <td className="px-4 py-3">
                                                                         <p className="text-sm tabular-nums whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-                                                                            {held.toFixed(1)} yr
+                                                                            {t('deepDive.years', { years: held.toFixed(1) })}
                                                                         </p>
                                                                         <p className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                                                                            {fmtShort(buyDate)} → {p.status === 'closed' && p.saleDate ? fmtShort(parseDate(p.saleDate)) : 'now'}
+                                                                            {fmtShort(buyDate, locale)} → {p.status === 'closed' && p.saleDate ? fmtShort(parseDate(p.saleDate), locale) : t('deepDive.now')}
                                                                         </p>
                                                                     </td>
                                                                     <td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: 'var(--text-primary)' }}>
@@ -451,14 +458,14 @@ export default function DeepDivePage() {
                                                                             style={{ background: 'var(--bg-base)' }}>
                                                                             <div className="flex gap-4 flex-wrap">
                                                                                 <MiniTable
-                                                                                    title="Purchase"
+                                                                                    title={t('deepDive.purchase')}
                                                                                     rows={[{ date: buyDate, amount: p.costInJPY }]}
                                                                                     formatValue={formatValue}
                                                                                     outflow
                                                                                 />
                                                                                 {dividendEvents.length > 0 && (
                                                                                     <MiniTable
-                                                                                        title={`Dividends (${dividendEvents.length})`}
+                                                                                        title={`${t('summary.dividends')} (${dividendEvents.length})`}
                                                                                         rows={dividendEvents.map(ev => ({
                                                                                             date: ev.exDate,
                                                                                             amount: ev.amountInBase,
@@ -467,7 +474,7 @@ export default function DeepDivePage() {
                                                                                     />
                                                                                 )}
                                                                                 <MiniTable
-                                                                                    title={p.status === 'closed' ? 'Sale' : 'Still held'}
+                                                                                    title={p.status === 'closed' ? t('deepDive.sale') : t('deepDive.stillHeld')}
                                                                                     rows={[{
                                                                                         date: p.status === 'closed' && p.saleDate
                                                                                             ? parseDate(p.saleDate)
@@ -488,7 +495,7 @@ export default function DeepDivePage() {
                                                     style={{ background: 'var(--table-header-bg)', borderTop: '1px solid var(--border)' }}>
                                                     <tr>
                                                         <td className="px-4 py-3 text-xs font-semibold uppercase tracking-widest sticky left-0 z-30"
-                                                            style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)' }}>Total</td>
+                                                            style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)' }}>{t('deepDive.total')}</td>
                                                         <td />{/* Held */}
                                                         <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
                                                             style={{ color: 'var(--text-primary)' }}>
@@ -515,14 +522,14 @@ export default function DeepDivePage() {
                                     <div className="flex-1 min-h-0 flex flex-col">
                                         <p className="text-xs font-semibold uppercase tracking-widest mb-3 flex-shrink-0"
                                             style={{ color: 'var(--text-muted)' }}>
-                                            Per-Position Annual Returns
+                                            {t('deepDive.annualReturnsTitle')}
                                             <span className="ml-2 normal-case font-normal" style={{ opacity: 0.6 }}>
-                                                — price return in native currency, partial years at buy/sale
+                                                — {t('deepDive.annualReturnsHint')}
                                             </span>
                                         </p>
                                         {loadingPrices ? (
                                             <p className="text-sm animate-pulse py-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                                                Loading price history…
+                                                {t('deepDive.loadingPriceHistory')}
                                             </p>
                                         ) : (
                                             <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-none">
@@ -531,7 +538,7 @@ export default function DeepDivePage() {
                                                         <tr>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-widest sticky left-0 z-10"
                                                                 style={{ color: 'var(--text-muted)', background: 'var(--table-header-bg)' }}>
-                                                                Position
+                                                                {t('deepDive.position')}
                                                             </th>
                                                             {allYears.map(yr => (
                                                                 <th key={yr}

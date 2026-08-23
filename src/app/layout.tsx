@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { LanguageProvider } from "../i18n";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,10 +36,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // `lang` is the SSR default; LanguageProvider rewrites it on the client
+    // once the stored preference is read.
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          {children}
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -17,6 +17,7 @@ import AddPositionModal from '../../components/management/AddPositionModal';
 import { getActiveSetId } from '../../utils/localPositions';
 import topix from '../../data/indices/topix.json';
 import type { IndexConstituent, IndexConstituentsFile, PriceAlert } from '../../types/screener';
+import { useTranslation } from '../../i18n';
 
 const INDICES: Record<string, IndexConstituentsFile> = {
     topix: topix as IndexConstituentsFile,
@@ -51,6 +52,7 @@ function migrateAlert(raw: unknown): PriceAlert | null {
 }
 
 function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove: (s: string) => void }) {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     if (added.length === 0) return null;
     return (
@@ -60,7 +62,7 @@ function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove
                 className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs transition-all hover:opacity-80"
                 style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
             >
-                +{added.length} more <MdExpandMore size={11} />
+                {t('screenerPage.overflowMore', { count: added.length })} <MdExpandMore size={11} />
             </button>
             {open && (
                 <>
@@ -81,7 +83,7 @@ function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove
                                 <button
                                     onClick={() => { onRemove(c.symbol); if (added.length === 1) setOpen(false); }}
                                     style={{ color: 'var(--text-muted)' }}
-                                    title={`Remove ${c.code}`}
+                                    title={t('screenerPage.removeTicker', { ticker: c.code })}
                                 >
                                     <MdClose size={13} />
                                 </button>
@@ -95,6 +97,7 @@ function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove
 }
 
 export default function ScreenerPage() {
+    const { t, locale } = useTranslation();
     const { currency, setCurrency } = useBaseCurrency();
     const activeSetName = useActiveSetName();
 
@@ -227,25 +230,26 @@ export default function ScreenerPage() {
                             </h1>
                             {indexLoaded && (
                                 <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
-                                    Constituent names · {file.source}{file.asOf ? ` · list snapshot ${file.asOf}` : ''}
+                                    {t('screenerPage.constituentNames', { source: file.source })}
+                                    {file.asOf ? ` · ${t('screenerPage.listSnapshot', { date: file.asOf })}` : ''}
                                 </span>
                             )}
                         </div>
 
                         {/* Universe strip */}
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Universe:</span>
+                            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('screenerPage.universe')}:</span>
                             {indexLoaded && (
                                 <span
                                     className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
                                     style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                 >
-                                    {file.index} · {file.count.toLocaleString()}
+                                    {file.index} · {file.count.toLocaleString(locale)}
                                     <button
                                         onClick={() => setIndexLoaded(false)}
                                         className="hover:opacity-70 leading-none"
                                         style={{ color: 'var(--accent)', opacity: 0.6 }}
-                                        title={`Remove ${file.index} universe`}
+                                        title={t('screenerPage.removeUniverse', { index: file.index })}
                                     >
                                         <MdClose size={11} />
                                     </button>
@@ -262,7 +266,7 @@ export default function ScreenerPage() {
                                         onClick={() => handleRemove(c.symbol)}
                                         className="hover:opacity-70 leading-none"
                                         style={{ color: 'var(--text-muted)' }}
-                                        title={`Remove ${c.code}`}
+                                        title={t('screenerPage.removeTicker', { ticker: c.code })}
                                     >
                                         <MdClose size={11} />
                                     </button>

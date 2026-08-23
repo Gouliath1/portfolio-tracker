@@ -2,6 +2,7 @@ import React from 'react';
 import { Table } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
 import { ELEMENT_IDS } from './tableConfig';
+import { useTranslation } from '../../../i18n';
 
 interface TableControlsProps {
     table: Table<Position>;
@@ -20,12 +21,14 @@ export const TableControls: React.FC<TableControlsProps> = ({
     setIsColumnMenuOpen,
     handleColumnMenuKeyDown,
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="flex items-center gap-2">
             {/* Filter */}
             <input
                 type="text"
-                placeholder="Filter by ticker, name, account…"
+                placeholder={t('table.filterPlaceholder')}
                 className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm glass outline-none transition-all"
                 style={{
                     color: 'var(--text-primary)',
@@ -48,7 +51,7 @@ export const TableControls: React.FC<TableControlsProps> = ({
                     aria-expanded={isColumnMenuOpen}
                     aria-controls={ELEMENT_IDS.COLUMN_MENU}
                 >
-                    Columns
+                    {t('table.columns')}
                 </button>
 
                 {isColumnMenuOpen && (
@@ -64,14 +67,14 @@ export const TableControls: React.FC<TableControlsProps> = ({
                                 style={{ color: 'var(--text-secondary)' }}
                                 onClick={() => table.toggleAllColumnsVisible(true)}
                             >
-                                Show all
+                                {t('table.showAllColumns')}
                             </button>
                             <button
                                 className="w-full px-4 py-2 text-left text-xs glass-hover transition-colors"
                                 style={{ color: 'var(--text-secondary)' }}
                                 onClick={() => table.toggleAllColumnsVisible(false)}
                             >
-                                Hide all
+                                {t('table.hideAllColumns')}
                             </button>
                             <div className="h-px my-1" style={{ background: 'var(--border)' }} />
                             {table.getAllColumns().filter(column => column.id !== 'delete').map(column => (

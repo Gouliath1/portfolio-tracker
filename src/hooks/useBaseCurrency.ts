@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { getCurrencySymbol } from '@portfolio/core';
+import { useTranslation } from '../i18n';
 
 export type BaseCurrency = 'JPY' | 'USD' | 'EUR' | 'GBP';
 
@@ -53,6 +54,9 @@ function readStored(): BaseCurrency {
 }
 
 export function useBaseCurrency() {
+    // Amounts are grouped and punctuated per the UI language, so a French user
+    // sees 1 234,56 rather than 1,234.56 for the same figure.
+    const { locale } = useTranslation();
     const [currency, setCurrencyState] = useState<BaseCurrency>(FALLBACK);
     const [hydrated, setHydrated] = useState(false);
 
@@ -73,10 +77,10 @@ export function useBaseCurrency() {
             return `${symbol}${'•'.repeat(Math.min(8, Math.ceil(Math.log10(Math.abs(amount) + 1))))}`;
         }
         if (currency === 'JPY') {
-            return `${symbol}${Math.round(amount).toLocaleString()}`;
+            return `${symbol}${Math.round(amount).toLocaleString(locale)}`;
         }
-        return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }, [currency, symbol]);
+        return `${symbol}${amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }, [currency, symbol, locale]);
 
     return { currency, setCurrency, symbol, formatValue, hydrated };
 }
