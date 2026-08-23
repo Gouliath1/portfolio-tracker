@@ -36,20 +36,28 @@ export function getHiddenValue(value: number): string {
  * @param amount - The numeric amount to format
  * @param currencyCode - The currency code for symbol selection
  * @param showValues - Whether to show actual values or hidden placeholders
+ * @param locale - BCP 47 tag driving digit grouping and the decimal separator,
+ *                 so amounts follow the UI language (1,234.56 vs 1 234,56).
+ *                 Omitted, it keeps the previous runtime-default behaviour.
  * @returns Formatted currency string with symbol and proper decimal places
  */
-export function formatCurrencyValue(amount: number, currencyCode: string, showValues: boolean): string {
+export function formatCurrencyValue(
+    amount: number,
+    currencyCode: string,
+    showValues: boolean,
+    locale?: string,
+): string {
     const symbol = getCurrencySymbol(currencyCode);
-    
+
     if (!showValues) {
         return `${symbol}${getHiddenValue(amount)}`;
     }
-    
+
     // JPY doesn't use decimal places
     if (currencyCode === 'JPY') {
-        return `${symbol}${Math.round(amount).toLocaleString()}`;
+        return `${symbol}${Math.round(amount).toLocaleString(locale)}`;
     }
-    
+
     // Other currencies use 2 decimal places
-    return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${symbol}${amount.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

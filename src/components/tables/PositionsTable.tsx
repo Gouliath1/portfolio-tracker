@@ -13,6 +13,7 @@ import { useTableState } from './positionsTable/tableState';
 import { useFilteredPositions } from './positionsTable/dataUtils';
 import { TableControls } from './positionsTable/TableControls';
 import { TableContent } from './positionsTable/TableContent';
+import { useTranslation } from '../../i18n';
 
 // Extend the TableMeta type from @tanstack/react-table
 declare module '@tanstack/react-table' {
@@ -54,6 +55,7 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
     // Track narrow viewports so we can pin fewer columns and render compactly.
     // On mobile, pinning the 4 default columns (~304px) exceeds the container
     // width, leaving no room to scroll the rest of the data into view.
+    const { t, locale } = useTranslation();
     const [isMobile, setIsMobile] = React.useState(false);
     React.useEffect(() => {
         const mq = window.matchMedia('(max-width: 767px)');
@@ -81,8 +83,17 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
     // Filter data based on search text
     const filteredData = useFilteredPositions(positions, filterText);
 
-    // Get column definitions
-    const columns = createTableColumns({ showDelete: !isDemoSet, showSell: !isDemoSet && !!onSellPosition });
+    // Get column definitions. Rebuilt when the language changes so headers,
+    // tooltips and number formatting follow the active locale.
+    const columns = React.useMemo(
+        () => createTableColumns({
+            showDelete: !isDemoSet,
+            showSell: !isDemoSet && !!onSellPosition,
+            t,
+            locale,
+        }),
+        [isDemoSet, onSellPosition, t, locale],
+    );
 
     /**
      * Creates and configures the react-table instance with all necessary options

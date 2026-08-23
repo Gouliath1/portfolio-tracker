@@ -9,6 +9,7 @@ import {
 } from '@portfolio/core';
 import { BaseCurrency } from '../../hooks/useBaseCurrency';
 import { Card } from './Card';
+import { useTranslation } from '../../i18n';
 
 // MSCI ACWI (global all-cap equity), priced in USD. We replay the portfolio's
 // exact cash flows into this index and compare money-weighted returns (XIRR vs
@@ -43,6 +44,7 @@ const Bar = ({ pct, scaleMax, color, label, value }: {
 const isoDay = (s: string) => s.replace(/\//g, '-').slice(0, 10);
 
 export const BenchmarkCard = ({ summary, baseCurrency }: BenchmarkCardProps) => {
+    const { t } = useTranslation();
     const annualized = calculatePortfolioAnnualizedReturn(summary);
     const portfolioXirr = annualized?.return ?? null;
 
@@ -118,10 +120,10 @@ export const BenchmarkCard = ({ summary, baseCurrency }: BenchmarkCardProps) => 
     );
 
     return (
-        <Card title="Benchmark">
+        <Card title={t('overview.benchmark')}>
             {portfolioXirr === null ? (
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Not enough history to compute a return yet.
+                    {t('overview.benchmarkNoHistory')}
                 </p>
             ) : (
                 <div className="space-y-4">
@@ -137,18 +139,18 @@ export const BenchmarkCard = ({ summary, baseCurrency }: BenchmarkCardProps) => 
                         )}
                         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                             {state === 'error'
-                                ? `${BENCHMARK_LABEL} data unavailable`
-                                : `Excess XIRR vs ${BENCHMARK_LABEL}`}
+                                ? t('overview.benchmarkUnavailable', { benchmark: BENCHMARK_LABEL })
+                                : t('overview.benchmarkExcess', { benchmark: BENCHMARK_LABEL })}
                         </p>
                     </div>
                     <div className="space-y-3">
                         <Bar
-                            label="Portfolio XIRR"
+                            label={t('overview.portfolioXirr')}
                             value={`${portfolioXirr >= 0 ? '+' : ''}${portfolioXirr.toFixed(1)}%`}
                             pct={portfolioXirr} scaleMax={scaleMax} color="var(--accent)"
                         />
                         <Bar
-                            label={`${BENCHMARK_LABEL} XIRR`}
+                            label={t('overview.benchmarkXirr', { benchmark: BENCHMARK_LABEL })}
                             value={benchmarkXirr === null
                                 ? (state === 'error' ? '—' : '…')
                                 : `${benchmarkXirr >= 0 ? '+' : ''}${benchmarkXirr.toFixed(1)}%`}

@@ -4,6 +4,18 @@ import React, { useEffect, useState } from 'react';
 import { MdClose, MdDownload, MdRefresh, MdUpload, MdInsertDriveFile } from 'react-icons/md';
 import { importPositionSet } from '../../utils/localPositions';
 import { Transaction } from '@portfolio/types';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
+
+/**
+ * Import failures are held as a key plus an optional untranslated detail —
+ * JSON.parse messages come from the JS engine in its own wording, so they are
+ * shown verbatim after a translated lead-in rather than mistranslated.
+ */
+interface ImportError {
+    key: TranslationKey;
+    detail?: string;
+}
 
 const TEMPLATE_TRANSACTIONS: Transaction[] = [
     {
@@ -40,10 +52,11 @@ interface ImportSetModalProps {
 }
 
 export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
+    const { t } = useTranslation();
     const [fields, setFields] = useState({ name: '', set_as_active: false });
     const [stagedFile, setStagedFile] = useState<File | null>(null);
     const [importing, setImporting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<ImportError | null>(null);
     const [dragging, setDragging] = useState(false);
 
     // Prevent the browser from navigating to a dropped file anywhere outside the drop zone.
@@ -107,14 +120,15 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
             } else if (jsonData.positions && Array.isArray(jsonData.positions)) {
                 records = jsonData.positions;
             } else {
-                throw new Error('Invalid JSON format. Expected a transactions array.');
+                setError({ key: 'import.errShape' });
+                return;
             }
 
             // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
             importPositionSet(
                 fields.name || `imported-${Date.now()}`,
                 fields.name || stagedFile.name.replace('.json', ''),
-                `Imported from ${stagedFile.name}`,
+                t('import.setDescription', { file: stagedFile.name }),
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 records as any,
                 fields.set_as_active,
@@ -122,7 +136,10 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
 
             onImported(records.length, fields.set_as_active);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to import');
+            setError({
+                key: 'import.errFailed',
+                detail: err instanceof Error ? err.message : undefined,
+            });
         } finally {
             setImporting(false);
         }
@@ -150,8 +167,8 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Load a portfolio</h2>
-                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('import.title')}</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}>
                         <MdClose size={18} />
                     </button>
                 </div>
@@ -160,17 +177,17 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
-                            {error}
+                            {t(error.key)}{error.detail ? ` (${error.detail})` : ''}
                         </div>
                     )}
 
                     <div className="space-y-1">
-                        <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Name</label>
+                        <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('import.name')}</label>
                         <input
                             type="text"
                             value={fields.name}
                             onChange={e => setFields(p => ({ ...p, name: e.target.value }))}
-                            placeholder="My Portfolio 2025"
+                            placeholder={t('import.namePlaceholder')}
                             className={inputClass}
                             style={inputStyle}
                             autoFocus
@@ -184,20 +201,20 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             onChange={e => setFields(p => ({ ...p, set_as_active: e.target.checked }))}
                             style={{ accentColor: 'var(--accent)' }}
                         />
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Switch to it after loading</span>
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('import.switchAfterLoad')}</span>
                     </label>
 
                     {/* Drop zone / staged file */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>JSON File *</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('import.jsonFile')} *</span>
                             <button
                                 onClick={handleDownloadTemplate}
                                 className="text-xs flex items-center gap-1 transition-opacity opacity-70 hover:opacity-100"
                                 style={{ color: 'var(--accent)' }}
                             >
                                 <MdDownload className="w-3 h-3" />
-                                Download template
+                                {t('import.downloadTemplate')}
                             </button>
                         </div>
 
@@ -217,9 +234,9 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                                     onClick={() => setStagedFile(null)}
                                     className="text-xs px-2 py-1 rounded-md transition-opacity opacity-70 hover:opacity-100"
                                     style={{ color: 'var(--text-secondary)' }}
-                                    aria-label="Remove file"
+                                    aria-label={t('import.removeFile')}
                                 >
-                                    Change
+                                    {t('import.change')}
                                 </button>
                             </div>
                         ) : (
@@ -237,15 +254,15 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             >
                                 <MdUpload className="w-6 h-6" style={{ color: 'var(--accent)' }} />
                                 <span className="text-sm text-center">
-                                    Drop a JSON file here or <span style={{ color: 'var(--accent)' }}>browse</span>
+                                    {t('import.dropZoneBefore')}<span style={{ color: 'var(--accent)' }}>{t('import.dropZoneBrowse')}</span>
                                 </span>
-                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>.json — transactions array</span>
+                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('import.dropZoneHint')}</span>
                                 <input type="file" accept=".json,application/json" onChange={handleFileInput} className="sr-only" />
                             </label>
                         )}
 
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Transactions JSON — download the template for the required fields. Legacy position files are auto-migrated.
+                            {t('import.formatHelp')}
                         </p>
                     </div>
 
@@ -256,7 +273,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             className="px-4 py-2 text-sm glass glass-hover rounded-lg transition-all disabled:opacity-50"
                             style={{ color: 'var(--text-secondary)' }}
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button
                             onClick={handleAdd}
@@ -269,7 +286,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             }}
                         >
                             {importing && <MdRefresh className="w-4 h-4 animate-spin" />}
-                            {importing ? 'Loading…' : 'Load'}
+                            {importing ? t('import.loading') : t('import.load')}
                         </button>
                     </div>
                 </div>

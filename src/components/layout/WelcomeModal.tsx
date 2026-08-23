@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MdBarChart, MdUploadFile, MdArrowForward, MdClose } from 'react-icons/md';
+import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 
 const STORAGE_KEY = 'pt_onboarded';
 
@@ -10,6 +11,7 @@ interface WelcomeModalProps {
 }
 
 export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
+    const { t, language, setLanguage } = useTranslation();
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
@@ -45,25 +47,61 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                     onClick={dismiss}
                     className="absolute top-4 right-4 p-1.5 rounded-lg transition-colors"
                     style={{ color: 'var(--text-muted)' }}
-                    aria-label="Dismiss"
+                    aria-label={t('welcome.dismiss')}
                 >
                     <MdClose size={18} />
                 </button>
 
-                {/* Icon + title */}
+                {/* Icon + language + title.
+                    The language picker sits in the very first row, before the
+                    welcome copy: a French speaker landing here for the first
+                    time can switch the whole modal into their own language
+                    before reading anything or deciding anything. `pr-8` keeps
+                    it clear of the absolutely-positioned dismiss button. */}
                 <div className="space-y-3">
-                    <div
-                        className="inline-flex items-center justify-center w-12 h-12 rounded-xl"
-                        style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}
-                    >
-                        <MdBarChart size={24} style={{ color: 'var(--accent)' }} />
+                    <div className="flex items-start justify-between gap-3 pr-8">
+                        <div
+                            className="inline-flex items-center justify-center w-12 h-12 rounded-xl flex-shrink-0"
+                            style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}
+                        >
+                            <MdBarChart size={24} style={{ color: 'var(--accent)' }} />
+                        </div>
+
+                        <div
+                            className="flex items-center gap-1 flex-wrap justify-end"
+                            role="group"
+                            aria-label={t('settings.language')}
+                        >
+                            {SUPPORTED_LANGUAGES.map(l => (
+                                <button
+                                    key={l.code}
+                                    onClick={() => setLanguage(l.code)}
+                                    lang={l.code}
+                                    aria-pressed={language === l.code}
+                                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                                    style={language === l.code ? {
+                                        background: 'var(--accent-dim)',
+                                        color: 'var(--accent)',
+                                        border: '1px solid var(--accent-glow)',
+                                    } : {
+                                        background: 'transparent',
+                                        color: 'var(--text-muted)',
+                                        border: '1px solid var(--border)',
+                                    }}
+                                >
+                                    {l.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            Welcome to PortfolioTracker
+                            {t('welcome.title')}
                         </h2>
                         <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                            You&apos;re currently viewing <strong style={{ color: 'var(--text-primary)' }}>demo data</strong> — not your real portfolio.
+                            {t('welcome.subtitleBefore')}{' '}
+                            <strong style={{ color: 'var(--text-primary)' }}>{t('welcome.demoData')}</strong>
+                            {t('welcome.subtitleAfter')}
                         </p>
                     </div>
                 </div>
@@ -76,9 +114,9 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                     >
                         <MdUploadFile size={20} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                         <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Import your positions</p>
+                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('welcome.importTitle')}</p>
                             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                Upload a JSON file with your holdings. A template is available in Settings to get you started.
+                                {t('welcome.importBody')}
                             </p>
                         </div>
                     </div>
@@ -88,9 +126,9 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                     >
                         <MdBarChart size={20} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
                         <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Or explore the demo first</p>
+                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('welcome.exploreTitle')}</p>
                             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                Browse the sample portfolio to see what the tracker can do before adding your own data.
+                                {t('welcome.exploreBody')}
                             </p>
                         </div>
                     </div>
@@ -98,7 +136,7 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
 
                 {/* Data persistence note */}
                 <p className="text-xs" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    Your data is stored locally in your browser — nothing is sent to a server. Export regularly to keep a backup.
+                    {t('welcome.localDataNote')}
                 </p>
 
                 {/* CTAs */}
@@ -108,7 +146,7 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                     >
-                        Import positions
+                        {t('welcome.ctaImport')}
                         <MdArrowForward size={16} />
                     </button>
                     <button
@@ -116,7 +154,7 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                         className="px-4 py-2.5 rounded-xl text-sm font-medium glass glass-hover transition-all"
                         style={{ color: 'var(--text-secondary)' }}
                     >
-                        Explore demo
+                        {t('welcome.ctaExplore')}
                     </button>
                 </div>
             </div>

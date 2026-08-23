@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MdClose, MdPlaylistAdd } from 'react-icons/md';
 import type { IndexConstituent } from '../../types/screener';
+import { useTranslation } from '../../i18n';
 
 interface PasteListModalProps {
     onAdd: (constituents: IndexConstituent[]) => void;
@@ -15,6 +16,7 @@ interface PasteListModalProps {
  * row's data loads, so no per-ticker lookup is needed here.
  */
 export function PasteListModal({ onAdd, onClose }: PasteListModalProps) {
+    const { t } = useTranslation();
     const [text, setText] = useState('');
 
     const parsed = Array.from(
@@ -39,12 +41,12 @@ export function PasteListModal({ onAdd, onClose }: PasteListModalProps) {
             <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl flex flex-col"
                 style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Paste a list of tickers</h2>
-                    <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label="Close"><MdClose size={18} /></button>
+                    <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('pasteList.title')}</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}><MdClose size={18} /></button>
                 </div>
                 <div className="px-6 py-5 space-y-3">
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Separate by commas, spaces, or new lines. Use Yahoo symbols (e.g. <code>7203.T</code>, <code>AAPL</code>).
+                        {t('pasteList.help')}
                     </p>
                     <textarea
                         value={text}
@@ -57,12 +59,12 @@ export function PasteListModal({ onAdd, onClose }: PasteListModalProps) {
                     />
                     <div className="flex items-center justify-between gap-3 pt-1">
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {parsed.length} ticker{parsed.length === 1 ? '' : 's'} detected
+                            {t(parsed.length === 1 ? 'pasteList.detected' : 'pasteList.detectedPlural', { count: parsed.length })}
                         </span>
                         <button onClick={handleAdd} disabled={parsed.length === 0}
                             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40"
                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                            <MdPlaylistAdd size={16} /> Add {parsed.length || ''}
+                            <MdPlaylistAdd size={16} /> {t('common.add')} {parsed.length || ''}
                         </button>
                     </div>
                 </div>

@@ -10,7 +10,8 @@ export const createChartOptions = (
     selectedTimeline: string,
     currencySymbol: string = '¥',
     currency: string = 'JPY',
-    yBounds?: { min: number; max: number }
+    yBounds?: { min: number; max: number },
+    locale: string = 'en-US',
 ): ChartOptions<'line'> => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -46,8 +47,8 @@ export const createChartOptions = (
                     if (typeof value === 'number') {
                         if (!showValues) return `${value.toFixed(2)}%`;
                         return currency === 'JPY'
-                            ? `${currencySymbol}${Math.round(value).toLocaleString()}`
-                            : `${currencySymbol}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            ? `${currencySymbol}${Math.round(value).toLocaleString(locale)}`
+                            : `${currencySymbol}${value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     }
                     return value;
                 },

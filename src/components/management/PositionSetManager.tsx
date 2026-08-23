@@ -11,6 +11,8 @@ import {
     exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 interface PositionSetManagerProps {
     onPositionSetChanged?: () => void;
@@ -18,6 +20,7 @@ interface PositionSetManagerProps {
 }
 
 const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetChanged, refreshTrigger }) => {
+    const { t, locale } = useTranslation();
     const [sets, setSets] = useState<PositionSetLocal[]>([]);
     const [activeId, setActiveId] = useState<string>('demo');
     // The highlighted row — a pending choice, not applied until the user confirms.
@@ -25,7 +28,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
 
     const refresh = () => {
         setSets(getPositionSets());
@@ -43,7 +46,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             refresh();
             onPositionSetChanged?.();
         } catch {
-            setError('Failed to switch portfolio');
+            setError('sets.errSwitch');
         }
     };
 
@@ -55,7 +58,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             refresh();
             if (wasActive) onPositionSetChanged?.();
         } catch {
-            setError('Failed to delete portfolio');
+            setError('sets.errDelete');
         }
     };
 
@@ -73,7 +76,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             refresh();
             if (getActiveSetId() === id) onPositionSetChanged?.();
         } catch {
-            setError('Failed to rename portfolio');
+            setError('sets.errRename');
         }
     };
 
@@ -90,12 +93,12 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch {
-            setError('Failed to save');
+            setError('sets.errSave');
         }
     };
 
     const formatDate = (iso: string) =>
-        new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        new Date(iso).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 
     const selectedSet = sets.find(s => s.id === selectedId);
     const showConfirm = selectedId !== activeId && !!selectedSet;
@@ -106,7 +109,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                 <div className="rounded-lg px-4 py-3 flex items-start gap-3"
                     style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)' }}>
                     <MdWarning className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--pnl-red)' }} />
-                    <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{error}</p>
+                    <p className="text-sm flex-1" style={{ color: 'var(--text-primary)' }}>{t(error)}</p>
                     <button onClick={() => setError(null)} className="opacity-50 hover:opacity-100"
                         style={{ color: 'var(--text-primary)' }}>✕</button>
                 </div>
@@ -115,7 +118,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                 {sets.length === 0 && (
                     <div className="py-10 text-center" style={{ background: 'var(--surface)' }}>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No portfolios — load a file to start</p>
+                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('sets.empty')}</p>
                     </div>
                 )}
 
@@ -149,14 +152,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                         }}
                                         className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm bg-transparent outline-none"
                                         style={{ color: 'var(--text-primary)', border: '1px solid var(--accent)' }}
-                                        aria-label="Portfolio name"
+                                        aria-label={t('sets.nameLabel')}
                                     />
                                     <button
                                         onClick={() => handleRename(set.id)}
                                         className="p-2 rounded-md transition-opacity opacity-70 hover:opacity-100 flex-shrink-0"
                                         style={{ color: 'var(--pnl-green)' }}
-                                        title="Save name"
-                                        aria-label="Save name"
+                                        title={t('sets.saveName')}
+                                        aria-label={t('sets.saveName')}
                                     >
                                         <MdCheck className="w-4 h-4" />
                                     </button>
@@ -164,8 +167,8 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                         onClick={() => setEditingId(null)}
                                         className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90 flex-shrink-0"
                                         style={{ color: 'var(--text-secondary)' }}
-                                        title="Cancel"
-                                        aria-label="Cancel rename"
+                                        title={t('common.cancel')}
+                                        aria-label={t('sets.cancelRename')}
                                     >
                                         <MdClose className="w-4 h-4" />
                                     </button>
@@ -173,7 +176,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                             ) : isDeleting ? (
                                 <div className="flex items-center gap-3 px-4 py-3.5">
                                     <p className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
-                                        Delete <strong>{set.display_name}</strong>?
+                                        {t('sets.confirmDeleteBefore')}<strong>{set.display_name}</strong>{t('sets.confirmDeleteAfter')}
                                     </p>
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                         <button
@@ -181,14 +184,14 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             className="px-3 py-1.5 rounded-lg text-xs font-medium"
                                             style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                                         >
-                                            Cancel
+                                            {t('common.cancel')}
                                         </button>
                                         <button
                                             onClick={() => handleDelete(set.id)}
                                             className="px-3 py-1.5 rounded-lg text-xs font-medium"
                                             style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red)' }}
                                         >
-                                            Delete
+                                            {t('common.delete')}
                                         </button>
                                     </div>
                                 </div>
@@ -202,7 +205,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             borderColor: isSelected ? 'var(--accent)' : 'var(--border-strong)',
                                             background: isSelected ? 'var(--accent)' : 'transparent',
                                         }}
-                                        aria-label={`Select ${set.display_name}`}
+                                        aria-label={t('sets.select', { name: set.display_name })}
                                         aria-pressed={isSelected}
                                     >
                                         {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'oklch(100% 0.003 275)' }} />}
@@ -220,16 +223,16 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             {isActive && (
                                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0"
                                                     style={{ background: 'var(--pnl-green-dim)', color: 'var(--pnl-green)' }}>
-                                                    <MdCheckCircle className="w-3 h-3" /> In use
+                                                    <MdCheckCircle className="w-3 h-3" /> {t('sets.inUse')}
                                                 </span>
                                             )}
                                             {set.info_type === 'warning' && (
-                                                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>Demo</span>
+                                                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t('sets.demo')}</span>
                                             )}
                                         </div>
                                         <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                            Created {created}
-                                            {updated !== created && <> · Updated {updated}</>}
+                                            {t('sets.created', { date: created })}
+                                            {updated !== created && <> · {t('sets.updated', { date: updated })}</>}
                                         </div>
                                     </button>
 
@@ -240,8 +243,8 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                                 onClick={() => startRename(set)}
                                                 className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
                                                 style={{ color: 'var(--text-secondary)' }}
-                                                title="Rename"
-                                                aria-label="Rename portfolio"
+                                                title={t('sets.rename')}
+                                                aria-label={t('sets.renamePortfolio')}
                                             >
                                                 <MdEdit className="w-4 h-4" />
                                             </button>
@@ -250,8 +253,8 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                             onClick={() => handleExport(set.id, set.name)}
                                             className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
                                             style={{ color: 'var(--text-secondary)' }}
-                                            title="Save to file"
-                                            aria-label="Save to file"
+                                            title={t('sets.saveToFile')}
+                                            aria-label={t('sets.saveToFile')}
                                         >
                                             <MdDownload className="w-4 h-4" />
                                         </button>
@@ -260,8 +263,8 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                                                 onClick={() => setDeletingId(set.id)}
                                                 className="p-2 rounded-md transition-opacity opacity-40 hover:opacity-90"
                                                 style={{ color: 'var(--pnl-red)' }}
-                                                title="Delete"
-                                                aria-label="Delete portfolio"
+                                                title={t('common.delete')}
+                                                aria-label={t('sets.deletePortfolio')}
                                             >
                                                 <MdDelete className="w-4 h-4" />
                                             </button>
@@ -280,7 +283,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                 <div className="flex items-center gap-3 rounded-xl px-4 py-3"
                     style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
                     <p className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
-                        Start using <strong>{selectedSet!.display_name}</strong>?
+                        {t('sets.confirmSwitchBefore')}<strong>{selectedSet!.display_name}</strong>{t('sets.confirmSwitchAfter')}
                     </p>
                     <button
                         onClick={() => handleActivate(selectedId)}
@@ -288,7 +291,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
                         style={{ background: 'var(--accent)', color: 'oklch(100% 0.003 275)' }}
                     >
                         <MdSwapHoriz className="w-4 h-4" />
-                        Switch
+                        {t('sets.switch')}
                     </button>
                 </div>
             )}

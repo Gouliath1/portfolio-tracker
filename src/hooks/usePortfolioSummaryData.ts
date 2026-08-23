@@ -5,6 +5,17 @@ import { calculatePortfolioSummary } from '@portfolio/core';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { loadPositions } from '../utils/positions';
 import { readCachedSummary, writeCachedSummary } from '../utils/pnlCache';
+import type { TranslationKey } from '../i18n';
+
+/**
+ * Surfaced as a translation key, not a message: the consuming component owns
+ * the active language and re-renders the error correctly if it changes.
+ * `detail` carries the raw Error text, which comes from outside the app.
+ */
+export interface SummaryLoadError {
+    key: TranslationKey;
+    detail?: string;
+}
 
 // Read-only data loader for views that just need the latest portfolio summary
 // (e.g. the deep-dive route). Mirrors the dashboard's tiered-cache strategy:
@@ -17,7 +28,7 @@ import { readCachedSummary, writeCachedSummary } from '../utils/pnlCache';
 export function usePortfolioSummaryData(currency: string, currencyHydrated: boolean = true) {
     const [summary, setSummary] = useState<PortfolioSummaryType | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<SummaryLoadError | null>(null);
 
     useEffect(() => {
         if (!currencyHydrated) return;
@@ -46,7 +57,10 @@ export function usePortfolioSummaryData(currency: string, currencyHydrated: bool
                 setLoading(false);
             } catch (err) {
                 if (cancelled) return;
-                setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
+                setError({
+                    key: 'home.errLoadPortfolio',
+                    detail: err instanceof Error ? err.message : undefined,
+                });
                 setLoading(false);
             }
         };

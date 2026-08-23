@@ -1,5 +1,6 @@
 import React from 'react';
 import { TimelineFilter, TIMELINE_BUTTONS } from './chartUtils';
+import { useTranslation } from '../../../i18n';
 
 interface TimelineFilterProps {
     selectedTimeline: TimelineFilter;
@@ -10,9 +11,11 @@ export const TimelineFilterButtons: React.FC<TimelineFilterProps> = ({
     selectedTimeline,
     onTimelineChange,
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="flex flex-wrap gap-1.5">
-            {TIMELINE_BUTTONS.map(({ key, label }) => (
+            {TIMELINE_BUTTONS.map(({ key, labelKey }) => (
                 <button
                     key={key}
                     onClick={() => onTimelineChange(key)}
@@ -26,7 +29,7 @@ export const TimelineFilterButtons: React.FC<TimelineFilterProps> = ({
                         border: '1px solid var(--border)',
                     }}
                 >
-                    {label}
+                    {t(labelKey)}
                 </button>
             ))}
         </div>

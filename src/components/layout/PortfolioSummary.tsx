@@ -7,6 +7,8 @@ import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { calculatePortfolioAnnualizedReturn } from '@portfolio/core';
 import { useDailyPnl } from '../../hooks/useDailyPnl';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 interface PortfolioSummaryProps {
     summary: PortfolioSummaryType;
@@ -17,10 +19,11 @@ interface PortfolioSummaryProps {
     isLoading?: boolean;
 }
 
-const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+const formatDate = (dateStr: string, locale: string) =>
+    new Date(dateStr).toLocaleDateString(locale, { year: 'numeric', month: 'short' });
 
 const InfoTooltip = ({ text }: { text: string }) => {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const btnRef = useRef<HTMLButtonElement>(null);
     const [tipRect, setTipRect] = useState<DOMRect | null>(null);
@@ -43,7 +46,7 @@ const InfoTooltip = ({ text }: { text: string }) => {
                 onClick={() => setOpen(prev => !prev)}
                 className="p-0.5 rounded transition-colors hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-[var(--accent-glow)]"
                 style={{ color: 'var(--text-muted)', opacity: 0.6 }}
-                aria-label="What is this?"
+                aria-label={t('common.whatIsThis')}
             >
                 <MdInfoOutline size={14} />
             </button>
@@ -135,6 +138,7 @@ const StatCard = ({ label, info, value, sub, footnote, positive, flash, instant,
 };
 
 export const PortfolioSummary = ({ summary, showValues, currency, formatValue, isLoading }: PortfolioSummaryProps) => {
+    const { t, locale } = useTranslation();
     const prevSummary = useRef<PortfolioSummaryType>(summary);
     const valueChanged = summary.totalValueJPY !== prevSummary.current.totalValueJPY;
     useEffect(() => { prevSummary.current = summary; }, [summary]);
@@ -153,7 +157,7 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
         : null;
 
     const sinceLabel = earliestDate
-        ? `since ${formatDate(earliestDate.replace(/\//g, '-'))}`
+        ? t('summary.since', { date: formatDate(earliestDate.replace(/\//g, '-'), locale) })
         : null;
 
     // Daily P&L sign helpers
@@ -180,11 +184,11 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
 
     // Breakdown chips show only when there's more than just unrealized to
     // report — otherwise the headline already says everything.
-    const breakdown: { label: string; amount: number }[] = [
-        { label: 'Unrealized', amount: unrealized },
+    const breakdown: { labelKey: TranslationKey; amount: number }[] = [
+        { labelKey: 'summary.unrealized', amount: unrealized },
     ];
-    if (dividends !== 0) breakdown.push({ label: 'Dividends', amount: dividends });
-    if (summary.closedPositions.length > 0) breakdown.push({ label: 'Realized (sales)', amount: realizedSales });
+    if (dividends !== 0) breakdown.push({ labelKey: 'summary.dividends', amount: dividends });
+    if (summary.closedPositions.length > 0) breakdown.push({ labelKey: 'summary.realizedSales', amount: realizedSales });
     const showBreakdown = !hasNullPrices && breakdown.length > 1;
 
     return (
@@ -193,27 +197,27 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
 
                 {/* 1 — Total Value (with cost as footnote) */}
                 <StatCard
-                    label="Total Value"
-                    info="Current market value of all open positions, converted into your base currency at today's FX rate. The 'Cost' line shows what you originally paid for those same positions (excludes closed lots)."
+                    label={t('summary.totalValue')}
+                    info={t('summary.totalValueInfo')}
                     value={hasNullPrices
-                        ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                        ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
                         : formatValue(summary.totalValueJPY, showValues)}
                     valueColorOverride={hasNullPrices ? undefined : 'var(--accent)'}
                     large
                     flash={valueChanged}
                     instant={isFirstDataRender}
                     footnote={
-                        <span>Cost: {formatValue(summary.totalCostJPY, showValues)}</span>
+                        <span>{t('summary.cost')}: {formatValue(summary.totalCostJPY, showValues)}</span>
                     }
                 />
 
                 {/* 2 — Annualised Return */}
                 <StatCard
-                    label="Annualised Return"
-                    info="Money-weighted annualised return (XIRR). Each purchase is a cash outflow on its transaction date; each sale and each dividend is a cash inflow on its date; today's open-position value is the terminal inflow — solving for the rate that makes the present value of those cash flows zero."
+                    label={t('summary.annualisedReturn')}
+                    info={t('summary.annualisedReturnInfo')}
                     value={
                         hasNullPrices
-                            ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                            ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
                             : annualizedReturn === null
                                 ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
                                 : `${annualizedReturn.return >= 0 ? '+' : ''}${annualizedReturn.return.toFixed(2)}%`
@@ -226,7 +230,7 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
                         <Link href="/returns/deep-dive"
                             className="transition-opacity hover:opacity-100"
                             style={{ color: 'var(--accent)', opacity: 0.8 }}>
-                            Deep Dive →
+                            {t('summary.deepDive')} →
                         </Link>
                     }
                 />
@@ -236,10 +240,10 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
                     sub-line so the headline never wraps. Component
                     breakdown lives in the secondary row below. */}
                 <StatCard
-                    label="Total P&L"
-                    info="Lifetime profit/loss across everything you've owned: unrealised mark-to-market on open lots + all dividends received + realised gains from past sales. The percentage divides this by your total deployed cost (open cost + closed cost)."
+                    label={t('summary.totalPnl')}
+                    info={t('summary.totalPnlInfo')}
                     value={hasNullPrices
-                        ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                        ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
                         : <>{totalPnlAbsolute >= 0 ? '+' : ''}{formatValue(totalPnlAbsolute, showValues)}</>}
                     sub={!hasNullPrices
                         ? <>
@@ -254,10 +258,10 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
 
                 {/* 4 — Daily P&L */}
                 <StatCard
-                    label="Today's P&L"
-                    info="Change in total portfolio value since the previous trading-day's close, in your base currency. Percentage is that change divided by yesterday's closing value."
+                    label={t('summary.todaysPnl')}
+                    info={t('summary.todaysPnlInfo')}
                     value={
-                        hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>Updating…</span>
+                        hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
                         : dailyPnl === null ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
                         : `${dailySign}${dailyPnl.percentageChange.toFixed(2)}%`
                     }
@@ -279,12 +283,12 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
                     {breakdown.map(r => {
                         const color = r.amount >= 0 ? 'var(--pnl-green)' : 'var(--pnl-red)';
                         return (
-                            <div key={r.label}
+                            <div key={r.labelKey}
                                 className="glass rounded-xl px-4 py-3 flex items-baseline justify-between"
                                 style={{ border: '1px solid var(--border)' }}
                             >
                                 <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                                    {r.label}
+                                    {t(r.labelKey)}
                                 </span>
                                 <span className="text-base sm:text-lg font-semibold tabular-nums" style={{ color }}>
                                     {r.amount >= 0 ? '+' : ''}{formatValue(r.amount, showValues)}

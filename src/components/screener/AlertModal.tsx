@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { MdClose, MdNotificationsActive, MdDelete, MdArrowUpward, MdArrowDownward, MdKeyboardArrowUp, MdKeyboardArrowDown } from 'react-icons/md';
 import type { PriceAlert, StockFundamentals } from '../../types/screener';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 interface AlertModalProps {
     symbol: string;
@@ -24,9 +26,10 @@ function stepFor(price: number | null): number {
 }
 
 export function AlertModal({ symbol, name, existing, onSave, onClear, onClose }: AlertModalProps) {
+    const { t, locale } = useTranslation();
     const [above, setAbove] = useState(existing?.targetAbove != null ? String(existing.targetAbove) : '');
     const [below, setBelow] = useState(existing?.targetBelow != null ? String(existing.targetBelow) : '');
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<TranslationKey | null>(null);
     const [currentPrice, setCurrentPrice] = useState<number | null>(null);
     const [currency, setCurrency] = useState<string | null>(null);
 
@@ -66,15 +69,15 @@ export function AlertModal({ symbol, name, existing, onSave, onClear, onClose }:
     const handleSave = () => {
         const ta = above.trim() ? parseFloat(above) : undefined;
         const tb = below.trim() ? parseFloat(below) : undefined;
-        if (ta !== undefined && (isNaN(ta) || ta <= 0)) { setError('Above price must be a positive number'); return; }
-        if (tb !== undefined && (isNaN(tb) || tb <= 0)) { setError('Below price must be a positive number'); return; }
-        if (ta == null && tb == null) { setError('Set at least one threshold'); return; }
+        if (ta !== undefined && (isNaN(ta) || ta <= 0)) { setError('alert.errAbove'); return; }
+        if (tb !== undefined && (isNaN(tb) || tb <= 0)) { setError('alert.errBelow'); return; }
+        if (ta == null && tb == null) { setError('alert.errNoThreshold'); return; }
         onSave({ targetAbove: ta, targetBelow: tb });
     };
 
     const fmtPrice = (v: number) => currency === 'JPY'
-        ? `¥${v.toLocaleString('en', { maximumFractionDigits: 0 })}`
-        : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (currency ? ` ${currency}` : '');
+        ? `¥${v.toLocaleString(locale, { maximumFractionDigits: 0 })}`
+        : v.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (currency ? ` ${currency}` : '');
 
     const step = stepFor(currentPrice);
 
@@ -131,11 +134,11 @@ export function AlertModal({ symbol, name, existing, onSave, onClear, onClose }:
                     <div className="flex items-center gap-2 min-w-0">
                         <MdNotificationsActive size={18} style={{ color: 'var(--accent)' }} />
                         <div className="min-w-0">
-                            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Price alert · {symbol}</h2>
+                            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{t('alert.title')} · {symbol}</h2>
                             <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{name}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+                    <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}>
                         <MdClose size={18} />
                     </button>
                 </div>
@@ -143,47 +146,47 @@ export function AlertModal({ symbol, name, existing, onSave, onClear, onClose }:
                 <div className="px-6 py-5 space-y-4">
                     {currentPrice != null && (
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Current: <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmtPrice(currentPrice)}</span>
-                            <span style={{ marginLeft: 8, opacity: 0.6 }}>step ±{step}</span>
+                            {t('alert.current')}: <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmtPrice(currentPrice)}</span>
+                            <span style={{ marginLeft: 8, opacity: 0.6 }}>{t('alert.step', { step })}</span>
                         </p>
                     )}
 
                     {error && (
-                        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>{error}</div>
+                        <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>{t(error)}</div>
                     )}
 
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                                 <MdArrowUpward size={12} style={{ color: 'var(--pnl-green)' }} />
-                                <span className="font-medium">Above</span>
-                                <span style={{ color: 'var(--text-muted)' }}>optional</span>
+                                <span className="font-medium">{t('alert.above')}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{t('common.optional')}</span>
                             </label>
                             <StepInput value={above} onChange={setAbove} dir="above" autoFocus />
                         </div>
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                                 <MdArrowDownward size={12} style={{ color: 'var(--pnl-red)' }} />
-                                <span className="font-medium">Below</span>
-                                <span style={{ color: 'var(--text-muted)' }}>optional</span>
+                                <span className="font-medium">{t('alert.below')}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{t('common.optional')}</span>
                             </label>
                             <StepInput value={below} onChange={setBelow} dir="below" />
                         </div>
                     </div>
 
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        You&apos;ll get a browser notification when the price crosses either threshold. The screener must be open for checks to run.
+                        {t('alert.help')}
                     </p>
 
                     <div className="flex gap-3 pt-1">
                         <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                            {existing ? 'Update alert' : 'Set alert'}
+                            {existing ? t('alert.update') : t('alert.set')}
                         </button>
                         {existing && (
                             <button onClick={onClear} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium glass transition-all"
                                 style={{ color: 'var(--pnl-red)' }}>
-                                <MdDelete size={16} /> Clear
+                                <MdDelete size={16} /> {t('common.clear')}
                             </button>
                         )}
                     </div>

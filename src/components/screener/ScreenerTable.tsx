@@ -21,6 +21,8 @@ import {
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
@@ -29,16 +31,16 @@ type View = 'all' | 'loaded' | 'unloaded' | 'pinned' | 'alerts' | 'notes';
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
-const fmtNum = (v: number, digits = 2) =>
-    v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const fmtNum = (v: number, locale: string, digits = 2) =>
+    v.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-const fmtPrice = (price: number, currency: string | null) =>
+const fmtPrice = (price: number, currency: string | null, locale: string) =>
     currency === 'JPY'
-        ? price.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
-        : fmtNum(price, 2);
+        ? price.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+        : fmtNum(price, locale, 2);
 
-const fmtCompact = (v: number) =>
-    new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+const fmtCompact = (v: number, locale: string) =>
+    new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
 function isAlertTriggered(alert: PriceAlert, price: number | null): boolean {
     if (price == null) return false;
@@ -81,6 +83,7 @@ export function ScreenerTable({
     constituents, onRemove, removableSymbols,
     pinnedSymbols, onTogglePin, alerts, onEditAlert, notes, onEditNote, onOpenChart, onBuy,
 }: ScreenerTableProps) {
+    const { t, locale } = useTranslation();
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
     const [infoOpen, setInfoOpen] = useState(false);
@@ -175,7 +178,9 @@ export function ScreenerTable({
             const v = render(e.data);
             if (v != null && v !== '') return v;
             if (isRatio && e.ratiosPending) {
-                const tip = e.ratiosError ? `Ratios unavailable: ${e.ratiosError}` : 'Ratios pending — click ⟳ to fetch';
+                const tip = e.ratiosError
+                    ? t('screener.ratiosUnavailable', { reason: e.ratiosError })
+                    : t('screener.ratiosPending');
                 return <span style={{ color: 'var(--text-muted)' }} title={tip}>…</span>;
             }
             return muted('—');
@@ -195,7 +200,7 @@ export function ScreenerTable({
                     return (
                         <button onClick={stop(() => onRemove?.(props.row.original.symbol))}
                             className="flex items-center justify-center p-1 rounded hover:opacity-70"
-                            style={{ color: 'var(--text-muted)' }} title="Remove from list">
+                            style={{ color: 'var(--text-muted)' }} title={t('screener.removeFromList')}>
                             <MdClose size={14} />
                         </button>
                     );
@@ -211,14 +216,14 @@ export function ScreenerTable({
                         <button onClick={stop(() => onTogglePin(sym))}
                             className="flex items-center justify-center p-1 rounded hover:opacity-70"
                             style={{ color: pinned ? 'var(--accent)' : 'var(--text-muted)' }}
-                            title={pinned ? 'Pinned — click to unpin' : 'Pin to watchlist'}>
+                            title={pinned ? t('screener.unpin') : t('screener.pin')}>
                             {pinned ? <MdStar size={16} /> : <MdStarBorder size={16} />}
                         </button>
                     );
                 },
             }),
             columnHelper.accessor('code', {
-                header: 'Ticker', size: 68, minSize: 52,
+                header: t('column.ticker'), size: 68, minSize: 52,
                 cell: props => (
                     <a href={`https://finance.yahoo.com/quote/${props.row.original.symbol}`}
                         target="_blank" rel="noopener noreferrer"
@@ -230,7 +235,7 @@ export function ScreenerTable({
                 ),
             }),
             columnHelper.accessor('name', {
-                header: 'Name', size: 160, minSize: 90,
+                header: t('column.name'), size: 160, minSize: 90,
                 cell: props => {
                     const sym = props.row.original.symbol;
                     const e = mapRef.current.get(sym);
@@ -255,20 +260,22 @@ export function ScreenerTable({
                     const fmt = (iso: string | null | undefined) => {
                         if (!iso) return null;
                         const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
-                        if (h < 1) return 'just now';
-                        if (h < 24) return `${h}h ago`;
-                        return `${Math.floor(h / 24)}d ago`;
+                        if (h < 1) return t('screener.ageJustNow');
+                        if (h < 24) return t('screener.ageHours', { hours: h });
+                        return t('screener.ageDays', { days: Math.floor(h / 24) });
                     };
                     const AMBER = 'oklch(68% 0.14 60)';
                     const dotTooltip = isLoaded ? (
                         <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {fetchedAt && (
                                 <span style={{ color: priceAge < 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
-                                    price: {fmt(fetchedAt)}
+                                    {t('screener.priceAge', { age: fmt(fetchedAt) ?? '' })}
                                 </span>
                             )}
                             <span style={{ color: ratiosFetchedAt && ratioAge < 7 * 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
-                                {ratiosFetchedAt ? `ratios: ${fmt(ratiosFetchedAt)}` : 'ratios: not fetched'}
+                                {ratiosFetchedAt
+                                    ? t('screener.ratiosAge', { age: fmt(ratiosFetchedAt) ?? '' })
+                                    : t('screener.ratiosNotFetched')}
                             </span>
                         </span>
                     ) : null;
@@ -296,7 +303,7 @@ export function ScreenerTable({
                 },
             }),
             columnHelper.accessor('sector', {
-                header: 'Sector', size: 150, minSize: 80,
+                header: t('screener.sector'), size: 150, minSize: 80,
                 cell: props => {
                     const sym = props.row.original.symbol;
                     const e = mapRef.current.get(sym);
@@ -305,48 +312,48 @@ export function ScreenerTable({
                 },
             }),
             columnHelper.accessor(() => null, {
-                id: 'price', header: 'Price', size: 110, minSize: 72,
+                id: 'price', header: t('screener.price'), size: 110, minSize: 72,
                 enableSorting: true, sortingFn: numSort('price'),
                 cell: props => fundCell(props.row.original.symbol, d =>
                     d.price == null ? null : (
                         <span className="tabular-nums">
-                            {d.currency === 'JPY' ? '¥' : ''}{fmtPrice(d.price, d.currency)}{' '}
+                            {d.currency === 'JPY' ? '¥' : ''}{fmtPrice(d.price, d.currency, locale)}{' '}
                             {d.currency !== 'JPY' && <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span>}
                         </span>
                     )),
             }),
             columnHelper.accessor(() => null, {
-                id: 'trailingPE', header: 'P/E', size: 58, minSize: 44,
+                id: 'trailingPE', header: t('screener.per'), size: 58, minSize: 44,
                 enableSorting: true, sortingFn: numSort('trailingPE'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, 1)}</span>, true),
+                    d.trailingPE == null ? null : <span className="tabular-nums">{fmtNum(d.trailingPE, locale, 1)}</span>, true),
             }),
             columnHelper.accessor(() => null, {
-                id: 'forwardPE', header: 'Fwd P/E', size: 68, minSize: 52,
+                id: 'forwardPE', header: t('screener.forwardPer'), size: 68, minSize: 52,
                 enableSorting: true, sortingFn: numSort('forwardPE'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, 1)}</span>, true),
+                    d.forwardPE == null ? null : <span className="tabular-nums">{fmtNum(d.forwardPE, locale, 1)}</span>, true),
             }),
             columnHelper.accessor(() => null, {
-                id: 'dividendYield', header: 'Div %', size: 62, minSize: 48,
+                id: 'dividendYield', header: t('screener.divYield'), size: 62, minSize: 48,
                 enableSorting: true, sortingFn: numSort('dividendYield'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, 2)}%</span>, true),
+                    d.dividendYield == null ? null : <span className="tabular-nums">{fmtNum(d.dividendYield * 100, locale, 2)}%</span>, true),
             }),
             columnHelper.accessor(() => null, {
-                id: 'priceToBook', header: 'P/B', size: 56, minSize: 44,
+                id: 'priceToBook', header: t('screener.pbr'), size: 56, minSize: 44,
                 enableSorting: true, sortingFn: numSort('priceToBook'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, 2)}</span>, true),
+                    d.priceToBook == null ? null : <span className="tabular-nums">{fmtNum(d.priceToBook, locale, 2)}</span>, true),
             }),
             columnHelper.accessor(() => null, {
-                id: 'marketCap', header: 'Mkt Cap (¥)', size: 82, minSize: 60,
+                id: 'marketCap', header: t('screener.marketCap'), size: 82, minSize: 60,
                 enableSorting: true, sortingFn: numSort('marketCap'),
                 cell: props => fundCell(props.row.original.symbol, d =>
-                    d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap)}</span>, true),
+                    d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap, locale)}</span>, true),
             }),
             columnHelper.display({
-                id: 'actions', header: 'Actions', size: 110, minSize: 96, maxSize: 110, enableResizing: false,
+                id: 'actions', header: t('screener.actions'), size: 110, minSize: 96, maxSize: 110, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
@@ -361,34 +368,35 @@ export function ScreenerTable({
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
                                 style={{ color: triggered ? 'var(--accent)' : 'var(--text-muted)' }}
                                 title={(() => {
-                                    if (!alert) return 'Set price alert';
+                                    if (!alert) return t('screener.setAlert');
                                     const parts: string[] = [];
-                                    if (alert.targetAbove != null) parts.push(`↑ ${fmtNum(alert.targetAbove, 0)}`);
-                                    if (alert.targetBelow != null) parts.push(`↓ ${fmtNum(alert.targetBelow, 0)}`);
-                                    return `Alert ${parts.join(' · ')}${triggered ? ' · triggered' : ''}`;
+                                    if (alert.targetAbove != null) parts.push(`↑ ${fmtNum(alert.targetAbove, locale, 0)}`);
+                                    if (alert.targetBelow != null) parts.push(`↓ ${fmtNum(alert.targetBelow, locale, 0)}`);
+                                    return t('screener.alertSummary', { thresholds: parts.join(' · ') })
+                                        + (triggered ? ` · ${t('screener.alertTriggered')}` : '');
                                 })()}>
                                 {alert ? <MdNotificationsActive size={15} /> : <MdNotificationsNone size={15} />}
                             </button>
                             <button onClick={stop(() => onEditNote(c))}
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
                                 style={{ color: note ? 'var(--accent)' : 'var(--text-muted)' }}
-                                title={note ? `Note: ${note}` : 'Add note'}>
+                                title={note ? t('screener.noteSummary', { note }) : t('screener.addNote')}>
                                 {note ? <MdStickyNote2 size={15} /> : <MdOutlineStickyNote2 size={15} />}
                             </button>
                             <button onClick={stop(() => onOpenChart(c, currency))}
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
-                                style={{ color: 'var(--text-secondary)' }} title="View chart">
+                                style={{ color: 'var(--text-secondary)' }} title={t('screener.viewChart')}>
                                 <MdShowChart size={15} />
                             </button>
                             <button onClick={stop(() => refreshRef.current(c.symbol))}
                                 className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
-                                style={{ color: 'var(--text-secondary)' }} title="Refresh data">
+                                style={{ color: 'var(--text-secondary)' }} title={t('screener.refreshData')}>
                                 <MdRefresh size={15} className={loading ? 'animate-spin' : ''} />
                             </button>
                             {onBuy && (
                                 <button onClick={stop(() => onBuy(c))}
                                     className="flex items-center justify-center p-1.5 rounded hover:opacity-70 transition-all"
-                                    style={{ color: 'var(--pnl-green)' }} title="Buy — add to portfolio">
+                                    style={{ color: 'var(--pnl-green)' }} title={t('screener.buy')}>
                                     <MdAddShoppingCart size={15} />
                                 </button>
                             )}
@@ -397,7 +405,7 @@ export function ScreenerTable({
                 },
             }),
         ];
-    }, [onRemove, removableSymbols, onTogglePin, onEditAlert, onEditNote, onBuy]);
+    }, [onRemove, removableSymbols, onTogglePin, onEditAlert, onEditNote, onBuy, onOpenChart, t, locale]);
 
     const columnVisibility = useMemo(() => ({
         remove: (removableSymbols?.size ?? 0) > 0,
@@ -479,29 +487,31 @@ export function ScreenerTable({
         const data = rows.map(c => {
             const e = fundMap.get(c.symbol);
             const d = e?.status === 'done' ? e.data : null;
+            // Spreadsheet headers follow the UI language — the export is read by
+            // the same person who set it.
             return {
-                Ticker: c.code,
-                Name: nameCacheRef.current.get(c.symbol) ?? c.name,
-                Sector: c.sector ?? '',
-                'Price (JPY)': d?.price ?? '',
-                'P/E': d?.trailingPE ?? '',
-                'Fwd P/E': d?.forwardPE ?? '',
-                'Div %': d?.dividendYield != null ? +(d.dividendYield * 100).toFixed(2) : '',
-                'P/B': d?.priceToBook ?? '',
-                'Mkt Cap (¥)': d?.marketCap ?? '',
+                [t('column.ticker')]: c.code,
+                [t('column.name')]: nameCacheRef.current.get(c.symbol) ?? c.name,
+                [t('screener.sector')]: c.sector ?? '',
+                [t('screener.exportPriceHeader')]: d?.price ?? '',
+                [t('screener.per')]: d?.trailingPE ?? '',
+                [t('screener.forwardPer')]: d?.forwardPE ?? '',
+                [t('screener.divYield')]: d?.dividendYield != null ? +(d.dividendYield * 100).toFixed(2) : '',
+                [t('screener.pbr')]: d?.priceToBook ?? '',
+                [t('screener.marketCap')]: d?.marketCap ?? '',
             };
         });
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Screener');
+        XLSX.utils.book_append_sheet(wb, ws, t('screener.exportSheetName'));
         XLSX.writeFile(wb, `screener-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    }, [table, fundMap]);
+    }, [table, fundMap, t]);
 
     const curPageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
     const minTableWidth = table.getVisibleLeafColumns().reduce((sum, c) => sum + (c.columnDef.minSize ?? 40), 0);
 
-    const viewTab = (id: View, label: string, count: number) => (
+    const viewTab = (id: View, labelKey: TranslationKey, count: number) => (
         <button
             key={id}
             onClick={() => handleSetView(id)}
@@ -510,7 +520,7 @@ export function ScreenerTable({
                 ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
                 : { color: 'var(--text-secondary)' }}
         >
-            {label} <span style={{ opacity: 0.6 }}>({count.toLocaleString()})</span>
+            {t(labelKey)} <span style={{ opacity: 0.6 }}>({count.toLocaleString(locale)})</span>
         </button>
     );
 
@@ -522,7 +532,7 @@ export function ScreenerTable({
                 <div className="relative" style={{ flex: '1 1 140px', maxWidth: 260 }}>
                     <MdSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                     <input value={filter} onChange={e => setFilter(e.target.value)}
-                        placeholder="Filter by ticker or name…"
+                        placeholder={t('screener.filterPlaceholder')}
                         className="w-full h-9 pl-9 pr-3 rounded-lg text-sm glass outline-none focus:ring-1"
                         style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)', ['--tw-ring-color' as string]: 'var(--accent)' }} />
                 </div>
@@ -540,7 +550,9 @@ export function ScreenerTable({
                     >
                         <MdFilterList size={14} />
                         <span className="hidden sm:inline">
-                            {selectedSectors ? `${selectedSectors.size} sector${selectedSectors.size !== 1 ? 's' : ''}` : 'Sector'}
+                            {selectedSectors
+                                ? t(selectedSectors.size === 1 ? 'screener.sectorCount' : 'screener.sectorCountPlural', { count: selectedSectors.size })
+                                : t('screener.sector')}
                         </span>
                         <MdExpandMore size={13} />
                     </button>
@@ -564,7 +576,7 @@ export function ScreenerTable({
                                         borderBottom: '1px solid var(--border)',
                                     }}>
                                     {!selectedSectors && <MdCheck size={12} />}
-                                    <span className={!selectedSectors ? '' : 'pl-4'}>All sectors</span>
+                                    <span className={!selectedSectors ? '' : 'pl-4'}>{t('screener.allSectors')}</span>
                                 </button>
                                 {allSectors.map(sector => {
                                     const active = selectedSectors?.has(sector) ?? false;
@@ -586,12 +598,12 @@ export function ScreenerTable({
                 {/* View tabs */}
                 <div className="inline-flex h-9 items-center rounded-lg p-1 gap-0.5 flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
-                    {viewTab('all', 'All', constituents.length)}
-                    {viewTab('loaded', 'Loaded', loadedCount)}
-                    {viewTab('unloaded', 'Not loaded', unloadedCount)}
-                    {viewTab('pinned', 'Pinned', pinnedSymbols.size)}
-                    {viewTab('alerts', 'Alerts', alertsCount)}
-                    {viewTab('notes', 'Notes', notesCount)}
+                    {viewTab('all', 'common.all', constituents.length)}
+                    {viewTab('loaded', 'screener.tabLoaded', loadedCount)}
+                    {viewTab('unloaded', 'screener.tabNotLoaded', unloadedCount)}
+                    {viewTab('pinned', 'screener.tabPinned', pinnedSymbols.size)}
+                    {viewTab('alerts', 'screener.tabAlerts', alertsCount)}
+                    {viewTab('notes', 'screener.tabNotes', notesCount)}
                 </div>
 
                 {/* Actions — pushed to the right */}
@@ -603,28 +615,28 @@ export function ScreenerTable({
                         <span className="hidden sm:inline">
                             {progress
                                 ? `${progress.done}/${progress.total}…`
-                                : showAll ? 'Refresh all' : 'Refresh page'}
+                                : showAll ? t('screener.refreshAll') : t('screener.refreshPage')}
                         </span>
                         <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : '↻'}</span>
                     </button>
                     <div className="relative group/export">
                         <button className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
                             style={{ color: 'var(--text-secondary)', background: 'var(--glass-bg)', border: '1px solid var(--border)' }}
-                            title="Export to Excel">
+                            title={t('screener.exportToExcel')}>
                             <MdDownload size={14} />
-                            <span className="hidden sm:inline">Export</span>
+                            <span className="hidden sm:inline">{t('screener.export')}</span>
                         </button>
                         <div className="absolute right-0 top-full mt-1 z-20 rounded-lg overflow-hidden shadow-lg opacity-0 pointer-events-none group-hover/export:opacity-100 group-hover/export:pointer-events-auto transition-all"
                             style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', minWidth: '140px' }}>
                             <button onClick={() => exportToExcel('page')}
                                 className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
                                 style={{ color: 'var(--text-primary)' }}>
-                                Current page ({pageRows.length} rows)
+                                {t('screener.exportCurrentPage', { count: pageRows.length })}
                             </button>
                             <button onClick={() => exportToExcel('all')}
                                 className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
                                 style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
-                                All filtered ({totalCount} rows)
+                                {t('screener.exportAllFiltered', { count: totalCount })}
                             </button>
                         </div>
                     </div>
@@ -634,7 +646,7 @@ export function ScreenerTable({
                             color: infoOpen ? 'var(--accent)' : 'var(--text-secondary)',
                             background: infoOpen ? 'var(--accent-dim)' : 'var(--glass-bg)',
                             border: '1px solid var(--border)',
-                        }} title="How it works">
+                        }} title={t('screener.howItWorks')}>
                         <MdInfoOutline size={14} />
                     </button>
                 </div>
@@ -645,76 +657,77 @@ export function ScreenerTable({
                 <div className="rounded-xl px-4 py-3 text-xs flex-shrink-0"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                     <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>How it works</span>
-                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)' }}><MdClose size={15} /></button>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{t('screener.howItWorks')}</span>
+                        <button onClick={() => setInfoOpen(false)} style={{ color: 'var(--text-muted)' }} aria-label={t('common.close')}><MdClose size={15} /></button>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0' }}>
-                        {/* Col 1 — Metrics */}
+                        {/* Col 1 — Metrics. Each row is "<term> — <definition>": the term
+                            stays a bold label, the definition is a separate key. */}
                         <div className="flex flex-col gap-0.5" style={{ paddingRight: '1.25rem', borderRight: '1px solid var(--border)' }}>
-                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Metrics</p>
-                            <span><strong>Price</strong> — live, Yahoo Finance</span>
-                            <span><strong>P/E</strong> — price ÷ trailing EPS</span>
-                            <span><strong>Fwd P/E</strong> — price ÷ next-year EPS</span>
-                            <span><strong>P/B</strong> — price ÷ book value</span>
-                            <span><strong>Div %</strong> — annual dividend yield</span>
-                            <span><strong>Mkt Cap</strong> — shares × price</span>
+                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.metrics')}</p>
+                            <span><strong>{t('screener.price')}</strong> — {t('info.metricPrice')}</span>
+                            <span><strong>{t('screener.per')}</strong> — {t('info.metricPer')}</span>
+                            <span><strong>{t('screener.forwardPer')}</strong> — {t('info.metricForwardPer')}</span>
+                            <span><strong>{t('screener.pbr')}</strong> — {t('info.metricPbr')}</span>
+                            <span><strong>{t('screener.divYield')}</strong> — {t('info.metricDivYield')}</span>
+                            <span><strong>{t('info.marketCapShort')}</strong> — {t('info.metricMarketCap')}</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                JP ratios from J-Quants, others from Yahoo. Update quarterly.
+                                {t('info.ratioSources')}
                             </p>
                         </div>
                         {/* Col 2 — Universe + Dot legend */}
                         <div className="flex flex-col gap-3" style={{ padding: '0 1.25rem', borderRight: '1px solid var(--border)' }}>
                             <div>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Universe</p>
-                                <p>BlackRock iShares 1475 ETF holdings — <strong>names only</strong>. Header date is the list snapshot, not data freshness.</p>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.universe')}</p>
+                                <p>{t('info.universeBefore')}<strong>{t('info.universeEmphasis')}</strong>{t('info.universeAfter')}</p>
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Row dot</p>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.rowDot')}</p>
                                 <div className="flex flex-col gap-1">
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--pnl-green)', display: 'inline-block' }} />
-                                        Fresh — price &lt;24 h, ratios &lt;7 d
+                                        {t('info.dotFresh')}
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'oklch(68% 0.14 60)', display: 'inline-block' }} />
-                                        Stale — price &gt;24 h or ratios &gt;7 d
+                                        {t('info.dotStale')}
                                     </span>
                                     <span className="flex items-center gap-2">
                                         <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, background: 'var(--border-strong)', opacity: 0.45, display: 'inline-block' }} />
-                                        Not loaded
+                                        {t('info.dotNotLoaded')}
                                     </span>
                                 </div>
-                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>Hover the dot for exact ages.</p>
+                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>{t('info.dotHover')}</p>
                             </div>
                         </div>
                         {/* Col 3 — Loading */}
                         <div className="flex flex-col gap-0.5" style={{ padding: '0 1.25rem', borderRight: '1px solid var(--border)' }}>
-                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Loading</p>
-                            <span><strong>On open</strong> — restores from localStorage, falls back to DB</span>
-                            <span><strong>Refresh page</strong> — live Yahoo fetch for 50 visible rows</span>
-                            <span><strong>Refresh all</strong> — all rows in Show all mode</span>
-                            <span><strong>⟳ per row</strong> — single stock on demand</span>
-                            <span><strong>Cart icon</strong> — open Add Position pre-filled with ticker &amp; name</span>
-                            <span><strong>Loaded tab</strong> — rows with data, no pagination</span>
-                            <span><strong>Show all</strong> — full list, one page</span>
+                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.loading')}</p>
+                            <span><strong>{t('info.onOpen')}</strong> — {t('info.onOpenBody')}</span>
+                            <span><strong>{t('screener.refreshPage')}</strong> — {t('info.refreshPageBody')}</span>
+                            <span><strong>{t('screener.refreshAll')}</strong> — {t('info.refreshAllBody')}</span>
+                            <span><strong>{t('info.perRowRefresh')}</strong> — {t('info.perRowRefreshBody')}</span>
+                            <span><strong>{t('info.cartIcon')}</strong> — {t('info.cartIconBody')}</span>
+                            <span><strong>{t('info.loadedTab')}</strong> — {t('info.loadedTabBody')}</span>
+                            <span><strong>{t('screener.showAll')}</strong> — {t('info.showAllBody')}</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Prices expire after 24 h, ratios after 7 d. Stale data shows immediately.
+                                {t('info.expiry')}
                             </p>
                         </div>
                         {/* Col 4 — Price alerts */}
                         <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
-                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Price alerts</p>
-                            <span><strong>Bell icon</strong> — set above/below thresholds on any row</span>
-                            <span><strong>Polling</strong> — alerted stocks re-fetched every hour while page is open</span>
-                            <span><strong>Notification</strong> — browser push when threshold crossed; edit alert to reset</span>
-                            <span><strong>Alerts tab</strong> — filter to rows with an alert set</span>
+                            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.priceAlerts')}</p>
+                            <span><strong>{t('info.bellIcon')}</strong> — {t('info.bellIconBody')}</span>
+                            <span><strong>{t('info.polling')}</strong> — {t('info.pollingBody')}</span>
+                            <span><strong>{t('info.notification')}</strong> — {t('info.notificationBody')}</span>
+                            <span><strong>{t('info.alertsTab')}</strong> — {t('info.alertsTabBody')}</span>
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                Checks require this tab to be open. Permission requested on first save.
+                                {t('info.alertsCaveat')}
                             </p>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Notes</p>
-                                <span><strong>Note icon</strong> — free-text note per row, saved locally</span>
-                                <span><strong>Notes tab</strong> — filter to rows with a note</span>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('screener.tabNotes')}</p>
+                                <span><strong>{t('info.noteIcon')}</strong> — {t('info.noteIconBody')}</span>
+                                <span><strong>{t('info.notesTab')}</strong> — {t('info.notesTabBody')}</span>
                             </div>
                         </div>
                     </div>
@@ -800,12 +813,12 @@ export function ScreenerTable({
                 </table>
                 {totalCount === 0 && (
                     <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        {view === 'loaded' ? 'No data loaded yet — click "Refresh page" to load the current page' :
-                            view === 'unloaded' ? 'All names have been loaded' :
-                            view === 'pinned' ? 'No pinned names — click the star on any row to pin it' :
-                            view === 'alerts' ? 'No price alerts set — click the bell icon on any row' :
-                            view === 'notes' ? 'No notes yet — click the note icon on any row' :
-                                'No names match your filter'}
+                        {view === 'loaded' ? t('screener.emptyLoaded') :
+                            view === 'unloaded' ? t('screener.emptyUnloaded') :
+                            view === 'pinned' ? t('screener.emptyPinned') :
+                            view === 'alerts' ? t('screener.emptyAlerts') :
+                            view === 'notes' ? t('screener.emptyNotes') :
+                                t('screener.emptyFilter')}
                     </div>
                 )}
             </div>
@@ -813,16 +826,16 @@ export function ScreenerTable({
             {/* Footer */}
             <div className="flex items-center justify-between gap-3 flex-shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <span>
-                    {view === 'all' && !showAll && `Page ${curPageIndex + 1} of ${pageCount}`}
-                    {view === 'all' && showAll && `${totalCount.toLocaleString()} names`}
-                    {view === 'loaded' && `${totalCount.toLocaleString()} rows with data`}
-                    {view === 'unloaded' && `${totalCount.toLocaleString()} rows without data`}
-                    {view === 'pinned' && `${totalCount.toLocaleString()} pinned`}
-                    {view === 'alerts' && `${totalCount.toLocaleString()} with alerts`}
-                    {view === 'notes' && `${totalCount.toLocaleString()} with notes`}
+                    {view === 'all' && !showAll && t('screener.pageOf', { page: curPageIndex + 1, total: pageCount })}
+                    {view === 'all' && showAll && t('screener.countNames', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'loaded' && t('screener.countWithData', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'unloaded' && t('screener.countWithoutData', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'pinned' && t('screener.countPinned', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'alerts' && t('screener.countWithAlerts', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'notes' && t('screener.countWithNotes', { count: totalCount.toLocaleString(locale) })}
                     {loadedCount > 0 && view === 'all' && (
                         <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
-                            · {loadedCount.toLocaleString()} loaded
+                            · {t('screener.countLoaded', { count: loadedCount.toLocaleString(locale) })}
                         </span>
                     )}
                 </span>
@@ -834,7 +847,7 @@ export function ScreenerTable({
                             className="px-2.5 py-1.5 rounded-lg transition-all"
                             style={{ color: showAll ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)', background: showAll ? 'var(--accent-dim)' : 'transparent' }}
                         >
-                            {showAll ? 'Paginate' : 'Show all'}
+                            {showAll ? t('screener.paginate') : t('screener.showAll')}
                         </button>
                     )}
                     {/* Prev / Next — only when paginated */}
@@ -843,12 +856,12 @@ export function ScreenerTable({
                             <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
                                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40"
                                 style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                                <MdChevronLeft size={16} /> Prev
+                                <MdChevronLeft size={16} /> {t('common.prev')}
                             </button>
                             <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}
                                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40"
                                 style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                                Next <MdChevronRight size={16} />
+                                {t('common.next')} <MdChevronRight size={16} />
                             </button>
                         </>
                     )}

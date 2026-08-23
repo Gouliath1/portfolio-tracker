@@ -25,6 +25,8 @@ import {
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
 } from 'react-icons/md';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
+import { useTranslation } from '../i18n';
+import type { TranslationKey, TranslationParams } from '../i18n';
 
 import ImportSetModal from '../components/management/ImportSetModal';
 import AddPositionModal from '../components/management/AddPositionModal';
@@ -44,17 +46,29 @@ interface UndoEntry {
     setId: string;
 }
 
+/**
+ * A user-facing message held as a key plus params, so it re-renders in the
+ * active language. `detail` carries text that came from outside the app
+ * (a fetch/Error message) and is shown verbatim rather than mistranslated.
+ */
+interface Notice {
+    key: TranslationKey;
+    params?: TranslationParams;
+    detail?: string;
+}
+
 export default function Home() {
+    const { t, locale } = useTranslation();
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummaryType | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<Notice | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [addPositionOpen, setAddPositionOpen] = useState(false);
     const [sellTarget, setSellTarget] = useState<{ position: Position; setId: string } | null>(null);
-    const [actionError, setActionError] = useState<string | null>(null);
-    const [actionInfo, setActionInfo] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<Notice | null>(null);
+    const [actionInfo, setActionInfo] = useState<Notice | null>(null);
     const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
     const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,7 +154,10 @@ export default function Home() {
             setError(null);
             setLoading(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load portfolio data');
+            setError({
+                key: 'home.errLoadPortfolio',
+                detail: err instanceof Error ? err.message : undefined,
+            });
             setLoading(false);
         } finally {
             if (showRefreshing) setRefreshing(false);
@@ -161,7 +178,10 @@ export default function Home() {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             await loadData(false, false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to refresh data');
+            setError({
+                key: 'home.errRefresh',
+                detail: err instanceof Error ? err.message : undefined,
+            });
         } finally {
             setRefreshing(false);
         }
@@ -185,7 +205,7 @@ export default function Home() {
 
     const handleDeletePosition = useCallback((position: Position) => {
         if (position.status === 'closed') {
-            setActionError('Closed lots can\'t be deleted from here — remove the underlying sell transaction from the exported JSON instead.');
+            setActionError({ key: 'home.errDeleteClosed' });
             return;
         }
         if (position.txBuyIndex === undefined) return;
@@ -196,7 +216,10 @@ export default function Home() {
         if (!buyTx || buyTx.way !== 'buy') return;
 
         if (position.quantity < buyTx.quantity) {
-            setActionError(`Cannot delete this buy — ${buyTx.quantity - position.quantity} of ${buyTx.quantity} have already been sold (FIFO). Delete the sells first.`);
+            setActionError({
+                key: 'home.errDeletePartiallySold',
+                params: { sold: buyTx.quantity - position.quantity, total: buyTx.quantity },
+            });
             return;
         }
 
@@ -310,7 +333,7 @@ export default function Home() {
                                         style={{ color: 'var(--accent)' }} />
                                     <span className="text-sm font-semibold truncate" title={activeSetName}
                                         style={{ color: 'var(--text-primary)' }}>
-                                        {activeSetName || 'Portfolio'}
+                                        {activeSetName || t('sidebar.activePortfolio')}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 ml-auto flex-shrink-0">
@@ -322,7 +345,7 @@ export default function Home() {
                                         onClick={() => setSettingsOpen(true)}
                                         className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg"
                                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                        aria-label="Open settings"
+                                        aria-label={t('settings.open')}
                                     >
                                         <MdSettings size={18} />
                                     </button>
@@ -330,12 +353,12 @@ export default function Home() {
                                         <div className="relative group">
                                             <button className="h-9 w-9 flex items-center justify-center rounded-lg"
                                                 style={{ color: 'var(--pnl-red)' }}
-                                                aria-label="Some prices unavailable">
+                                                aria-label={t('home.pricesUnavailable')}>
                                                 <MdCloudOff size={18} />
                                             </button>
                                             <div className="absolute right-0 top-full mt-2 w-56 rounded-xl px-4 py-3 text-xs pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                                 style={{ color: 'var(--text-secondary)', background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
-                                                Some prices unavailable — showing last cached values
+                                                {t('home.pricesUnavailableDetail')}
                                             </div>
                                         </div>
                                     )}
@@ -343,10 +366,10 @@ export default function Home() {
                                         onClick={() => setShowValues(!showValues)}
                                         className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all"
                                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                        aria-label={showValues ? 'Hide values' : 'Show values'}
+                                        aria-label={showValues ? t('home.hideValues') : t('home.showValues')}
                                     >
                                         {showValues ? <MdVisibilityOff size={16} /> : <MdVisibility size={16} />}
-                                        <span className="hidden sm:inline">{showValues ? 'Hide' : 'Show'}</span>
+                                        <span className="hidden sm:inline">{showValues ? t('common.hide') : t('common.show')}</span>
                                     </button>
                                     <button
                                         onClick={handleRefreshClick}
@@ -355,7 +378,7 @@ export default function Home() {
                                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                     >
                                         <MdRefresh size={16} className={refreshing ? 'animate-spin' : ''} />
-                                        <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+                                        <span className="hidden sm:inline">{refreshing ? t('home.refreshing') : t('home.refresh')}</span>
                                     </button>
                                 </div>
                             </div>
@@ -368,7 +391,7 @@ export default function Home() {
                                     <div className="text-center space-y-4">
                                         <div className="w-8 h-8 rounded-full border-2 border-t-transparent mx-auto animate-spin"
                                             style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Loading portfolio…</p>
+                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('home.loadingPortfolio')}</p>
                                     </div>
                                 </div>
                             )}
@@ -378,8 +401,10 @@ export default function Home() {
                                 <div className="flex-1 min-h-0 flex items-center justify-center px-8">
                                     <div className="rounded-xl p-8 max-w-md text-center space-y-3"
                                         style={{ background: 'var(--surface)', border: '1px solid var(--pnl-red)' }}>
-                                        <p className="font-semibold" style={{ color: 'var(--pnl-red)' }}>Error</p>
-                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{error}</p>
+                                        <p className="font-semibold" style={{ color: 'var(--pnl-red)' }}>{t('common.error')}</p>
+                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                            {t(error.key, error.params)}{error.detail ? ` (${error.detail})` : ''}
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -442,10 +467,12 @@ export default function Home() {
                                     {/* Title row */}
                                     <div className="flex items-center gap-3 flex-shrink-0">
                                         <h1 className="text-sm font-semibold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>
-                                            Assets
+                                            {t('nav.assets')}
                                         </h1>
                                         <span className="text-xs truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
-                                            Open and closed positions · {(portfolioSummary.positions.length + portfolioSummary.closedPositions.length).toLocaleString()} total
+                                            {t('home.assetsSubtitle', {
+                                                count: (portfolioSummary.positions.length + portfolioSummary.closedPositions.length).toLocaleString(locale),
+                                            })}
                                         </span>
                                     </div>
                                     {/* Open / Closed strip */}
@@ -453,18 +480,18 @@ export default function Home() {
                                         <div className="inline-flex rounded-lg p-0.5 text-sm font-medium"
                                             style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                                             {([
-                                                { id: 'open' as const,   label: 'Open',   count: portfolioSummary.positions.length },
-                                                { id: 'closed' as const, label: 'Closed', count: portfolioSummary.closedPositions.length },
-                                            ]).map(t => (
+                                                { id: 'open' as const,   labelKey: 'home.tabOpen' as TranslationKey,   count: portfolioSummary.positions.length },
+                                                { id: 'closed' as const, labelKey: 'home.tabClosed' as TranslationKey, count: portfolioSummary.closedPositions.length },
+                                            ]).map(tab => (
                                                 <button
-                                                    key={t.id}
-                                                    onClick={() => setAssetsTab(t.id)}
+                                                    key={tab.id}
+                                                    onClick={() => setAssetsTab(tab.id)}
                                                     className="px-3 py-1.5 rounded-md transition-all"
-                                                    style={assetsTab === t.id
+                                                    style={assetsTab === tab.id
                                                         ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
                                                         : { color: 'var(--text-secondary)' }}
                                                 >
-                                                    {t.label} <span style={{ opacity: 0.6 }}>({t.count})</span>
+                                                    {t(tab.labelKey)} <span style={{ opacity: 0.6 }}>({tab.count})</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -476,7 +503,7 @@ export default function Home() {
                                                     style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                                 >
                                                     <MdAdd size={15} />
-                                                    Add position
+                                                    {t('addPosition.title')}
                                                 </button>
                                             </div>
                                         )}
@@ -511,9 +538,9 @@ export default function Home() {
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
                                             <h2 className="text-base font-semibold mb-1"
-                                                style={{ color: 'var(--text-primary)' }}>Your portfolios</h2>
+                                                style={{ color: 'var(--text-primary)' }}>{t('home.yourPortfolios')}</h2>
                                             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                Switch between your portfolios, save one to a file, or load a new one.
+                                                {t('home.yourPortfoliosHelp')}
                                             </p>
                                         </div>
                                         <button
@@ -522,7 +549,7 @@ export default function Home() {
                                             style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                                         >
                                             <MdUpload size={15} />
-                                            Load from file
+                                            {t('home.loadFromFile')}
                                         </button>
                                     </div>
                                     <PositionSetManager
@@ -552,7 +579,8 @@ export default function Home() {
                     style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)' }}
                 >
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        <span style={{ color: 'var(--text-primary)' }}>{String(undoEntry.position.ticker)}</span> removed
+                        <span style={{ color: 'var(--text-primary)' }}>{String(undoEntry.position.ticker)}</span>
+                        {' '}{t('home.removed')}
                     </span>
                     <button
                         onClick={handleUndo}
@@ -560,7 +588,7 @@ export default function Home() {
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                     >
                         <MdUndo size={15} />
-                        Undo
+                        {t('home.undo')}
                     </button>
                 </div>
             )}
@@ -574,7 +602,7 @@ export default function Home() {
                             handlePositionSetChanged();
                         } else {
                             setDemoBannerRefresh(prev => prev + 1);
-                            setActionInfo(`Loaded ${count} transactions — switch to the new portfolio below to view it.`);
+                            setActionInfo({ key: 'home.infoLoadedTransactions', params: { count } });
                             setTimeout(() => setActionInfo(null), 5000);
                         }
                     }}
@@ -607,13 +635,13 @@ export default function Home() {
                     className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl max-w-md"
                     style={{ background: 'var(--surface-popover)', border: '1px solid var(--pnl-red)' }}
                 >
-                    <span className="text-sm" style={{ color: 'var(--pnl-red)' }}>{actionError}</span>
+                    <span className="text-sm" style={{ color: 'var(--pnl-red)' }}>{t(actionError.key, actionError.params)}</span>
                     <button
                         onClick={() => setActionError(null)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                     >
-                        Dismiss
+                        {t('welcome.dismiss')}
                     </button>
                 </div>
             )}
@@ -624,13 +652,13 @@ export default function Home() {
                     className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl max-w-md"
                     style={{ background: 'var(--surface-popover)', border: '1px solid var(--accent-glow)' }}
                 >
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{actionInfo}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t(actionInfo.key, actionInfo.params)}</span>
                     <button
                         onClick={() => setActionInfo(null)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                     >
-                        Dismiss
+                        {t('welcome.dismiss')}
                     </button>
                 </div>
             )}

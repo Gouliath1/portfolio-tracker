@@ -1,6 +1,16 @@
 import { Position } from '@portfolio/types';
 import { HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { TimelineFilter, formatDateLabel, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { translate, DEFAULT_LANGUAGE, localeTag } from '../../../i18n';
+import type { TranslationKey, TranslationParams } from '../../../i18n';
+
+/** Translator signature; defaults to English so tests can call this directly. */
+export type Translator = (key: TranslationKey, params?: TranslationParams) => string;
+
+export const defaultTranslator: Translator = (key, params) =>
+    translate(DEFAULT_LANGUAGE, key, params);
+
+export const DEFAULT_LOCALE = localeTag(DEFAULT_LANGUAGE);
 
 const cssVar = (name: string): string => {
     if (typeof window === 'undefined') return '';
@@ -51,7 +61,9 @@ export const createChartData = (
     positions: Position[],
     timeline: TimelineFilter,
     showValues: boolean,
-    currency: string = 'JPY'
+    currency: string = 'JPY',
+    t: Translator = defaultTranslator,
+    locale: string = DEFAULT_LOCALE,
 ): ChartData => {
     const valueData: number[] = [];
     const costData: number[] = [];
@@ -85,28 +97,13 @@ export const createChartData = (
     });
 
     return {
-        labels: dateIntervals.map(date => {
-            switch (timeline) {
-                case '1D':
-                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                case '5D':
-                case '1M':
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                case '6M':
-                case 'YTD':
-                case '1Y':
-                case '2Y':
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                case '5Y':
-                case 'All':
-                default:
-                    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-            }
-        }),
+        labels: dateIntervals.map(date => formatDateLabel(date, timeline, locale)),
         datasets: [
             {
                 // Portfolio Value — primary, strongest visual weight
-                label: showValues ? `Total Value (${currency})` : 'P&L %',
+                label: showValues
+                    ? t('chart.datasetTotalValue', { currency })
+                    : t('chart.datasetPnlPct'),
                 data: valueData,
                 borderColor: cssVar('--chart-line1'),
                 backgroundColor: cssVar('--chart-line1-fill'),
@@ -122,7 +119,7 @@ export const createChartData = (
             },
             {
                 // Cost Basis — secondary, dashed slate line
-                label: `Total Cost (${currency})`,
+                label: t('chart.datasetTotalCost', { currency }),
                 data: costData,
                 borderColor: cssVar('--chart-line2'),
                 backgroundColor: cssVar('--chart-line2-fill'),
@@ -139,7 +136,9 @@ export const createChartData = (
             },
             {
                 // P&L — finance green with soft gradient area fill
-                label: showValues ? `P&L (${currency})` : 'P&L (%)',
+                label: showValues
+                    ? t('chart.datasetPnl', { currency })
+                    : t('chart.datasetPnlPctParen'),
                 data: pnlData,
                 borderColor: cssVar('--chart-line3'),
                 backgroundColor: pnlAreaGradient,
