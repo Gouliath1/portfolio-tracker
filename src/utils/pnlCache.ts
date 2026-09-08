@@ -21,7 +21,7 @@ import type { HistoricalSnapshot } from '../lib/core/historicalPortfolioCalculat
 const VERSION = 'v3';
 const KEY_PREFIX = `pt_pnl_${VERSION}_`;
 const CHART_KEY_PREFIX = `pt_chart_${VERSION}_`;
-const DAILY_KEY_PREFIX = `pt_daily_${VERSION}_`;
+const PERIOD_KEY_PREFIX = `pt_period_${VERSION}_`;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days — anything older recomputes
 
 type Stored = {
@@ -159,52 +159,67 @@ export function clearChartCache(): void {
     }
 }
 
-// ── Daily PnL cache (yesterday's-close snapshot) ────────────────────────────
+// ── Period P&L cache (past-close snapshots) ─────────────────────────────────
 //
-// useDailyPnl computes a single snapshot at yesterday's business-day close.
-// That value only changes once per day, so we cache the raw snapshot value
-// keyed by (positions, currency). The "Today's P&L" delta is recomputed from
-// it + the live currentValue.
+// usePeriodPnl computes one snapshot per lookback window (a week ago, a month
+// ago). Those reference values only change once per day, so we cache the raw
+// snapshot value keyed by (positions, currency, period). The displayed delta is
+// recomputed from it + the live currentValue.
 
-type StoredDaily = {
-    yesterdayValue: number;
+export type PnlPeriod = '1w' | '1m';
+
+type StoredPeriod = {
+    pastValue: number;
     storedAt: number;
     storedDate: string;
 };
 
-export type CachedDailyRead = {
-    yesterdayValue: number;
+export type CachedPeriodRead = {
+    pastValue: number;
     fromToday: boolean;
 };
 
-function buildDailyKey(positions: Position[], baseCurrency: string): string {
+function buildPeriodKey(positions: Position[], baseCurrency: string, period: PnlPeriod): string {
     const sig = positions.map(p => [
         p.transactionDate, p.ticker, p.quantity, p.costPerUnit,
         p.transactionCcy, p.stockCcy, p.saleDate ?? '', p.salePricePerUnit ?? 0, p.saleCcy ?? '',
     ]);
-    return `${DAILY_KEY_PREFIX}${baseCurrency}_${hash(JSON.stringify(sig))}`;
+    return `${PERIOD_KEY_PREFIX}${baseCurrency}_${period}_${hash(JSON.stringify(sig))}`;
 }
 
-export function readCachedDailyValue(positions: Position[], baseCurrency: string): CachedDailyRead | null {
+export function readCachedPeriodValue(positions: Position[], baseCurrency: string, period: PnlPeriod): CachedPeriodRead | null {
     if (typeof window === 'undefined') return null;
     try {
-        const raw = localStorage.getItem(buildDailyKey(positions, baseCurrency));
+        const raw = localStorage.getItem(buildPeriodKey(positions, baseCurrency, period));
         if (!raw) return null;
-        const parsed = JSON.parse(raw) as StoredDaily;
-        if (typeof parsed.yesterdayValue !== 'number' || typeof parsed.storedAt !== 'number') return null;
+        const parsed = JSON.parse(raw) as StoredPeriod;
+        if (typeof parsed.pastValue !== 'number' || typeof parsed.storedAt !== 'number') return null;
         if (Date.now() - parsed.storedAt > MAX_AGE_MS) return null;
-        return { yesterdayValue: parsed.yesterdayValue, fromToday: parsed.storedDate === localDateStr() };
+        return { pastValue: parsed.pastValue, fromToday: parsed.storedDate === localDateStr() };
     } catch {
         return null;
     }
 }
 
-export function writeCachedDailyValue(positions: Position[], baseCurrency: string, yesterdayValue: number): void {
+export function writeCachedPeriodValue(positions: Position[], baseCurrency: string, period: PnlPeriod, pastValue: number): void {
     if (typeof window === 'undefined') return;
     try {
-        const stored: StoredDaily = { yesterdayValue, storedAt: Date.now(), storedDate: localDateStr() };
-        localStorage.setItem(buildDailyKey(positions, baseCurrency), JSON.stringify(stored));
+        const stored: StoredPeriod = { pastValue, storedAt: Date.now(), storedDate: localDateStr() };
+        localStorage.setItem(buildPeriodKey(positions, baseCurrency, period), JSON.stringify(stored));
     } catch {
         // Quota or serialization error — caching is best-effort.
+    }
+}
+
+// One-shot cleanup of the retired "Today's P&L" cache entries. Harmless to
+// run on every import — after the first pass there is nothing left to remove.
+export function clearLegacyDailyCache(): void {
+    if (typeof window === 'undefined') return;
+    try {
+        for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('pt_daily_')) localStorage.removeItem(key);
+        }
+    } catch {
+        // Storage unavailable — nothing to clean.
     }
 }
