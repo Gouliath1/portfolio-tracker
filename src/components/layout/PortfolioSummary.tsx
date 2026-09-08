@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { MdInfoOutline } from 'react-icons/md';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { calculatePortfolioAnnualizedReturn } from '@portfolio/core';
-import { useDailyPnl } from '../../hooks/useDailyPnl';
+import { usePeriodPnl, PNL_PERIODS, type PnlPeriod } from '../../hooks/usePeriodPnl';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 
@@ -149,7 +149,7 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
 
     const hasNullPrices = isLoading || summary.positions.some(p => p.currentPrice === null);
     const annualizedReturn = calculatePortfolioAnnualizedReturn(summary);
-    const dailyPnl = useDailyPnl(summary.positions, summary.totalValueJPY, currency);
+    const periodPnl = usePeriodPnl(summary.positions, summary.totalValueJPY, currency);
 
     // Earliest transaction date (shared by P&L and CAGR "since" label)
     const earliestDate = summary.positions.length > 0
@@ -160,9 +160,10 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
         ? t('summary.since', { date: formatDate(earliestDate.replace(/\//g, '-'), locale) })
         : null;
 
-    // Daily P&L sign helpers
-    const dailyPositive = dailyPnl === null ? null : dailyPnl.absoluteChange >= 0;
-    const dailySign = dailyPnl && dailyPnl.absoluteChange >= 0 ? '+' : '';
+    const periodLabels: Record<PnlPeriod, TranslationKey> = {
+        '1w': 'summary.period1w',
+        '1m': 'summary.period1m',
+    };
 
     // Total P&L = unrealized (open lots, price-only) + all dividends
     //             + realized sales (closed lots, price-only).
@@ -256,19 +257,43 @@ export const PortfolioSummary = ({ summary, showValues, currency, formatValue, i
                     instant={isFirstDataRender}
                 />
 
-                {/* 4 — Daily P&L */}
+                {/* 4 — Recent P&L. Two windows in one card so the KPI row stays
+                    4-up: the % is the headline per row, the amount trails it. */}
                 <StatCard
-                    label={t('summary.todaysPnl')}
-                    info={t('summary.todaysPnlInfo')}
+                    label={t('summary.recentPnl')}
+                    info={t('summary.recentPnlInfo')}
                     value={
-                        hasNullPrices ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
-                        : dailyPnl === null ? <span className="text-lg" style={{ color: 'var(--text-muted)' }}>—</span>
-                        : `${dailySign}${dailyPnl.percentageChange.toFixed(2)}%`
+                        hasNullPrices
+                            ? <span style={{ color: 'var(--text-muted)' }}>{t('common.updating')}</span>
+                            : (
+                                <div className="space-y-2">
+                                    {PNL_PERIODS.map(period => {
+                                        const entry = periodPnl[period];
+                                        const positive = entry === null ? null : entry.absoluteChange >= 0;
+                                        const color = positive === null
+                                            ? 'var(--text-muted)'
+                                            : positive ? 'var(--pnl-green)' : 'var(--pnl-red)';
+                                        const sign = positive ? '+' : '';
+                                        return (
+                                            <div key={period} className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-medium uppercase tracking-widest w-6 shrink-0"
+                                                    style={{ color: 'var(--text-muted)' }}>
+                                                    {t(periodLabels[period])}
+                                                </span>
+                                                <span className="text-lg sm:text-xl font-semibold tabular-nums" style={{ color }}>
+                                                    {entry === null ? '—' : `${sign}${entry.percentageChange.toFixed(2)}%`}
+                                                </span>
+                                                {entry !== null && (
+                                                    <span className="ml-auto text-xs tabular-nums" style={{ color, opacity: 0.75 }}>
+                                                        {sign}{formatValue(entry.absoluteChange, showValues)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
                     }
-                    sub={dailyPnl && !hasNullPrices
-                        ? `${dailySign}${formatValue(dailyPnl.absoluteChange, showValues)}`
-                        : undefined}
-                    positive={hasNullPrices ? null : dailyPositive}
                     flash={valueChanged}
                     instant={isFirstDataRender}
                 />
