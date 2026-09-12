@@ -6,15 +6,25 @@ import { MdClose, MdLightMode, MdDarkMode } from 'react-icons/md';
 import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 import { ExchangeRatesSection } from './ExchangeRatesSection';
+import { ConnectAiSection } from './ConnectAiSection';
+import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
 
 interface SettingsPanelProps {
     open: boolean;
     onClose: () => void;
     currency: BaseCurrency;
     onCurrencyChange: (currency: BaseCurrency) => void;
+    /** Active portfolio set — the AI connection is scoped to it. */
+    activeSetId?: string | null;
+    /** Built on demand so an unopened panel never serialises the portfolio. */
+    buildBrief?: () => { snapshot: PortfolioSnapshot; markdown: string };
+    hasPositions?: boolean;
 }
 
-export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: SettingsPanelProps) => {
+export const SettingsPanel = ({
+    open, onClose, currency, onCurrencyChange,
+    activeSetId = null, buildBrief, hasPositions = false,
+}: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const { t, language, setLanguage } = useTranslation();
     const panelRef = useRef<HTMLDivElement>(null);
@@ -171,6 +181,16 @@ export const SettingsPanel = ({ open, onClose, currency, onCurrencyChange }: Set
                             </div>
                         </div>
                     </section>
+
+                    {/* AI connection — the one opt-in that lets holdings leave the browser */}
+                    {buildBrief && (
+                        <ConnectAiSection
+                            open={open}
+                            setId={activeSetId}
+                            buildBrief={buildBrief}
+                            hasPositions={hasPositions}
+                        />
+                    )}
 
                     {/* Exchange rates — read-only view of the FX rates used for valuation */}
                     <ExchangeRatesSection open={open} currency={currency} />

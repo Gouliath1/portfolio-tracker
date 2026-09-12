@@ -85,3 +85,7 @@ src/app/api/*/*/route-new.ts
 
 # AI snapshot bridge — a mirror of your holdings for the local MCP server
 data/portfolio-snapshot.json
+
+# AI share store — local mirror of shared portfolios
+data/shares.db
+data/shares.db-*

@@ -336,6 +336,13 @@ export default function Home() {
     // server reading the file reports the same numbers the portal shows rather
     // than whatever was true the last time someone pressed a button. No-ops
     // unless the page is served from localhost — see `publishSnapshot`.
+    // Resolved in an effect, not during render: getActiveSetId reads
+    // localStorage, which doesn't exist while Next prerenders this page.
+    const [activeSetId, setActiveSetId] = useState<string | null>(null);
+    useEffect(() => {
+        setActiveSetId(getActiveSetId());
+    }, [demoBannerRefresh]);
+
     const lastPublished = useRef<string | null>(null);
     useEffect(() => {
         if (summary.positions.length === 0) return;
@@ -727,6 +734,9 @@ export default function Home() {
                 onClose={() => setSettingsOpen(false)}
                 currency={currency}
                 onCurrencyChange={handleCurrencyChange}
+                activeSetId={activeSetId}
+                buildBrief={makeBrief}
+                hasPositions={summary.positions.length > 0}
             />
         </>
     );
