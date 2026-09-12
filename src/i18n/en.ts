@@ -601,7 +601,7 @@ export const en = {
     'about.callHttps': 'HTTPS + auth token — another company',
     'about.boxSqliteFiles': 'SQLite files',
     'about.boxTursoService': 'Turso',
-    'about.detailSeparateService': 'separate cloud service',
+    'about.detailSeparateService': 'separate company, outside Vercel',
     'about.branchesNote': 'Same libSQL client and the same tables either way. Prices are written on every cache miss, which a read-only disk cannot do — hence Turso, which is a database reached over the network, not part of Vercel.',
     'about.legendLive': 'live',
     'about.legendOff': 'off',
