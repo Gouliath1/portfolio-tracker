@@ -582,7 +582,9 @@ export const en = {
 
     'about.detailPositions': '{count} positions',
     'about.detailPosition': '{count} position',
-    'about.detailRows': '{rows} rows',
+    'about.detailRows': '{rows} rows cached',
+    'about.detailHoldsSnapshots': 'holds AI snapshots',
+    'about.detailCacheDown': 'market cache not initialising',
     'about.detailNoKey': 'no key set',
     'about.detailStatic': 'bundled',
     'about.detailConnected': 'connected',

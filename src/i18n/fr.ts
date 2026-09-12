@@ -571,7 +571,9 @@ export const fr: Translations = {
 
     'about.detailPositions': '{count} positions',
     'about.detailPosition': '{count} position',
-    'about.detailRows': '{rows} lignes',
+    'about.detailRows': '{rows} lignes en cache',
+    'about.detailHoldsSnapshots': 'contient les instantanés IA',
+    'about.detailCacheDown': 'cache de marché non initialisé',
     'about.detailNoKey': 'aucune clé',
     'about.detailStatic': 'intégrée',
     'about.detailConnected': 'connecté',
