@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
     putShare, deleteShare, getShare, isValidToken, SHARE_TTL_DAYS,
+    storageUnavailableReason,
 } from '../../../lib/server/shareStore';
 
 export const dynamic = 'force-dynamic';
@@ -54,8 +55,11 @@ export async function POST(request: NextRequest) {
 
     const result = await putShare(token, snapshot, markdown);
     if (!result) {
+        // Name the actual cause. "Storage is unavailable" alone sends whoever
+        // is debugging this to check credentials that may be perfectly fine.
+        const reason = storageUnavailableReason();
         return json(
-            { ok: false, error: 'Sharing is unavailable — no snapshot storage is configured' },
+            { ok: false, error: `Sharing is unavailable — ${reason ?? 'snapshot storage could not be opened'}` },
             503,
         );
     }

@@ -41,6 +41,26 @@ let _client: Client | null = null;
 let _initPromise: Promise<void> | null = null;
 let _unavailable = false;
 
+/**
+ * Why storage is unavailable, when it is.
+ *
+ * "Sharing is unavailable" on its own sends you looking for missing
+ * credentials even when the credentials are fine and the database refused the
+ * connection. Keeping the cause lets the caller say which it was.
+ */
+let _unavailableReason: string | null = null;
+
+export function storageUnavailableReason(): string | null {
+    return _unavailableReason;
+}
+
+function markUnavailable(reason: string): null {
+    _unavailable = true;
+    _unavailableReason = reason;
+    console.warn(`[shareStore] ${reason}`);
+    return null;
+}
+
 export interface ShareRecord {
     snapshot: unknown;
     markdown: string;
@@ -84,9 +104,10 @@ function getClient(): Client | null {
         if (url && token) {
             _client = createClient({ url, authToken: token });
         } else if (process.env.VERCEL) {
-            console.warn('[shareStore] No Turso credentials on Vercel — sharing disabled.');
-            _unavailable = true;
-            return null;
+            return markUnavailable(
+                'TURSO_DATABASE_URL / TURSO_AUTH_TOKEN are not set in this environment, ' +
+                'and a serverless filesystem cannot hold a local database.',
+            );
         } else {
             const path = process.env.SHARE_DB_PATH ?? DEFAULT_LOCAL_PATH;
             try { mkdirSync(dirname(path), { recursive: true }); } catch { /* exists */ }
@@ -94,9 +115,9 @@ function getClient(): Client | null {
         }
         return _client;
     } catch (error) {
-        console.warn('[shareStore] Failed to initialize storage:', error);
-        _unavailable = true;
-        return null;
+        return markUnavailable(
+            `Could not open the database: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 }
 
@@ -127,9 +148,12 @@ async function ensureInit(): Promise<Client | null> {
     try {
         await _initPromise;
     } catch (error) {
-        console.warn('[shareStore] Schema init failed:', error);
-        _unavailable = true;
-        return null;
+        // A fresh promise next time, so a transient outage can recover rather
+        // than pinning the process to a permanent failure.
+        _initPromise = null;
+        return markUnavailable(
+            `Database rejected the schema setup: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
     return client;
 }
@@ -243,4 +267,5 @@ export function resetShareStoreForTests(): void {
     _client = null;
     _initPromise = null;
     _unavailable = false;
+    _unavailableReason = null;
 }
