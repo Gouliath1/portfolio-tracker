@@ -18,7 +18,7 @@ export interface ArchitectureStatus {
     /** Vercel's edge region, when deployed there. */
     region: string | null;
     /** Where market data is cached, and how many rows it holds. */
-    cache: { kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null; rows: number | null };
+    cache: { kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null; rows: number | null; reason: string | null };
     /** Where opt-in AI snapshots are stored. */
     shares: { available: boolean; kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null };
     /** Providers the server can reach with its current configuration. */

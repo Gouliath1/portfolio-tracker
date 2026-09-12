@@ -27,6 +27,10 @@ const DEFAULT_LOCAL_PATH = './data/marketCache.db';
 let _client: Client | null = null;
 let _initPromise: Promise<void> | null = null;
 let _storageUnavailable = false; // sticky flag — once we know storage is broken, stop trying
+// Why it is unavailable, when it is. "Unavailable" alone sends you hunting for
+// missing credentials even when the credentials are fine and the schema setup
+// is what failed, so the cause is kept and reported.
+let _unavailableReason: string | null = null;
 
 // Vercel's runtime filesystem is read-only, so a local SQLite file can't be
 // created in serverless. If Turso credentials aren't set in that environment,
@@ -48,6 +52,7 @@ function getClient(): Client | null {
         } else if (isServerlessReadOnlyFs()) {
             console.warn('[marketDataDb] No TURSO_DATABASE_URL/TOKEN set and running on Vercel — disabling persistent cache. Routes will fall through to upstream APIs.');
             _storageUnavailable = true;
+            _unavailableReason = 'no Turso credentials set';
             return null;
         } else {
             const path = process.env.MARKET_DB_PATH ?? DEFAULT_LOCAL_PATH;
@@ -58,6 +63,7 @@ function getClient(): Client | null {
     } catch (err) {
         console.warn('[marketDataDb] Failed to initialize storage:', err);
         _storageUnavailable = true;
+        _unavailableReason = `could not open the database: ${err instanceof Error ? err.message : String(err)}`;
         return null;
     }
 }
@@ -154,6 +160,7 @@ async function ensureInit(): Promise<boolean> {
         } catch (err) {
             console.warn('[marketDataDb] Schema init failed:', err);
             _storageUnavailable = true;
+            _unavailableReason = `schema setup failed: ${err instanceof Error ? err.message : String(err)}`;
         }
     })();
     await _initPromise;
@@ -620,6 +627,8 @@ export interface CacheStatus {
     location: string | null;
     /** Cached daily closes, FX rates and fundamentals rows. Null if unreadable. */
     rows: number | null;
+    /** Why it is unavailable, when it is — never a secret, just the cause. */
+    reason: string | null;
 }
 
 /**
@@ -635,9 +644,11 @@ export async function getCacheStatus(): Promise<CacheStatus> {
 
     const location = kind === 'sqlite' ? (process.env.MARKET_DB_PATH ?? DEFAULT_LOCAL_PATH) : null;
 
-    if (kind === 'unavailable' || !(await ensureInit())) return { kind: 'unavailable', location: null, rows: null };
+    if (kind === 'unavailable' || !(await ensureInit())) {
+        return { kind: 'unavailable', location: null, rows: null, reason: _unavailableReason };
+    }
     const c = getClient();
-    if (!c) return { kind: 'unavailable', location: null, rows: null };
+    if (!c) return { kind: 'unavailable', location: null, rows: null, reason: _unavailableReason };
 
     try {
         const result = await c.execute(`
@@ -646,9 +657,9 @@ export async function getCacheStatus(): Promise<CacheStatus> {
               + (SELECT COUNT(*) FROM market_fx_rates)
               + (SELECT COUNT(*) FROM security_fundamentals) AS total
         `);
-        return { kind, location, rows: Number(result.rows[0]?.total ?? 0) };
+        return { kind, location, rows: Number(result.rows[0]?.total ?? 0), reason: null };
     } catch (err) {
         console.warn('[marketDataDb] Status query failed:', err);
-        return { kind, location, rows: null };
+        return { kind, location, rows: null, reason: err instanceof Error ? err.message : String(err) };
     }
 }

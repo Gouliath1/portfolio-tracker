@@ -42,7 +42,7 @@ interface ServerStatus {
     environment: 'development' | 'production';
     host: 'local' | 'vercel';
     region: string | null;
-    cache: { kind: Storage; location: string | null; rows: number | null };
+    cache: { kind: Storage; location: string | null; rows: number | null; reason: string | null };
     shares: { available: boolean; kind: Storage; location: string | null };
     providers: { yahoo: boolean; jquants: boolean };
 }
@@ -251,7 +251,29 @@ export function ArchitectureDiagram() {
 
     const onLocal = server?.host === 'local';
     const onVercel = server?.host === 'vercel';
-    const rows = server?.cache.rows != null ? t('about.detailRows', { rows: n(server.cache.rows) }) : undefined;
+
+    /**
+     * A store is lit when something actually lives in it, whichever branch it
+     * sits under — the snapshot store can be on Turso while the market cache
+     * is down, and that is worth seeing rather than flattening to "off".
+     */
+    const storeInUse = (kind: Storage): State => {
+        if (!server) return 'unknown';
+        return server.cache.kind === kind || server.shares.kind === kind ? 'live' : 'off';
+    };
+
+    /** What that store currently holds, or why it holds nothing. */
+    const storeDetail = (kind: Storage): string | undefined => {
+        if (!server) return undefined;
+        const parts: string[] = [];
+        if (server.cache.kind === kind && server.cache.rows != null) {
+            parts.push(t('about.detailRows', { rows: n(server.cache.rows) }));
+        } else if (server.cache.kind === 'unavailable') {
+            parts.push(t('about.detailCacheDown'));
+        }
+        if (server.shares.kind === kind) parts.push(t('about.detailHoldsSnapshots'));
+        return parts.length ? parts.join(' · ') : undefined;
+    };
 
     const browserBoxes: Box[] = [
         { key: 'pages', titleKey: 'about.boxPages', state: 'live' },
@@ -320,8 +342,8 @@ export function ArchitectureDiagram() {
                     store={{
                         key: 'local-store',
                         titleKey: 'about.boxSqliteFiles',
-                        state: onLocal && server?.cache.kind === 'sqlite' ? 'live' : 'off',
-                        detail: onLocal ? rows : undefined,
+                        state: storeInUse('sqlite'),
+                        detail: storeDetail('sqlite'),
                         location: './data/marketCache.db · ./data/shares.db',
                     }}
                 />
@@ -341,9 +363,9 @@ export function ArchitectureDiagram() {
                     store={{
                         key: 'turso',
                         titleKey: 'about.boxTursoService',
-                        state: onVercel && server?.cache.kind === 'turso' ? 'live' : 'off',
+                        state: storeInUse('turso'),
                         // The "outside Vercel" note stays put whether or not it is live.
-                        detail: [t('about.detailSeparateService'), onVercel ? rows : null].filter(Boolean).join(' · '),
+                        detail: [t('about.detailSeparateService'), storeDetail('turso')].filter(Boolean).join(' · '),
                         location: 'libsql://….turso.io',
                     }}
                 />
