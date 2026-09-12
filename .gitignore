@@ -82,3 +82,6 @@ src/app/api/*/*/route-new.ts
 
 # Private personal notes
 /notes/
+
+# AI snapshot bridge — a mirror of your holdings for the local MCP server
+data/portfolio-snapshot.json
