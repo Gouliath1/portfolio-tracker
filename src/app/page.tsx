@@ -20,9 +20,12 @@ import { useBaseCurrency } from '../hooks/useBaseCurrency';
 import { useAssetClasses } from '../hooks/useAssetClasses';
 import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
+import { buildSnapshot, formatSnapshotMarkdown } from '../utils/portfolioSnapshot';
+import { copyToClipboard } from '../utils/clipboard';
+import { publishSnapshot } from '../utils/publishSnapshot';
 import {
     MdCloudOff, MdRefresh, MdSettings, MdAdd, MdUndo, MdUpload,
-    MdVisibility, MdVisibilityOff, MdAccountBalanceWallet,
+    MdVisibility, MdVisibilityOff, MdAccountBalanceWallet, MdAutoAwesome,
 } from 'react-icons/md';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { useTranslation } from '../i18n';
@@ -306,6 +309,49 @@ export default function Home() {
         [summary, assetClasses, effectiveSelected],
     );
 
+    // ── AI brief ──────────────────────────────────────────────────────────
+    // The portfolio only exists in this browser, so an assistant can't reach it
+    // on its own — the numbers have to be carried across by hand. This puts a
+    // compact markdown brief on the clipboard, ready to paste into any chat.
+    // Deliberately built from the unfiltered `summary`: the overview's
+    // asset-class filter is a viewing aid, not a statement about what is held.
+    const makeBrief = useCallback(() => {
+        const snapshot = buildSnapshot(summary, currency, {
+            assetClasses,
+            portfolioName: activeSetName || 'Portfolio',
+        });
+        return { snapshot, markdown: formatSnapshotMarkdown(snapshot) };
+    }, [summary, currency, assetClasses, activeSetName]);
+
+    const handleCopyBrief = useCallback(async () => {
+        if (await copyToClipboard(makeBrief().markdown)) {
+            setActionInfo({ key: 'home.copyBriefCopied' });
+            setTimeout(() => setActionInfo(null), 5000);
+        } else {
+            setActionError({ key: 'home.errCopyBrief' });
+        }
+    }, [makeBrief]);
+
+    // Keep the local snapshot bridge in step with what's on screen, so an MCP
+    // server reading the file reports the same numbers the portal shows rather
+    // than whatever was true the last time someone pressed a button. No-ops
+    // unless the page is served from localhost — see `publishSnapshot`.
+    const lastPublished = useRef<string | null>(null);
+    useEffect(() => {
+        if (summary.positions.length === 0) return;
+        // A page load publishes several times over a second or two as cached
+        // prices give way to live ones and asset classes resolve. Only the
+        // settled version is worth writing, so let the burst finish first.
+        const timer = setTimeout(() => {
+            const { snapshot, markdown } = makeBrief();
+            // The brief is dated to the day, so it only differs when data does.
+            if (markdown === lastPublished.current) return;
+            lastPublished.current = markdown;
+            void publishSnapshot(snapshot, markdown);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [summary.positions.length, makeBrief]);
+
     return (
         <>
             <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
@@ -370,6 +416,17 @@ export default function Home() {
                                     >
                                         {showValues ? <MdVisibilityOff size={16} /> : <MdVisibility size={16} />}
                                         <span className="hidden sm:inline">{showValues ? t('common.hide') : t('common.show')}</span>
+                                    </button>
+                                    <button
+                                        onClick={handleCopyBrief}
+                                        disabled={summary.positions.length === 0}
+                                        className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                                        title={t('home.copyBriefHint')}
+                                        aria-label={t('home.copyBrief')}
+                                    >
+                                        <MdAutoAwesome size={16} />
+                                        <span className="hidden sm:inline">{t('home.copyBrief')}</span>
                                     </button>
                                     <button
                                         onClick={handleRefreshClick}
