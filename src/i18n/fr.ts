@@ -590,7 +590,7 @@ export const fr: Translations = {
     'about.callHttps': 'HTTPS + jeton — autre société',
     'about.boxSqliteFiles': 'Fichiers SQLite',
     'about.boxTursoService': 'Turso',
-    'about.detailSeparateService': 'service cloud distinct',
+    'about.detailSeparateService': 'société distincte, hors Vercel',
     'about.branchesNote': 'Même client libSQL et mêmes tables dans les deux cas. Les cours sont écrits à chaque défaut de cache, ce qu’un disque en lecture seule ne permet pas — d’où Turso, une base atteinte par le réseau, qui ne fait pas partie de Vercel.',
     'about.legendLive': 'actif',
     'about.legendOff': 'inactif',

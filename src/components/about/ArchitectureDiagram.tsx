@@ -133,9 +133,14 @@ function Connector({ labelKey, emphasis = false }: { labelKey: TranslationKey; e
 }
 
 /**
- * One of the two places the same code runs, with its database underneath and
- * the call between them named — a file opened on the same disk, or a network
- * request to another company's service.
+ * One of the two places the same code runs, with its database and the call
+ * between them named.
+ *
+ * `storeInside` is the asymmetry the whole diagram exists to show. On a laptop
+ * the database is a file on that same machine, so it is drawn within the box.
+ * Turso is another company's service reached over the network, so it is drawn
+ * outside Vercel's box with the arrow crossing the boundary — drawing it
+ * inside would say it ships with Vercel, which it does not.
  */
 function Branch({
     titleKey,
@@ -145,6 +150,7 @@ function Branch({
     runtime,
     callKey,
     store,
+    storeInside,
 }: {
     titleKey: TranslationKey;
     host: string;
@@ -154,44 +160,56 @@ function Branch({
     runtime: Box;
     callKey: TranslationKey;
     store: Box;
+    /** True when the store lives on this same machine. */
+    storeInside: boolean;
 }) {
     const { t } = useTranslation();
+
+    const call = (
+        <div className="flex items-center gap-2 py-1.5 pl-4">
+            <MdArrowDownward size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" className="flex-shrink-0" />
+            <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t(callKey)}</p>
+        </div>
+    );
+
     return (
-        <div
-            className="rounded-2xl p-3 sm:p-4"
-            style={{
-                border: `1px solid ${active ? 'var(--accent-glow)' : 'var(--border)'}`,
-                background: active ? 'var(--accent-dim)' : 'transparent',
-                opacity: active ? 1 : 0.62,
-            }}
-        >
-            <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
-                <p className="text-[10px] font-semibold uppercase tracking-widest"
-                    style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
-                    {t(titleKey)}
-                </p>
-                <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{host}</p>
-                <span className="text-[10px] px-1.5 py-0.5 rounded"
-                    style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                    {t(diskKey)}
-                </span>
-                {active && (
+        <div style={{ opacity: active ? 1 : 0.62 }}>
+            <div
+                className="rounded-2xl p-3 sm:p-4"
+                style={{
+                    border: `1px solid ${active ? 'var(--accent-glow)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent-dim)' : 'transparent',
+                }}
+            >
+                <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest"
+                        style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
+                        {t(titleKey)}
+                    </p>
+                    <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{host}</p>
                     <span className="text-[10px] px-1.5 py-0.5 rounded"
-                        style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
-                        {t('about.branchServingThis')}
+                        style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                        {t(diskKey)}
                     </span>
-                )}
+                    {active && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
+                            {t('about.branchServingThis')}
+                        </span>
+                    )}
+                </div>
+
+                <StatusBox box={runtime} />
+                {storeInside && <>{call}<StatusBox box={store} /></>}
             </div>
 
-            <StatusBox box={runtime} />
-
-            {/* The call itself — the one line that says why the two differ. */}
-            <div className="flex items-center gap-2 py-1.5 pl-4">
-                <MdArrowDownward size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" className="flex-shrink-0" />
-                <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t(callKey)}</p>
-            </div>
-
-            <StatusBox box={store} />
+            {/* Outside the box, because the service is outside the platform. */}
+            {!storeInside && (
+                <div className="pl-2">
+                    {call}
+                    <StatusBox box={store} />
+                </div>
+            )}
         </div>
     );
 }
@@ -285,7 +303,7 @@ export function ArchitectureDiagram() {
 
             {/* Same code, two places it can run — and the databases differ only
                 because one of those places has no writable disk. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
                 <Branch
                     titleKey="about.branchLocal"
                     host="localhost:3000"
@@ -298,6 +316,7 @@ export function ArchitectureDiagram() {
                         detail: t('about.detailRoutes'),
                     }}
                     callKey="about.callFile"
+                    storeInside
                     store={{
                         key: 'local-store',
                         titleKey: 'about.boxSqliteFiles',
@@ -318,11 +337,13 @@ export function ArchitectureDiagram() {
                         detail: t('about.detailRoutes'),
                     }}
                     callKey="about.callHttps"
+                    storeInside={false}
                     store={{
                         key: 'turso',
                         titleKey: 'about.boxTursoService',
                         state: onVercel && server?.cache.kind === 'turso' ? 'live' : 'off',
-                        detail: onVercel ? rows : t('about.detailSeparateService'),
+                        // The "outside Vercel" note stays put whether or not it is live.
+                        detail: [t('about.detailSeparateService'), onVercel ? rows : null].filter(Boolean).join(' · '),
                         location: 'libsql://….turso.io',
                     }}
                 />
