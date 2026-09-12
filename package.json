@@ -16,6 +16,7 @@
   "dependencies": {
     "@libsql/client": "^0.15.14",
     "@tanstack/react-table": "^8.21.3",
+    "@vercel/analytics": "^2.0.1",
     "chart.js": "^4.4.9",
     "dotenv": "^17.2.2",
     "lightweight-charts": "^5.2.0",
