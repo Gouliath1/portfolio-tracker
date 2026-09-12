@@ -68,6 +68,30 @@ function getClient(): Client | null {
     }
 }
 
+/**
+ * Add a column that a later schema version introduced, on a database that may
+ * already have it.
+ *
+ * Driven by ALTER rather than by reading `PRAGMA table_info` first, because
+ * Turso's remote protocol does not accept every PRAGMA a local SQLite file
+ * does — and a migration probe throwing must never be what takes the whole
+ * cache offline. "Duplicate column" is the success case on an up-to-date
+ * database; anything else is logged and survived, since a missing optional
+ * column degrades one field rather than the cache.
+ *
+ * Table and column names are compile-time literals from the schema below,
+ * never caller input.
+ */
+async function addColumnIfMissing(c: Client, table: string, column: string, type: string): Promise<void> {
+    try {
+        await c.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (/duplicate column/i.test(message)) return; // already migrated
+        console.warn(`[marketDataDb] Could not add ${table}.${column}: ${message}`);
+    }
+}
+
 async function ensureInit(): Promise<boolean> {
     if (_storageUnavailable) return false;
     if (_initPromise) {
@@ -139,14 +163,8 @@ async function ensureInit(): Promise<boolean> {
                 )
             `);
             // Migrate existing DBs: add columns introduced after the initial schema.
-            const fcols = await c.execute('PRAGMA table_info(security_fundamentals)');
-            const colNames = fcols.rows.map(r => String(r.name));
-            if (!colNames.includes('ratios_fetched_at')) {
-                await c.execute('ALTER TABLE security_fundamentals ADD COLUMN ratios_fetched_at TEXT');
-            }
-            if (!colNames.includes('sector')) {
-                await c.execute('ALTER TABLE security_fundamentals ADD COLUMN sector TEXT');
-            }
+            await addColumnIfMissing(c, 'security_fundamentals', 'ratios_fetched_at', 'TEXT');
+            await addColumnIfMissing(c, 'security_fundamentals', 'sector', 'TEXT');
             // Persisted Yahoo cookie+crumb (single row) so the rare successful
             // acquisition survives restarts and is reused for hours.
             await c.execute(`
