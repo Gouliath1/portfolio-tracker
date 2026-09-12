@@ -31,6 +31,7 @@ export const fr: Translations = {
     'nav.analysis': 'Analyse',
     'nav.screener': 'Screener',
     'nav.settings': 'Paramètres',
+    'nav.about': 'À propos',
     'sidebar.activePortfolio': 'Portefeuille',
     'sidebar.baseCurrency': 'devise de référence',
 
@@ -545,4 +546,70 @@ export const fr: Translations = {
     'deepDive.annualReturnsTitle': 'Performance annuelle par position',
     'deepDive.annualReturnsHint': 'performance du cours en devise de cotation, années partielles à l’achat/la vente',
     'deepDive.loadingPriceHistory': 'Chargement de l’historique des cours…',
+
+    // ── Page À propos ────────────────────────────────────────────────────
+    'about.title': 'Comment fonctionne cette application',
+    'about.subtitle': 'Vos positions restent dans ce navigateur. Le serveur ne manipule que des données de marché publiques.',
+    'about.settingsHint': 'Architecture et ce qui quitte votre navigateur',
+
+    'about.architecture': 'Architecture',
+
+    'about.layerBrowser': 'Votre navigateur',
+    'about.layerProviders': 'Données de marché',
+    'about.layerAi': 'Assistant IA — sur activation',
+
+    'about.boxPages': 'Pages',
+    'about.boxEngine': 'Calculs',
+    'about.boxStorage': 'localStorage',
+    'about.boxYahoo': 'Yahoo Finance',
+    'about.boxJquants': 'J-Quants',
+    'about.boxTopix': 'Liste TOPIX',
+    'about.boxMcp': 'Connecteur MCP',
+
+    'about.flowToServer': 'symboles et dates uniquement',
+    'about.flowToProviders': 'seulement si absent',
+
+    'about.detailPositions': '{count} positions',
+    'about.detailPosition': '{count} position',
+    'about.detailRows': '{rows} lignes',
+    'about.detailNoKey': 'aucune clé',
+    'about.detailStatic': 'intégrée',
+    'about.detailConnected': 'connecté',
+    'about.detailNotConnected': 'non connecté',
+    'about.hostVercel': 'Vercel',
+
+    'about.branchesLabel': 'Où tourne le serveur — même code, deux endroits',
+    'about.branchLocal': 'Sur votre PC',
+    'about.branchVercel': 'Sur Vercel',
+    'about.branchServingThis': 'sert cette page',
+    'about.boxRuntime': 'Application Next.js',
+    'about.detailRoutes': 'Routes API — cours, change, dividendes, screener',
+    'about.diskWritable': 'disque inscriptible',
+    'about.diskReadOnly': 'disque en lecture seule',
+    'about.callFile': 'ouverture d’un fichier — même machine',
+    'about.callHttps': 'HTTPS + jeton — autre société',
+    'about.boxSqliteFiles': 'Fichiers SQLite',
+    'about.boxTursoService': 'Turso',
+    'about.detailSeparateService': 'service cloud distinct',
+    'about.branchesNote': 'Même client libSQL et mêmes tables dans les deux cas. Les cours sont écrits à chaque défaut de cache, ce qu’un disque en lecture seule ne permet pas — d’où Turso, une base atteinte par le réseau, qui ne fait pas partie de Vercel.',
+    'about.legendLive': 'actif',
+    'about.legendOff': 'inactif',
+    'about.aiNote': 'Le stockage des instantanés est le seul endroit où vos positions sont conservées hors de ce navigateur : la connexion publie une copie en lecture seule derrière un lien secret, qu’un assistant lit via MCP. La déconnexion la supprime.',
+
+    'about.privacyTitle': 'Ce qui quitte votre navigateur',
+    'about.privacyLeaves': 'Des symboles et des dates, pour que le serveur récupère des cours publics.',
+    'about.privacyStays': 'Quantités, prix de revient et noms de compte restent sur cet appareil — sauf si vous connectez un assistant IA.',
+
+    'about.serverDataTitle': 'Vos données sur le serveur',
+    'about.serverDataNone': 'Rien n’est stocké. Aucun assistant n’est connecté : le serveur ne détient aucune ligne pour ce portefeuille.',
+    'about.serverDataStored': 'Une ligne stockée — publiée le {updated}, supprimée automatiquement le {expires}.',
+    'about.serverDataIntro': 'Le cache ci-dessus contient des cours publics et ne sait rien de vous. Le seul endroit où vos propres données sont écrites est le stockage d’instantanés, et uniquement après connexion d’un assistant. Cela représente une ligne, la voici en entier :',
+    'about.colTokenHash': 'Une empreinte SHA-256 de votre lien secret. Le lien lui-même n’est jamais stocké : une base dérobée ne livre aucune URL fonctionnelle.',
+    'about.colSnapshot': 'Vos positions en JSON — symbole, quantité, prix de revient moyen, valeur, ainsi que les totaux et les répartitions. Ni nom, ni e-mail, ni numéro de compte ; il n’y a aucune connexion à laquelle les rattacher.',
+    'about.colMarkdown': 'Les mêmes chiffres rédigés en texte, ce que l’assistant lit réellement.',
+    'about.colExpires': 'Trente jours après la dernière publication. Les lignes expirées sont supprimées dès qu’elles sont consultées.',
+    'about.serverDataRevoke': 'La déconnexion depuis les paramètres supprime la ligne immédiatement, partout.',
+
+    'about.stackTitle': 'Réalisé avec',
+    'about.stackItems': 'Next.js 15 · React 19 · TypeScript · Tailwind CSS 4 · Chart.js · TanStack Table · libSQL/Turso',
 };

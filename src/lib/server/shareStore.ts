@@ -269,3 +269,14 @@ export function resetShareStoreForTests(): void {
     _unavailable = false;
     _unavailableReason = null;
 }
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+/** Where published snapshots are stored, for the About page's diagram. */
+export function getShareStoreStatus(): { kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null } {
+    if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+        return { kind: 'turso', location: null };
+    }
+    if (process.env.VERCEL) return { kind: 'unavailable', location: null };
+    return { kind: 'sqlite', location: process.env.SHARE_DB_PATH ?? DEFAULT_LOCAL_PATH };
+}

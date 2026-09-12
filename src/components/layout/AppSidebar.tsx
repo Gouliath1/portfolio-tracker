@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import {
-    MdHome, MdAccountBalance, MdSwapHoriz,
+    MdHome, MdAccountBalance, MdSwapHoriz, MdInfoOutline,
     MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
@@ -11,7 +11,7 @@ import type { TranslationKey } from '../../i18n';
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive' | 'screener';
+    activePage: 'home' | 'deep-dive' | 'screener' | 'about';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -160,6 +160,21 @@ export function AppSidebar({
                     </span>
                     <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('sidebar.baseCurrency')}</span>
                 </div>
+                {/* About — how the app is built, and what leaves the browser */}
+                {activePage === 'about' ? (
+                    <div className={itemClass} style={activeStyle}>
+                        <MdInfoOutline size={17} />
+                        {t('nav.about')}
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => router.push('/about')}
+                        className={itemClass}
+                        style={defaultStyle}>
+                        <MdInfoOutline size={17} />
+                        {t('nav.about')}
+                    </button>
+                )}
                 {onHome && onSettingsClick ? (
                     <button
                         onClick={onSettingsClick}
