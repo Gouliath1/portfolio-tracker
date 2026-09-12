@@ -42,6 +42,7 @@ export const en = {
     'nav.analysis': 'Analysis',
     'nav.screener': 'Screener',
     'nav.settings': 'Settings',
+    'nav.about': 'About',
     'sidebar.activePortfolio': 'Portfolio',
     'sidebar.baseCurrency': 'base currency',
 
@@ -556,4 +557,70 @@ export const en = {
     'deepDive.annualReturnsTitle': 'Per-Position Annual Returns',
     'deepDive.annualReturnsHint': 'price return in native currency, partial years at buy/sale',
     'deepDive.loadingPriceHistory': 'Loading price history…',
+
+    // ── About page ───────────────────────────────────────────────────────
+    'about.title': 'How this app works',
+    'about.subtitle': 'Your holdings stay in this browser. The server only ever handles public market data.',
+    'about.settingsHint': 'Architecture and what leaves your browser',
+
+    'about.architecture': 'Architecture',
+
+    'about.layerBrowser': 'Your browser',
+    'about.layerProviders': 'Market data',
+    'about.layerAi': 'AI assistant — opt-in',
+
+    'about.boxPages': 'Pages',
+    'about.boxEngine': 'Calculations',
+    'about.boxStorage': 'localStorage',
+    'about.boxYahoo': 'Yahoo Finance',
+    'about.boxJquants': 'J-Quants',
+    'about.boxTopix': 'TOPIX list',
+    'about.boxMcp': 'MCP connector',
+
+    'about.flowToServer': 'tickers and dates only',
+    'about.flowToProviders': 'only on a miss',
+
+    'about.detailPositions': '{count} positions',
+    'about.detailPosition': '{count} position',
+    'about.detailRows': '{rows} rows',
+    'about.detailNoKey': 'no key set',
+    'about.detailStatic': 'bundled',
+    'about.detailConnected': 'connected',
+    'about.detailNotConnected': 'not connected',
+    'about.hostVercel': 'Vercel',
+
+    'about.branchesLabel': 'Where the server runs — same code, two places',
+    'about.branchLocal': 'On your PC',
+    'about.branchVercel': 'On Vercel',
+    'about.branchServingThis': 'serving this page',
+    'about.boxRuntime': 'Next.js app',
+    'about.detailRoutes': 'API routes — prices, FX, dividends, screener',
+    'about.diskWritable': 'writable disk',
+    'about.diskReadOnly': 'read-only disk',
+    'about.callFile': 'open a file — same machine',
+    'about.callHttps': 'HTTPS + auth token — another company',
+    'about.boxSqliteFiles': 'SQLite files',
+    'about.boxTursoService': 'Turso',
+    'about.detailSeparateService': 'separate cloud service',
+    'about.branchesNote': 'Same libSQL client and the same tables either way. Prices are written on every cache miss, which a read-only disk cannot do — hence Turso, which is a database reached over the network, not part of Vercel.',
+    'about.legendLive': 'live',
+    'about.legendOff': 'off',
+    'about.aiNote': 'The snapshot store is the one place your holdings are kept outside this browser: connecting publishes a read-only copy behind a secret link, which an assistant reads over MCP. Disconnecting deletes it.',
+
+    'about.privacyTitle': 'What leaves your browser',
+    'about.privacyLeaves': 'Ticker symbols and dates, so the server can fetch public prices.',
+    'about.privacyStays': 'Quantities, cost basis and account names stay on this device — unless you connect an AI assistant.',
+
+    'about.serverDataTitle': 'Your data on the server',
+    'about.serverDataNone': 'Nothing stored. No assistant is connected, so the server holds no row for this portfolio.',
+    'about.serverDataStored': 'One row stored — last published {updated}, deleted automatically on {expires}.',
+    'about.serverDataIntro': 'The market cache above holds public prices and knows nothing about you. The only place your own data is ever written is the snapshot store, and only once you connect an assistant. That is one row, and this is all of it:',
+    'about.colTokenHash': 'A SHA-256 hash of your secret link. The link itself is never stored, so a stolen database yields no working URLs.',
+    'about.colSnapshot': 'Your holdings as JSON — ticker, quantity, average cost, value, plus totals and allocations. No name, email or account number; there is no login to attach one to.',
+    'about.colMarkdown': 'The same figures written out in prose, which is what the assistant actually reads.',
+    'about.colExpires': 'Thirty days after the last publish. Expired rows are deleted the next time they are touched.',
+    'about.serverDataRevoke': 'Disconnecting in Settings deletes the row immediately, everywhere.',
+
+    'about.stackTitle': 'Built with',
+    'about.stackItems': 'Next.js 15 · React 19 · TypeScript · Tailwind CSS 4 · Chart.js · TanStack Table · libSQL/Turso',
 } as const;

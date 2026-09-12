@@ -610,3 +610,45 @@ export async function setCachedDividendEvents(ticker: string, events: Record<Dat
         console.warn(`[marketDataDb] Write dividends failed for ${ticker}:`, err);
     }
 }
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+/** Where the cache is actually stored right now, and how much is in it. */
+export interface CacheStatus {
+    kind: 'turso' | 'sqlite' | 'unavailable';
+    /** The local file path when it is a file; null for Turso, which is remote. */
+    location: string | null;
+    /** Cached daily closes, FX rates and fundamentals rows. Null if unreadable. */
+    rows: number | null;
+}
+
+/**
+ * Reports the live state of the cache for the About page. Deliberately
+ * read-only and failure-tolerant: a status probe must never be the thing that
+ * takes a route down.
+ */
+export async function getCacheStatus(): Promise<CacheStatus> {
+    const kind: CacheStatus['kind'] =
+        process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN ? 'turso'
+        : isServerlessReadOnlyFs() ? 'unavailable'
+        : 'sqlite';
+
+    const location = kind === 'sqlite' ? (process.env.MARKET_DB_PATH ?? DEFAULT_LOCAL_PATH) : null;
+
+    if (kind === 'unavailable' || !(await ensureInit())) return { kind: 'unavailable', location: null, rows: null };
+    const c = getClient();
+    if (!c) return { kind: 'unavailable', location: null, rows: null };
+
+    try {
+        const result = await c.execute(`
+            SELECT
+                (SELECT COUNT(*) FROM security_prices)
+              + (SELECT COUNT(*) FROM market_fx_rates)
+              + (SELECT COUNT(*) FROM security_fundamentals) AS total
+        `);
+        return { kind, location, rows: Number(result.rows[0]?.total ?? 0) };
+    } catch (err) {
+        console.warn('[marketDataDb] Status query failed:', err);
+        return { kind, location, rows: null };
+    }
+}
