@@ -133,83 +133,83 @@ function Connector({ labelKey, emphasis = false }: { labelKey: TranslationKey; e
 }
 
 /**
- * One of the two places the same code runs, with its database and the call
- * between them named.
+ * One of the two places the server can run, as a box containing everything
+ * that server is made of.
  *
- * `storeInside` is the asymmetry the whole diagram exists to show. On a laptop
- * the database is a file on that same machine, so it is drawn within the box.
- * Turso is another company's service reached over the network, so it is drawn
- * outside Vercel's box with the arrow crossing the boundary — drawing it
- * inside would say it ships with Vercel, which it does not.
+ * Deployed, it is made of two pieces from two companies: Vercel runs the code,
+ * Turso holds the database. Both sit inside the "on server" box because both
+ * are the server, but each keeps its own sub-box, and the read-only disk
+ * belongs to Vercel's — it is Vercel's constraint, not Turso's, and stating it
+ * at the outer level would wrongly imply the database is read-only too.
  */
 function Branch({
     titleKey,
     host,
+    platformKey,
     diskKey,
     active,
     runtime,
     callKey,
     store,
-    storeInside,
 }: {
     titleKey: TranslationKey;
     host: string;
-    /** Whether this machine's disk can be written to — the reason the two differ. */
+    /** The company or machine running the code. */
+    platformKey: TranslationKey;
+    /** Whether that platform's disk can be written to. */
     diskKey: TranslationKey;
     active: boolean;
     runtime: Box;
     callKey: TranslationKey;
     store: Box;
-    /** True when the store lives on this same machine. */
-    storeInside: boolean;
 }) {
     const { t } = useTranslation();
 
-    const call = (
-        <div className="flex items-center gap-2 py-1.5 pl-4">
-            <MdArrowDownward size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" className="flex-shrink-0" />
-            <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t(callKey)}</p>
-        </div>
-    );
-
     return (
-        <div style={{ opacity: active ? 1 : 0.62 }}>
-            <div
-                className="rounded-2xl p-3 sm:p-4"
-                style={{
-                    border: `1px solid ${active ? 'var(--accent-glow)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent-dim)' : 'transparent',
-                }}
-            >
-                <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
+        <div
+            className="rounded-2xl p-3 sm:p-4"
+            style={{
+                border: `1px solid ${active ? 'var(--accent-glow)' : 'var(--border)'}`,
+                background: active ? 'var(--accent-dim)' : 'transparent',
+                opacity: active ? 1 : 0.62,
+            }}
+        >
+            <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
+                <p className="text-[10px] font-semibold uppercase tracking-widest"
+                    style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
+                    {t(titleKey)}
+                </p>
+                {host && <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{host}</p>}
+                {active && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded"
+                        style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
+                        {t('about.branchServingThis')}
+                    </span>
+                )}
+            </div>
+
+            {/* The platform that runs the code — the read-only disk is its
+                property, so the chip lives here rather than on the outer box. */}
+            <div className="rounded-xl p-2.5" style={{ border: '1px dashed var(--border)' }}>
+                <div className="flex items-baseline gap-2 mb-2 flex-wrap">
                     <p className="text-[10px] font-semibold uppercase tracking-widest"
-                        style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
-                        {t(titleKey)}
+                        style={{ color: 'var(--text-muted)' }}>
+                        {t(platformKey)}
                     </p>
-                    <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{host}</p>
                     <span className="text-[10px] px-1.5 py-0.5 rounded"
                         style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                         {t(diskKey)}
                     </span>
-                    {active && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded"
-                            style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
-                            {t('about.branchServingThis')}
-                        </span>
-                    )}
                 </div>
-
                 <StatusBox box={runtime} />
-                {storeInside && <>{call}<StatusBox box={store} /></>}
             </div>
 
-            {/* Outside the box, because the service is outside the platform. */}
-            {!storeInside && (
-                <div className="pl-2">
-                    {call}
-                    <StatusBox box={store} />
-                </div>
-            )}
+            <div className="flex items-center gap-2 py-1.5 pl-4">
+                <MdArrowDownward size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" className="flex-shrink-0" />
+                <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t(callKey)}</p>
+            </div>
+
+            <StatusBox box={store} />
         </div>
     );
 }
@@ -307,6 +307,7 @@ export function ArchitectureDiagram() {
                 <Branch
                     titleKey="about.branchLocal"
                     host="localhost:3000"
+                    platformKey="about.platformNode"
                     diskKey="about.diskWritable"
                     active={!!onLocal}
                     runtime={{
@@ -316,7 +317,6 @@ export function ArchitectureDiagram() {
                         detail: t('about.detailRoutes'),
                     }}
                     callKey="about.callFile"
-                    storeInside
                     store={{
                         key: 'local-store',
                         titleKey: 'about.boxSqliteFiles',
@@ -326,8 +326,9 @@ export function ArchitectureDiagram() {
                     }}
                 />
                 <Branch
-                    titleKey="about.branchVercel"
-                    host={[t('about.hostVercel'), server?.region].filter(Boolean).join(' · ')}
+                    titleKey="about.branchServer"
+                    host={server?.region ?? ''}
+                    platformKey="about.platformVercel"
                     diskKey="about.diskReadOnly"
                     active={!!onVercel}
                     runtime={{
@@ -337,7 +338,6 @@ export function ArchitectureDiagram() {
                         detail: t('about.detailRoutes'),
                     }}
                     callKey="about.callHttps"
-                    storeInside={false}
                     store={{
                         key: 'turso',
                         titleKey: 'about.boxTursoService',
