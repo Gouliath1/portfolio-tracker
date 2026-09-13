@@ -34,6 +34,13 @@ interface Box {
     detail?: string;
     /** Where it physically sits: a file path, a host, a service name. */
     location?: string;
+    /**
+     * Labelled rows, for the two database boxes. They hold the same kinds of
+     * fact — tech, job, placement, current state — so they are described with
+     * the same fields in the same order, and a reader can compare them line
+     * for line instead of re-reading two differently-shaped blurbs.
+     */
+    fields?: { labelKey: TranslationKey; value: string; mono?: boolean }[];
 }
 
 type Storage = 'turso' | 'sqlite' | 'unavailable';
@@ -70,7 +77,24 @@ function StatusBox({ box }: { box: Box }) {
                     {t(box.titleKey)}
                 </p>
             </div>
-            {(box.detail || box.location) && (
+            {box.fields && (
+                <dl className="pl-3.5 mt-1.5 grid gap-x-2 gap-y-1"
+                    style={{ gridTemplateColumns: 'auto minmax(0, 1fr)' }}>
+                    {box.fields.map(field => (
+                        <div key={field.labelKey} className="contents">
+                            <dt className="text-[10px] font-semibold uppercase tracking-wider leading-tight pt-px"
+                                style={{ color: 'var(--text-muted)' }}>
+                                {t(field.labelKey)}
+                            </dt>
+                            <dd className={`text-[11px] leading-tight break-words m-0 ${field.mono ? 'font-mono text-[10px]' : ''}`}
+                                style={{ color: 'var(--text-secondary)' }}>
+                                {field.value}
+                            </dd>
+                        </div>
+                    ))}
+                </dl>
+            )}
+            {!box.fields && (box.detail || box.location) && (
                 <div className="pl-3.5 mt-1 space-y-0.5">
                     {box.detail && (
                         <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>{box.detail}</p>
@@ -253,27 +277,41 @@ export function ArchitectureDiagram() {
     const onVercel = server?.host === 'vercel';
 
     /**
-     * A store is lit when something actually lives in it, whichever branch it
-     * sits under — the snapshot store can be on Turso while the market cache
-     * is down, and that is worth seeing rather than flattening to "off".
+     * The store the environment is configured to use. When the cache reports
+     * itself unavailable it has no kind of its own, so the share store — which
+     * reads the same credentials — says which one was meant.
      */
-    const storeInUse = (kind: Storage): State => {
+    const intendedKind: Storage | undefined = server
+        ? (server.cache.kind !== 'unavailable' ? server.cache.kind : server.shares.kind)
+        : undefined;
+
+    /** Lit when this environment actually uses it, whichever branch it sits under. */
+    const storeState = (kind: Storage): State => {
         if (!server) return 'unknown';
-        return server.cache.kind === kind || server.shares.kind === kind ? 'live' : 'off';
+        return kind === intendedKind || server.shares.kind === kind ? 'live' : 'off';
     };
 
-    /** What that store currently holds, or why it holds nothing. */
-    const storeDetail = (kind: Storage): string | undefined => {
-        if (!server) return undefined;
+    /** What it holds right now, or why it holds nothing. */
+    const storeNow = (kind: Storage): string => {
+        if (!server) return '—';
         const parts: string[] = [];
-        if (server.cache.kind === kind && server.cache.rows != null) {
-            parts.push(t('about.detailRows', { rows: n(server.cache.rows) }));
-        } else if (server.cache.kind === 'unavailable') {
-            parts.push(t('about.detailCacheDown'));
+        if (kind === intendedKind) {
+            parts.push(server.cache.kind === 'unavailable'
+                ? t('about.detailCacheDown')
+                : t('about.detailRows', { rows: n(server.cache.rows ?? 0) }));
         }
         if (server.shares.kind === kind) parts.push(t('about.detailHoldsSnapshots'));
-        return parts.length ? parts.join(' · ') : undefined;
+        return parts.length ? parts.join(' · ') : t('about.nowUnused');
     };
+
+    /** Both databases answer the same four questions, in the same order. */
+    const storeFields = (kind: Storage, techKey: TranslationKey, whereKey: TranslationKey, address: string) => [
+        { labelKey: 'about.fieldTech' as TranslationKey, value: t(techKey) },
+        { labelKey: 'about.fieldDoes' as TranslationKey, value: t('about.storeDoes') },
+        { labelKey: 'about.fieldWhere' as TranslationKey, value: t(whereKey) },
+        { labelKey: 'about.fieldAddress' as TranslationKey, value: address, mono: true },
+        { labelKey: 'about.fieldNow' as TranslationKey, value: storeNow(kind) },
+    ];
 
     const browserBoxes: Box[] = [
         { key: 'pages', titleKey: 'about.boxPages', state: 'live' },
@@ -342,9 +380,13 @@ export function ArchitectureDiagram() {
                     store={{
                         key: 'local-store',
                         titleKey: 'about.boxSqliteFiles',
-                        state: storeInUse('sqlite'),
-                        detail: storeDetail('sqlite'),
-                        location: './data/marketCache.db · ./data/shares.db',
+                        state: storeState('sqlite'),
+                        fields: storeFields(
+                            'sqlite',
+                            'about.techSqliteFile',
+                            'about.whereSameMachine',
+                            './data/marketCache.db · ./data/shares.db',
+                        ),
                     }}
                 />
                 <Branch
@@ -363,10 +405,13 @@ export function ArchitectureDiagram() {
                     store={{
                         key: 'turso',
                         titleKey: 'about.boxTursoService',
-                        state: storeInUse('turso'),
-                        // The "outside Vercel" note stays put whether or not it is live.
-                        detail: [t('about.detailSeparateService'), storeDetail('turso')].filter(Boolean).join(' · '),
-                        location: 'libsql://….turso.io',
+                        state: storeState('turso'),
+                        fields: storeFields(
+                            'turso',
+                            'about.techSqliteHosted',
+                            'about.whereTurso',
+                            'libsql://….turso.io',
+                        ),
                     }}
                 />
             </div>
