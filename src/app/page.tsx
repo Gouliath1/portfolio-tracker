@@ -601,7 +601,12 @@ export default function Home() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex-1 min-h-0 scroll-elastic-y">
+                                    {/* PositionsTable scrolls internally (its own fixed-height, sticky-header
+                                        grid) — this wrapper must stay non-scrolling for that tab, or the two
+                                        nested scrollers fight over the same vertical gesture. ClosedPositionsTable
+                                        has no scroll of its own (it grows to its natural height), so it needs
+                                        this wrapper to be the one that scrolls. */}
+                                    <div className={assetsTab === 'open' ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0 scroll-elastic-y'}>
                                         {assetsTab === 'open' ? (
                                             <PositionsTable
                                                 positions={portfolioSummary.positions}
