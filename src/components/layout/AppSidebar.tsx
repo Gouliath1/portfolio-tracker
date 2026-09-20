@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import {
     MdHome, MdAccountBalance, MdSwapHoriz, MdInfoOutline,
-    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
+    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch, MdReceiptLong,
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -11,7 +11,7 @@ import type { TranslationKey } from '../../i18n';
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive' | 'screener' | 'about';
+    activePage: 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -34,10 +34,6 @@ type NavItem = { id: SidebarViewId; labelKey: TranslationKey; icon: React.Compon
 
 const OVERVIEW_ITEM: NavItem = { id: 'overview', labelKey: 'nav.overview', icon: MdHome };
 const ASSETS_ITEM: NavItem = { id: 'assets', labelKey: 'nav.assets', icon: MdAccountBalance };
-// Data is last as a utility view.
-const VIEW_ITEMS: NavItem[] = [
-    { id: 'data', labelKey: 'nav.portfolios', icon: PortfoliosIcon },
-];
 
 const activeStyle  = { background: 'var(--accent-dim)', color: 'var(--accent)' } as const;
 const defaultStyle = { color: 'var(--text-secondary)' } as const;
@@ -71,13 +67,21 @@ export function AppSidebar({
                 </button>
             </div>
 
-            {/* Active portfolio */}
+            {/* Active portfolio — doubles as the nav entry into the portfolio management view */}
             {activeSetName && (
-                <div className="px-4 py-3 flex items-center gap-2.5 flex-shrink-0"
-                    style={{ borderBottom: '1px solid var(--border)' }}>
-                    <MdAccountBalanceWallet size={18} style={{ color: 'var(--accent)' }} className="flex-shrink-0" />
+                <button
+                    onClick={() => {
+                        if (onHome && onViewChange) onViewChange('data');
+                        else router.push('/?view=data');
+                    }}
+                    className="w-full px-4 py-3 flex items-center gap-2.5 flex-shrink-0 text-left transition-colors hover:opacity-80"
+                    style={{
+                        borderBottom: '1px solid var(--border)',
+                        ...(onHome && activeView === 'data' ? activeStyle : defaultStyle),
+                    }}>
+                    <PortfoliosIcon size={18} />
                     <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-widest"
+                        <div className="text-[11px] font-semibold uppercase tracking-widest"
                             style={{ color: 'var(--text-muted)' }}>
                             {t('sidebar.activePortfolio')}
                         </div>
@@ -86,10 +90,10 @@ export function AppSidebar({
                             {activeSetName}
                         </div>
                     </div>
-                </div>
+                </button>
             )}
 
-            {/* Nav — Overview · Analysis · Assets · Screener · Data */}
+            {/* Nav — Overview · Analysis · Assets · Screener */}
             <nav className="flex-1 px-3 py-4 space-y-0.5">
                 {(() => {
                     const viewButton = ({ id, labelKey, icon: Icon }: NavItem) => {
@@ -145,7 +149,21 @@ export function AppSidebar({
                                 </button>
                             )}
 
-                            {VIEW_ITEMS.map(viewButton)}
+                            {/* Taxes — standalone board for tax setup and estimates */}
+                            {activePage === 'taxes' ? (
+                                <div className={itemClass} style={activeStyle}>
+                                    <MdReceiptLong size={17} />
+                                    {t('nav.taxes')}
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => router.push('/taxes')}
+                                    className={itemClass}
+                                    style={defaultStyle}>
+                                    <MdReceiptLong size={17} />
+                                    {t('nav.taxes')}
+                                </button>
+                            )}
                         </>
                     );
                 })()}
