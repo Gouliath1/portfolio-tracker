@@ -353,7 +353,8 @@ export function ScreenerTable({
                     d.marketCap == null ? null : <span className="tabular-nums">¥{fmtCompact(d.marketCap, locale)}</span>, true),
             }),
             columnHelper.display({
-                id: 'actions', header: t('screener.actions'), size: 110, minSize: 96, maxSize: 110, enableResizing: false,
+                id: 'actions', header: t('screener.actions'),
+                size: onBuy ? 138 : 110, minSize: onBuy ? 124 : 96, maxSize: onBuy ? 138 : 110, enableResizing: false,
                 cell: props => {
                     const c = props.row.original;
                     const e = mapRef.current.get(c.symbol);
