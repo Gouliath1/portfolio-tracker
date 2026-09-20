@@ -510,7 +510,12 @@ export function ScreenerTable({
 
     const curPageIndex = table.getState().pagination.pageIndex;
     const pageCount = table.getPageCount();
-    const minTableWidth = table.getVisibleLeafColumns().reduce((sum, c) => sum + (c.columnDef.minSize ?? 40), 0);
+    // Must match what each header/cell actually renders at (getSize(), which respects
+    // user resizing) — using columnDef.minSize here instead let table-layout: fixed
+    // shrink columns below what their <th>/<td> width actually asks for, since fixed
+    // layout distributes the table's real width proportionally across the rendered
+    // widths rather than clamping to each column's own minimum.
+    const minTableWidth = table.getVisibleLeafColumns().reduce((sum, c) => sum + c.getSize(), 0);
 
     const viewTab = (id: View, labelKey: TranslationKey, count: number) => (
         <button
@@ -560,7 +565,7 @@ export function ScreenerTable({
                     {sectorOpen && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setSectorOpen(false)} />
-                            <div className="absolute left-0 top-full mt-1 z-20 rounded-xl py-1 overflow-y-auto"
+                            <div className="absolute right-0 top-full mt-1 z-20 rounded-xl py-1 overflow-y-auto max-w-[calc(100vw-2rem)]"
                                 style={{
                                     background: 'var(--surface-popover)',
                                     border: '1px solid var(--border-strong)',
@@ -618,7 +623,7 @@ export function ScreenerTable({
                                 ? `${progress.done}/${progress.total}…`
                                 : showAll ? t('screener.refreshAll') : t('screener.refreshPage')}
                         </span>
-                        <span className="sm:hidden">{progress ? `${progress.done}/${progress.total}` : '↻'}</span>
+                        {progress && <span className="sm:hidden">{progress.done}/{progress.total}</span>}
                     </button>
                     <div className="relative group/export">
                         <button className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
