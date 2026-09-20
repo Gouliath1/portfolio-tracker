@@ -133,6 +133,27 @@ body {
 *::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 3px; }
 *::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
 
+/* ── Elastic scroll ────────────────────────────────────────────
+   Native rubber-band bounce feels right vertically (the natural reading
+   direction) and wrong horizontally (a table swipe shouldn't spring back).
+   Three variants for the three shapes of scroll region in this app; use
+   these instead of hand-rolling overflow/overscroll-behavior combinations
+   so every screen bounces the same way. */
+.scroll-elastic-y {
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  overscroll-behavior-x: none;
+}
+.scroll-elastic-x {
+  overflow-x: auto;
+  overscroll-behavior-x: none;
+}
+.scroll-elastic-xy {
+  overflow: auto;
+  overscroll-behavior-y: auto;
+  overscroll-behavior-x: none;
+}
+
 /* ── Data tables ───────────────────────────────────────────── */
 /* Apply className="data-table" to <table> for consistent row styling. */
 .data-table tbody tr { background: transparent; }

@@ -187,7 +187,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div className="flex-1 scroll-elastic-y px-6 py-5 space-y-5">
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
                             {t(error.key)}{error.detail ? ` (${error.detail})` : ''}
