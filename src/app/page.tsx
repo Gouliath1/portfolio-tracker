@@ -424,10 +424,10 @@ export default function Home() {
                                         {currency}
                                     </span>
                                     <button
-                                        onClick={() => setSettingsOpen(true)}
+                                        onClick={() => setSettingsOpen(o => !o)}
                                         className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg"
                                         style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                                        aria-label={t('settings.open')}
+                                        aria-label={t(settingsOpen ? 'settings.close' : 'settings.open')}
                                     >
                                         <MdSettings size={18} />
                                     </button>
