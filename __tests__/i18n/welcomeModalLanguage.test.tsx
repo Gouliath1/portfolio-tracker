@@ -16,10 +16,10 @@ import { fr } from '@/i18n/fr';
 
 const ONBOARDED_KEY = 'pt_onboarded';
 
-const renderModal = (onOpenSettings = () => {}) =>
+const renderModal = (onAddPosition = () => {}, onImport = () => {}) =>
     render(
         <LanguageProvider>
-            <WelcomeModal onOpenSettings={onOpenSettings} />
+            <WelcomeModal onAddPosition={onAddPosition} onImport={onImport} />
         </LanguageProvider>
     );
 
@@ -60,8 +60,8 @@ describe('WelcomeModal — first-run language picker', () => {
 
         act(() => { fireEvent.click(screen.getByRole('button', { name: 'Français' })); });
 
-        expect(screen.getByText(fr['welcome.importTitle'])).toBeInTheDocument();
-        expect(screen.getByText(fr['welcome.exploreTitle'])).toBeInTheDocument();
+        expect(screen.getByText(fr['welcome.primaryBody'])).toBeInTheDocument();
+        expect(screen.getByText(fr['welcome.importLink'])).toBeInTheDocument();
         expect(screen.getByText(fr['welcome.localDataNote'])).toBeInTheDocument();
     });
 
@@ -69,7 +69,7 @@ describe('WelcomeModal — first-run language picker', () => {
         renderModal();
         act(() => { fireEvent.click(screen.getByRole('button', { name: 'Français' })); });
 
-        expect(screen.getByRole('button', { name: new RegExp(fr['welcome.ctaImport'], 'i') })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: new RegExp(fr['welcome.ctaPrimary'], 'i') })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: fr['welcome.ctaExplore'] })).toBeInTheDocument();
     });
 
@@ -98,14 +98,38 @@ describe('WelcomeModal — first-run language picker', () => {
         expect(group).toContainElement(screen.getByRole('button', { name: 'Français' }));
     });
 
-    it('still dismisses and opens settings from the import CTA after switching language', () => {
-        const onOpenSettings = jest.fn();
-        renderModal(onOpenSettings);
+    it('still dismisses and triggers add-position from the primary CTA after switching language', () => {
+        const onAddPosition = jest.fn();
+        renderModal(onAddPosition);
 
         act(() => { fireEvent.click(screen.getByRole('button', { name: 'Français' })); });
-        fireEvent.click(screen.getByRole('button', { name: new RegExp(fr['welcome.ctaImport'], 'i') }));
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(fr['welcome.ctaPrimary'], 'i') }));
 
-        expect(onOpenSettings).toHaveBeenCalledTimes(1);
+        expect(onAddPosition).toHaveBeenCalledTimes(1);
         expect(window.localStorage.getItem(ONBOARDED_KEY)).toBe('1');
+    });
+
+    it('still dismisses and triggers import from the import link after switching language', () => {
+        const onImport = jest.fn();
+        renderModal(() => {}, onImport);
+
+        act(() => { fireEvent.click(screen.getByRole('button', { name: 'Français' })); });
+        fireEvent.click(screen.getByRole('button', { name: fr['welcome.importLink'] }));
+
+        expect(onImport).toHaveBeenCalledTimes(1);
+        expect(window.localStorage.getItem(ONBOARDED_KEY)).toBe('1');
+    });
+
+    it('dismisses on "continue with the demo" without calling either handler', () => {
+        const onAddPosition = jest.fn();
+        const onImport = jest.fn();
+        renderModal(onAddPosition, onImport);
+
+        fireEvent.click(screen.getByRole('button', { name: en['welcome.ctaExplore'] }));
+
+        expect(onAddPosition).not.toHaveBeenCalled();
+        expect(onImport).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem(ONBOARDED_KEY)).toBe('1');
+        expect(screen.queryByRole('heading', { name: en['welcome.title'] })).not.toBeInTheDocument();
     });
 });

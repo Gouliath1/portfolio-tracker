@@ -77,13 +77,11 @@ export const en = {
     'welcome.subtitleBefore': 'You’re currently viewing',
     'welcome.demoData': 'demo data',
     'welcome.subtitleAfter': ' — not your real portfolio.',
-    'welcome.importTitle': 'Import your positions',
-    'welcome.importBody': 'Upload a JSON file with your holdings. A template is available in Settings to get you started.',
-    'welcome.exploreTitle': 'Or explore the demo first',
-    'welcome.exploreBody': 'Browse the sample portfolio to see what the tracker can do before adding your own data.',
+    'welcome.primaryBody': 'Enter a ticker, quantity and cost — it takes about a minute.',
+    'welcome.ctaPrimary': 'Add position',
+    'welcome.ctaExplore': 'Continue with the demo',
+    'welcome.importLink': 'Already have your data? Import a file',
     'welcome.localDataNote': 'Your data is stored locally in your browser — nothing is sent to a server. Export regularly to keep a backup.',
-    'welcome.ctaImport': 'Import positions',
-    'welcome.ctaExplore': 'Explore demo',
 
     // ── Demo banner ──────────────────────────────────────────────────────
     'demoBanner.message': 'Viewing demo data — use Load portfolio or Add position to start your own portfolio',

@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MdBarChart, MdUploadFile, MdArrowForward, MdClose } from 'react-icons/md';
+import { MdArrowForward, MdBarChart, MdClose } from 'react-icons/md';
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 
 const STORAGE_KEY = 'pt_onboarded';
 
 interface WelcomeModalProps {
-    onOpenSettings: () => void;
+    onAddPosition: () => void;
+    onImport: () => void;
 }
 
-export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
+export default function WelcomeModal({ onAddPosition, onImport }: WelcomeModalProps) {
     const { t, language, setLanguage } = useTranslation();
     const [visible, setVisible] = useState(false);
 
@@ -24,23 +25,44 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
         setVisible(false);
     };
 
+    // Same dialog convention as SettingsPanel: Escape closes, background scroll locks.
+    useEffect(() => {
+        if (!visible) return;
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') dismiss(); };
+        document.addEventListener('keydown', handler);
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', handler);
+            document.body.style.overflow = '';
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible]);
+
+    const handleAddPosition = () => {
+        dismiss();
+        onAddPosition();
+    };
+
     const handleImport = () => {
         dismiss();
-        onOpenSettings();
+        onImport();
     };
 
     if (!visible) return null;
 
     return (
-        /* Backdrop */
+        /* Backdrop — flat dim, no blur: opaque surfaces per the product's design principles. */
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+            style={{ background: 'rgba(0,0,0,0.70)' }}
         >
-            {/* Card */}
+            {/* Card — border carries the elevation; no shadow stacked on top of it. */}
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={t('welcome.title')}
                 className="relative w-full max-w-md rounded-2xl p-8 space-y-6"
-                style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}
+                style={{ background: 'var(--surface-popover)', border: '1px solid var(--border-strong)' }}
             >
                 {/* Dismiss */}
                 <button
@@ -106,57 +128,48 @@ export default function WelcomeModal({ onOpenSettings }: WelcomeModalProps) {
                     </div>
                 </div>
 
-                {/* What you can do */}
-                <div className="space-y-3">
-                    <div
-                        className="flex gap-3 rounded-xl p-4"
-                        style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
-                    >
-                        <MdUploadFile size={20} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-                        <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('welcome.importTitle')}</p>
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                {t('welcome.importBody')}
-                            </p>
-                        </div>
-                    </div>
-                    <div
-                        className="flex gap-3 rounded-xl p-4"
-                        style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
-                    >
-                        <MdBarChart size={20} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }} />
-                        <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('welcome.exploreTitle')}</p>
-                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                                {t('welcome.exploreBody')}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Data persistence note */}
-                <p className="text-xs" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    {t('welcome.localDataNote')}
+                {/* Primary path: add a position by hand — no file, no format to learn.
+                    One instruction stated once: this line of plain text, then the button
+                    that does it. No boxed card restating the same thing above it. */}
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    {t('welcome.primaryBody')}
                 </p>
 
-                {/* CTAs */}
-                <div className="flex gap-3">
+                {/* Two real, equally-clickable next steps: add data by hand, or just look around
+                    (the demo is already what's loaded behind this modal — dismissing is enough).
+                    Equal flex-1 widths keep both buttons the same height even when translated
+                    copy (French) runs longer than the English original. */}
+                <div className="flex gap-3 items-stretch">
                     <button
-                        onClick={handleImport}
+                        onClick={handleAddPosition}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                         style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
                     >
-                        {t('welcome.ctaImport')}
+                        {t('welcome.ctaPrimary')}
                         <MdArrowForward size={16} />
                     </button>
                     <button
                         onClick={dismiss}
-                        className="px-4 py-2.5 rounded-xl text-sm font-medium glass glass-hover transition-all"
+                        className="flex-1 flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium glass glass-hover transition-all"
                         style={{ color: 'var(--text-secondary)' }}
                     >
                         {t('welcome.ctaExplore')}
                     </button>
                 </div>
+
+                {/* Least common path — already has an export file — stays a low-weight link. */}
+                <button
+                    onClick={handleImport}
+                    className="text-xs underline-offset-2 hover:underline"
+                    style={{ color: 'var(--text-muted)' }}
+                >
+                    {t('welcome.importLink')}
+                </button>
+
+                {/* Data persistence note */}
+                <p className="text-xs" style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    {t('welcome.localDataNote')}
+                </p>
             </div>
         </div>
     );
