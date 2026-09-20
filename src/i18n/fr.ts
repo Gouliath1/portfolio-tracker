@@ -66,13 +66,11 @@ export const fr: Translations = {
     'welcome.subtitleBefore': 'Vous consultez actuellement des ',
     'welcome.demoData': 'données de démonstration',
     'welcome.subtitleAfter': ' — pas votre portefeuille réel.',
-    'welcome.importTitle': 'Importer vos positions',
-    'welcome.importBody': 'Importez un fichier JSON contenant vos positions. Un modèle est disponible dans Paramètres pour vous aider à démarrer.',
-    'welcome.exploreTitle': 'Ou explorez d’abord la démo',
-    'welcome.exploreBody': 'Parcourez le portefeuille exemple pour découvrir ce que le tracker permet de faire avant d’ajouter vos propres données.',
+    'welcome.primaryBody': 'Indiquez un titre, une quantité et un coût — cela prend une minute.',
+    'welcome.ctaPrimary': 'Ajouter une position',
+    'welcome.ctaExplore': 'Continuer avec la démo',
+    'welcome.importLink': 'Vous avez déjà vos données ? Importez un fichier',
     'welcome.localDataNote': 'Vos données sont stockées localement dans votre navigateur — rien n’est envoyé à un serveur. Exportez régulièrement pour conserver une sauvegarde.',
-    'welcome.ctaImport': 'Importer des positions',
-    'welcome.ctaExplore': 'Explorer la démo',
 
     // ── Demo banner ──────────────────────────────────────────────────────
     'demoBanner.message': 'Vous consultez des données de démonstration — utilisez Charger un portefeuille ou Ajouter une position pour créer votre propre portefeuille',

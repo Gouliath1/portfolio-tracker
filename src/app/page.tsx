@@ -727,7 +727,10 @@ export default function Home() {
                 </div>
             )}
 
-            <WelcomeModal onOpenSettings={() => setSettingsOpen(true)} />
+            <WelcomeModal
+                onAddPosition={() => setAddPositionOpen(true)}
+                onImport={() => setImportModalOpen(true)}
+            />
 
             <SettingsPanel
                 open={settingsOpen}
