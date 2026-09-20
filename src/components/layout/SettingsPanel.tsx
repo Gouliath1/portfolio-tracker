@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
-import { MdClose, MdLightMode, MdDarkMode, MdInfoOutline, MdChevronRight } from 'react-icons/md';
+import { MdClose, MdLightMode, MdDarkMode, MdInfoOutline, MdReceiptLong, MdChevronRight } from 'react-icons/md';
 import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 import { ExchangeRatesSection } from './ExchangeRatesSection';
@@ -20,11 +20,15 @@ interface SettingsPanelProps {
     /** Built on demand so an unopened panel never serialises the portfolio. */
     buildBrief?: () => { snapshot: PortfolioSnapshot; markdown: string };
     hasPositions?: boolean;
+    /** Tax estimates are still under development — off by default, toggled on here. */
+    taxFeatureEnabled?: boolean;
+    onTaxFeatureEnabledChange?: (enabled: boolean) => void;
 }
 
 export const SettingsPanel = ({
     open, onClose, currency, onCurrencyChange,
     activeSetId = null, buildBrief, hasPositions = false,
+    taxFeatureEnabled = false, onTaxFeatureEnabledChange,
 }: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const { t, language, setLanguage } = useTranslation();
@@ -196,6 +200,57 @@ export const SettingsPanel = ({
 
                     {/* Exchange rates — read-only view of the FX rates used for valuation */}
                     <ExchangeRatesSection open={open} currency={currency} />
+
+                    {/* Taxes — still under development, off by default */}
+                    {onTaxFeatureEnabledChange && (
+                        <section className="space-y-2">
+                            <div className="glass rounded-xl p-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <MdReceiptLong size={18} style={{ color: 'var(--accent)' }} className="flex-shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                            {t('taxes.enableFeature')}
+                                        </p>
+                                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                            {t('taxes.enableFeatureHelp')}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    role="switch"
+                                    aria-checked={taxFeatureEnabled}
+                                    onClick={() => onTaxFeatureEnabledChange(!taxFeatureEnabled)}
+                                    className="flex-shrink-0 w-11 h-6 rounded-full transition-colors relative"
+                                    style={{ background: taxFeatureEnabled ? 'var(--accent)' : 'var(--border)' }}
+                                >
+                                    <span
+                                        className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+                                        style={{ transform: taxFeatureEnabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* This is the only route to the board on mobile, where the sidebar is hidden */}
+                            {taxFeatureEnabled && (
+                                <button
+                                    onClick={() => { onClose(); router.push('/taxes'); }}
+                                    className="w-full glass glass-hover rounded-xl p-4 flex items-center justify-between gap-4 text-left transition-colors"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                                {t('nav.taxes')}
+                                            </p>
+                                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                                {t('taxes.settingsHint')}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <MdChevronRight size={18} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />
+                                </button>
+                            )}
+                        </section>
+                    )}
 
                     {/* About — the only route to it on mobile, where the sidebar is hidden */}
                     <section>

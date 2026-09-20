@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { loadPositions } from '../utils/positions';
-import { calculatePortfolioSummary } from '@portfolio/core';
+import { calculatePortfolioSummary, taxLotKey } from '@portfolio/core';
 import { readCachedSummary, writeCachedSummary, clearChartCache } from '../utils/pnlCache';
 import { PortfolioSummary as PortfolioSummaryType, Position, Transaction } from '@portfolio/types';
 import { PortfolioSummary } from '../components/layout/PortfolioSummary';
@@ -17,6 +17,10 @@ import WelcomeModal from '../components/layout/WelcomeModal';
 import { SettingsPanel } from '../components/layout/SettingsPanel';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { useBaseCurrency } from '../hooks/useBaseCurrency';
+import { useAccountTaxSettings } from '../hooks/useAccountTaxSettings';
+import { useTaxResidence } from '../hooks/useTaxResidence';
+import { useTaxFeatureEnabled } from '../hooks/useTaxFeatureEnabled';
+import { usePortfolioSummaryData } from '../hooks/usePortfolioSummaryData';
 import { useAssetClasses } from '../hooks/useAssetClasses';
 import { useActiveSetName } from '../hooks/useActiveSetName';
 import { deriveSummaryForClasses, presentAssetClasses } from '../utils/assetClassFilter';
@@ -118,6 +122,9 @@ export default function Home() {
     }, [activeView]);
 
     const { currency, setCurrency, symbol, formatValue } = useBaseCurrency();
+    const { settings: accountTaxSettings } = useAccountTaxSettings();
+    const { residenceCountry: taxResidenceCountry } = useTaxResidence();
+    const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
     const activeSetName = useActiveSetName(demoBannerRefresh);
 
     useEffect(() => {
@@ -280,6 +287,27 @@ export default function Home() {
 
     const hasStalePrice = summary.positions.some(p => p.currentPrice === null);
 
+    // ── Tax estimate: force the gain into real JPY ──────────────────────────
+    // Japan (the taxpayer's reporting currency per the tax model) computes a
+    // gain from the historical JPY rate at acquisition vs. today's/the sale's
+    // JPY rate — a different number from converting the display-currency gain
+    // at today's rate. So when the display base currency isn't JPY, load a
+    // parallel JPY summary purely for the tax column (shares the same cache
+    // the dashboard itself uses when the display currency already is JPY).
+    // Gated on the tax feature actually being configured, since this doubles
+    // network fetches otherwise.
+    const taxFeatureActive = taxFeatureEnabled && taxResidenceCountry !== null
+        && Object.values(accountTaxSettings).some(s => s.wrapper !== 'NONE');
+    const { summary: taxJpySummary } = usePortfolioSummaryData('JPY', taxFeatureActive);
+
+    const taxGainJpyByKey = useMemo(() => {
+        const map = new Map<string, number>();
+        if (!taxJpySummary) return map;
+        for (const p of taxJpySummary.positions) map.set(taxLotKey(p), p.pnlJPY);
+        for (const p of taxJpySummary.closedPositions) map.set(taxLotKey(p), p.realizedPnlJPY ?? 0);
+        return map;
+    }, [taxJpySummary]);
+
     // ── Overview asset-class filter ───────────────────────────────────────
     // Resolve the asset class for every ticker we hold (open + closed), then
     // scope the whole overview — KPIs, chart, analytics, benchmark — to the
@@ -370,6 +398,7 @@ export default function Home() {
                     onSettingsClick={() => setSettingsOpen(true)}
                     currency={currency}
                     activeSetName={activeSetName}
+                    taxFeatureEnabled={taxFeatureEnabled}
                 />
 
                 {/* ── Content column ───────────────────────────────── */}
@@ -580,6 +609,10 @@ export default function Home() {
                                                 baseCurrency={currency}
                                                 onDeletePosition={handleDeletePosition}
                                                 onSellPosition={handleSellPosition}
+                                                taxFeatureEnabled={taxFeatureEnabled}
+                                                taxResidenceCountry={taxResidenceCountry}
+                                                accountTaxSettings={accountTaxSettings}
+                                                taxGainJpyByKey={taxGainJpyByKey}
                                             />
                                         ) : (
                                             <ClosedPositionsTable
@@ -740,6 +773,8 @@ export default function Home() {
                 activeSetId={activeSetId}
                 buildBrief={makeBrief}
                 hasPositions={summary.positions.length > 0}
+                taxFeatureEnabled={taxFeatureEnabled}
+                onTaxFeatureEnabledChange={setTaxFeatureEnabled}
             />
         </>
     );

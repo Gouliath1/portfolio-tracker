@@ -9,6 +9,7 @@ import { MobileBottomNav } from '../../../components/layout/MobileBottomNav';
 import { calculatePortfolioAnnualizedReturn, calculatePositionXirr } from '@portfolio/core';
 import { useBaseCurrency } from '../../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../../hooks/useActiveSetName';
+import { useTaxFeatureEnabled } from '../../../hooks/useTaxFeatureEnabled';
 import { usePortfolioSummaryData } from '../../../hooks/usePortfolioSummaryData';
 import { useTranslation } from '../../../i18n';
 
@@ -84,6 +85,7 @@ export default function DeepDivePage() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { currency, setCurrency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
     const activeSetName = useActiveSetName();
+    const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
     const { summary, loading, error } = usePortfolioSummaryData(currency, currencyHydrated);
     const router = useRouter();
 
@@ -195,7 +197,7 @@ export default function DeepDivePage() {
     return (
         <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
-            <AppSidebar activePage="deep-dive" currency={currency} activeSetName={activeSetName} />
+            <AppSidebar activePage="deep-dive" currency={currency} activeSetName={activeSetName} taxFeatureEnabled={taxFeatureEnabled} />
 
             {/* ── Content column ───────────────────────────────── */}
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
@@ -633,6 +635,8 @@ export default function DeepDivePage() {
                 onClose={() => setSettingsOpen(false)}
                 currency={currency}
                 onCurrencyChange={setCurrency}
+                taxFeatureEnabled={taxFeatureEnabled}
+                onTaxFeatureEnabledChange={setTaxFeatureEnabled}
             />
         </div>
     );

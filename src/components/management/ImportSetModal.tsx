@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { MdClose, MdDownload, MdRefresh, MdUpload, MdInsertDriveFile } from 'react-icons/md';
 import { importPositionSet } from '../../utils/localPositions';
+import { applyTaxSettingsFromBackup, type TaxSettingsBackup } from '../../utils/taxSettingsBackup';
 import { Transaction } from '@portfolio/types';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -133,6 +134,18 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 records as any,
                 fields.set_as_active,
             );
+
+            // Tax setup travels in the same file, under a key the shape check
+            // above already ignores. Applying it writes straight to localStorage;
+            // a reload is the simplest way to get the already-mounted app's tax
+            // hooks (which only hydrate once, on mount) to pick it up.
+            const taxSettings = jsonData.taxSettings as TaxSettingsBackup | undefined;
+            if (taxSettings && (taxSettings.residenceCountry || taxSettings.accountTaxSettings)) {
+                applyTaxSettingsFromBackup(taxSettings);
+                onImported(records.length, fields.set_as_active);
+                window.location.reload();
+                return;
+            }
 
             onImported(records.length, fields.set_as_active);
         } catch (err) {
