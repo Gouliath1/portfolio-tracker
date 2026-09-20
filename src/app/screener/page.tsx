@@ -218,10 +218,10 @@ export default function ScreenerPage() {
     const overflowAdded = added.slice(2);
 
     return (
-        <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+        <div className="flex h-dvh overflow-hidden" style={{ background: 'var(--bg-base)' }}>
             <AppSidebar activePage="screener" currency={currency} activeSetName={activeSetName} taxFeatureEnabled={taxFeatureEnabled} />
 
-            <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
+            <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-dvh overflow-hidden">
                 <div className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden">
                     <div className="max-w-screen-xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5 pb-4 h-full flex flex-col gap-3">
 
