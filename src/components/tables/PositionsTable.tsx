@@ -14,6 +14,8 @@ import { useFilteredPositions } from './positionsTable/dataUtils';
 import { TableControls } from './positionsTable/TableControls';
 import { TableContent } from './positionsTable/TableContent';
 import { useTranslation } from '../../i18n';
+import type { AccountTaxSettings } from '../../hooks/useAccountTaxSettings';
+import type { TaxResidenceCountry } from '@portfolio/core';
 
 // Extend the TableMeta type from @tanstack/react-table
 declare module '@tanstack/react-table' {
@@ -24,6 +26,10 @@ declare module '@tanstack/react-table' {
         onDeleteRow?: (position: Position) => void;
         onSellRow?: (position: Position) => void;
         isDemoSet?: boolean;
+        taxResidenceCountry?: TaxResidenceCountry | null;
+        accountTaxSettings?: AccountTaxSettings;
+        /** Gain forced to real JPY (see useTaxJpySummary), keyed by taxLotKey — required because the tax rate is always computed in JPY regardless of the display base currency. */
+        taxGainJpyByKey?: Map<string, number>;
     }
 }
 
@@ -34,6 +40,11 @@ interface PositionsTableProps {
     onDeletePosition?: (position: Position) => void;
     onSellPosition?: (position: Position) => void;
     isDemoSet?: boolean;
+    /** Still under development — the "Est. Tax if Sold" column is hidden unless this is on (Settings). */
+    taxFeatureEnabled?: boolean;
+    taxResidenceCountry?: TaxResidenceCountry | null;
+    accountTaxSettings?: AccountTaxSettings;
+    taxGainJpyByKey?: Map<string, number>;
 }
 
 /**
@@ -51,7 +62,7 @@ interface PositionsTableProps {
  * @param showValues - Boolean to control value visibility (privacy mode)
  * @returns JSX element containing the complete positions table interface
  */
-export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, onSellPosition, isDemoSet = false }: PositionsTableProps) => {
+export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', onDeletePosition, onSellPosition, isDemoSet = false, taxFeatureEnabled = false, taxResidenceCountry, accountTaxSettings, taxGainJpyByKey }: PositionsTableProps) => {
     // Track narrow viewports so we can pin fewer columns and render compactly.
     // On mobile, pinning the 4 default columns (~304px) exceeds the container
     // width, leaving no room to scroll the rest of the data into view.
@@ -89,10 +100,11 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
         () => createTableColumns({
             showDelete: !isDemoSet,
             showSell: !isDemoSet && !!onSellPosition,
+            showTaxColumn: taxFeatureEnabled,
             t,
             locale,
         }),
-        [isDemoSet, onSellPosition, t, locale],
+        [isDemoSet, onSellPosition, taxFeatureEnabled, t, locale],
     );
 
     /**
@@ -116,6 +128,9 @@ export const PositionsTable = ({ positions, showValues, baseCurrency = 'JPY', on
             onDeleteRow: onDeletePosition ? (pos: Position) => onDeletePosition(pos) : undefined,
             onSellRow: onSellPosition ? (pos: Position) => onSellPosition(pos) : undefined,
             isDemoSet,
+            taxResidenceCountry,
+            accountTaxSettings,
+            taxGainJpyByKey,
         },
         onSortingChange: setSorting,
         onColumnVisibilityChange: setColumnVisibility,

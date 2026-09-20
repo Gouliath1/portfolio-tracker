@@ -11,6 +11,7 @@ import {
     exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
+import { readTaxSettingsForBackup } from '../../utils/taxSettingsBackup';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 
@@ -83,7 +84,11 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
     const handleExport = (id: string, name: string) => {
         try {
             const transactions = exportSetTransactions(id);
-            const blob = new Blob([JSON.stringify(transactions, null, 2)], { type: 'application/json' });
+            // Tax setup lives outside the transaction list — bundled in here (under
+            // a key the importer already tolerates) so exporting stays a full backup.
+            const taxSettings = readTaxSettingsForBackup();
+            const payload = taxSettings ? { transactions, taxSettings } : transactions;
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

@@ -6,7 +6,7 @@
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Position } from '@portfolio/types';
-import { calculateAnnualizedReturn, formatBrokerDisplay } from '@portfolio/core';
+import { calculateAnnualizedReturn, formatBrokerDisplay, estimateCapitalGainsTax, taxLotKey, DEFAULT_ACCOUNT_TAX_SETTING } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
 import { MdDeleteOutline } from 'react-icons/md';
@@ -21,6 +21,8 @@ type Translator = (key: TranslationKey, params?: TranslationParams) => string;
 interface CreateTableColumnsOptions {
     showDelete?: boolean;
     showSell?: boolean;
+    /** Tax estimates are still under development — column omitted entirely unless this is on. */
+    showTaxColumn?: boolean;
     /** Defaults to English so non-React callers (and tests) work unchanged. */
     t?: Translator;
     /** BCP 47 tag for number formatting inside cells. */
@@ -38,6 +40,7 @@ interface CreateTableColumnsOptions {
 export function createTableColumns({
     showDelete = false,
     showSell = false,
+    showTaxColumn = false,
     t = (key, params) => translate(DEFAULT_LANGUAGE, key, params),
     locale = localeTag(DEFAULT_LANGUAGE),
 }: CreateTableColumnsOptions = {}) {
@@ -466,6 +469,85 @@ export function createTableColumns({
                 return formatCurrencyValue(total, baseCcy, props.table.options.meta?.showValues ?? false, locale);
             },
         }),
+
+        /**
+         * Estimated capital-gains tax if this position were sold today, based
+         * on tax residence + the account's wrapper (Settings → Taxes). Always
+         * computed — and shown — in JPY, the taxpayer's reporting currency,
+         * regardless of the table's display base currency: the gain must use
+         * the historical JPY rate at acquisition vs. today's JPY rate, which
+         * is a different (and correct) number from converting the display-
+         * currency gain at today's rate. Estimate only, not tax advice — see
+         * src/lib/core/taxRules.ts for the model and its limitations. Still
+         * under development — omitted entirely unless enabled in Settings.
+         */
+        ...(showTaxColumn ? [columnHelper.accessor(row => row, {
+            id: 'estTaxIfSold',
+            header: () => (
+                <span title={t('column.estTaxIfSoldTooltip')} className="cursor-help">
+                    {t('column.estTaxIfSold')}
+                </span>
+            ),
+            size: 140,
+            cell: props => {
+                const row = props.row.original;
+                if (row.currentPrice === null) {
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
+                }
+                const meta = props.table.options.meta;
+                const setting = meta?.accountTaxSettings?.[row.account] ?? DEFAULT_ACCOUNT_TAX_SETTING;
+                if (setting.wrapper === 'NONE' || !meta?.taxResidenceCountry) {
+                    return <span style={{ color: 'var(--text-muted)' }} title={t('column.estTaxSetupHint')}>{t('common.notApplicable')}</span>;
+                }
+                const gainJpy = meta.taxGainJpyByKey?.get(taxLotKey(row));
+                if (gainJpy === undefined) {
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</span>;
+                }
+                const holdingDays = Math.floor((Date.now() - new Date(row.transactionDate).getTime()) / (1000 * 60 * 60 * 24));
+                const estimate = estimateCapitalGainsTax({
+                    gain: gainJpy,
+                    holdingDays,
+                    residenceCountry: meta.taxResidenceCountry,
+                    setting,
+                });
+                if (!estimate) {
+                    return <span style={{ color: 'var(--text-muted)' }}>{t('common.notApplicable')}</span>;
+                }
+                const displayValue = formatCurrencyValue(estimate.totalTax, 'JPY', meta.showValues ?? false, locale);
+                const tooltip = estimate.sourceTax > 0 ? `${estimate.residenceLabel} · ${estimate.sourceLabel}` : estimate.residenceLabel;
+                return (
+                    <span className="tabular-nums" title={tooltip} style={{ color: 'var(--text-secondary)' }}>
+                        {displayValue}
+                    </span>
+                );
+            },
+            footer: props => {
+                const meta = props.table.options.meta;
+                if (!meta?.taxResidenceCountry || !meta.accountTaxSettings || !meta.taxGainJpyByKey) return null;
+                const rows = props.table.getRowModel().rows.filter(r => r.original.currentPrice !== null);
+                if (rows.length === 0) return null;
+                let total = 0;
+                let any = false;
+                for (const row of rows) {
+                    const setting = meta.accountTaxSettings[row.original.account] ?? DEFAULT_ACCOUNT_TAX_SETTING;
+                    if (setting.wrapper === 'NONE') continue;
+                    const gainJpy = meta.taxGainJpyByKey.get(taxLotKey(row.original));
+                    if (gainJpy === undefined) continue;
+                    const holdingDays = Math.floor((Date.now() - new Date(row.original.transactionDate).getTime()) / (1000 * 60 * 60 * 24));
+                    const estimate = estimateCapitalGainsTax({
+                        gain: gainJpy,
+                        holdingDays,
+                        residenceCountry: meta.taxResidenceCountry,
+                        setting,
+                    });
+                    if (!estimate) continue;
+                    any = true;
+                    total += estimate.totalTax;
+                }
+                if (!any) return null;
+                return formatCurrencyValue(total, 'JPY', meta.showValues ?? false, locale);
+            },
+        })] : []),
     ];
 
     if (showSell) {

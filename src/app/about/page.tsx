@@ -17,6 +17,7 @@ import { ArchitectureDiagram } from '../../components/about/ArchitectureDiagram'
 import { ServerDataPanel } from '../../components/about/ServerDataPanel';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
+import { useTaxFeatureEnabled } from '../../hooks/useTaxFeatureEnabled';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 
@@ -31,6 +32,7 @@ export default function AboutPage() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { currency, setCurrency } = useBaseCurrency();
     const activeSetName = useActiveSetName();
+    const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -39,7 +41,7 @@ export default function AboutPage() {
     return (
         <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
-            <AppSidebar activePage="about" currency={currency} activeSetName={activeSetName} />
+            <AppSidebar activePage="about" currency={currency} activeSetName={activeSetName} taxFeatureEnabled={taxFeatureEnabled} />
 
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
                 <main className="flex-1 min-h-0 overflow-y-auto pb-20 md:pb-0">
@@ -131,6 +133,8 @@ export default function AboutPage() {
                 onClose={() => setSettingsOpen(false)}
                 currency={currency}
                 onCurrencyChange={setCurrency}
+                taxFeatureEnabled={taxFeatureEnabled}
+                onTaxFeatureEnabledChange={setTaxFeatureEnabled}
             />
         </div>
     );

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import {
     MdHome, MdAccountBalance, MdSwapHoriz, MdInfoOutline,
-    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
+    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch, MdReceiptLong,
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -11,7 +11,7 @@ import type { TranslationKey } from '../../i18n';
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive' | 'screener' | 'about';
+    activePage: 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -21,6 +21,8 @@ interface AppSidebarProps {
     currency: string;
     /** Display name of the active portfolio, shown under the logo */
     activeSetName?: string;
+    /** Still under development — hidden unless turned on in Settings. */
+    taxFeatureEnabled?: boolean;
 }
 
 const PortfoliosIcon = ({ size = 17 }: { size?: number }) => (
@@ -46,6 +48,7 @@ export function AppSidebar({
     onSettingsClick,
     currency,
     activeSetName,
+    taxFeatureEnabled = false,
 }: AppSidebarProps) {
     const onHome = activePage === 'home';
     const router = useRouter();
@@ -147,6 +150,24 @@ export function AppSidebar({
                                     <MdManageSearch size={17} />
                                     {t('nav.screener')}
                                 </button>
+                            )}
+
+                            {/* Taxes — still under development, hidden unless enabled in Settings */}
+                            {taxFeatureEnabled && (
+                                activePage === 'taxes' ? (
+                                    <div className={itemClass} style={activeStyle}>
+                                        <MdReceiptLong size={17} />
+                                        {t('nav.taxes')}
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => router.push('/taxes')}
+                                        className={itemClass}
+                                        style={defaultStyle}>
+                                        <MdReceiptLong size={17} />
+                                        {t('nav.taxes')}
+                                    </button>
+                                )
                             )}
                         </>
                     );

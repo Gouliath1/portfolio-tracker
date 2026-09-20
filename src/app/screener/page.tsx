@@ -12,6 +12,7 @@ import { StockChartModal } from '../../components/screener/StockChartModal';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
 import { useAlertPoller } from '../../hooks/useAlertPoller';
+import { useTaxFeatureEnabled } from '../../hooks/useTaxFeatureEnabled';
 import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
 import AddPositionModal from '../../components/management/AddPositionModal';
 import { getActiveSetId } from '../../utils/localPositions';
@@ -100,6 +101,7 @@ export default function ScreenerPage() {
     const { t, locale } = useTranslation();
     const { currency, setCurrency } = useBaseCurrency();
     const activeSetName = useActiveSetName();
+    const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
 
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [indexKey, setIndexKey] = useState('topix');
@@ -217,7 +219,7 @@ export default function ScreenerPage() {
 
     return (
         <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
-            <AppSidebar activePage="screener" currency={currency} activeSetName={activeSetName} />
+            <AppSidebar activePage="screener" currency={currency} activeSetName={activeSetName} taxFeatureEnabled={taxFeatureEnabled} />
 
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
                 <div className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden">
@@ -353,6 +355,8 @@ export default function ScreenerPage() {
                 onClose={() => setSettingsOpen(false)}
                 currency={currency}
                 onCurrencyChange={setCurrency}
+                taxFeatureEnabled={taxFeatureEnabled}
+                onTaxFeatureEnabledChange={setTaxFeatureEnabled}
             />
 
             <MobileBottomNav

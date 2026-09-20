@@ -7,7 +7,7 @@ import {
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 
-export type MobileNavPage = 'home' | 'deep-dive' | 'screener' | 'about';
+export type MobileNavPage = 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
 export type HomeView = 'overview' | 'assets' | 'data';
 
 interface MobileBottomNavProps {
