@@ -360,7 +360,7 @@ export default function DeepDivePage() {
                                                 — {t('deepDive.returnsByPositionHint')}
                                             </span>
                                         </p>
-                                        <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-y-auto overscroll-x-none">
+                                        <div className="flex-1 min-h-0 glass rounded-xl scroll-elastic-xy">
                                             <table className="min-w-full data-table xirr-table">
                                                 <thead className="sticky top-0 z-20"
                                                     style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
@@ -534,7 +534,7 @@ export default function DeepDivePage() {
                                                 {t('deepDive.loadingPriceHistory')}
                                             </p>
                                         ) : (
-                                            <div className="flex-1 min-h-0 glass rounded-xl overflow-auto overscroll-y-auto overscroll-x-none">
+                                            <div className="flex-1 min-h-0 glass rounded-xl scroll-elastic-xy">
                                                 <table className="min-w-full data-table xirr-table xirr-annual">
                                                     <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--border)' }}>
                                                         <tr>

@@ -134,7 +134,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <form onSubmit={handleSubmit} className="flex-1 scroll-elastic-y px-6 py-5 space-y-5">
                     {setId === DEMO_SET_ID && (
                         <div className="flex gap-2 rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
                             <MdInfo size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />

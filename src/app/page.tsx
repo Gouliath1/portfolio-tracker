@@ -504,7 +504,7 @@ export default function Home() {
 
                             {/* Overview: KPIs render immediately with placeholder; chart waits for data */}
                             {activeView === 'overview' && (
-                                <div className="flex-1 min-h-0 overflow-y-auto">
+                                <div className="flex-1 min-h-0 scroll-elastic-y">
                                 <div className="space-y-4 sm:space-y-6">
                                     {!loading && portfolioSummary && (
                                         <AssetClassFilter
@@ -601,7 +601,7 @@ export default function Home() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex-1 min-h-0 overflow-auto">
+                                    <div className="flex-1 min-h-0 scroll-elastic-y">
                                         {assetsTab === 'open' ? (
                                             <PositionsTable
                                                 positions={portfolioSummary.positions}
@@ -630,7 +630,7 @@ export default function Home() {
 
                             {/* Data: portfolio management */}
                             {!loading && portfolioSummary && activeView === 'data' && (
-                                <div className="flex-1 min-h-0 overflow-y-auto">
+                                <div className="flex-1 min-h-0 scroll-elastic-y">
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>

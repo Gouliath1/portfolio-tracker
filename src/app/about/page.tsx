@@ -44,7 +44,7 @@ export default function AboutPage() {
             <AppSidebar activePage="about" currency={currency} activeSetName={activeSetName} taxFeatureEnabled={taxFeatureEnabled} />
 
             <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
-                <main className="flex-1 min-h-0 overflow-y-auto pb-20 md:pb-0">
+                <main className="flex-1 min-h-0 scroll-elastic-y pb-20 md:pb-0">
                     <div className="w-full max-w-screen-lg mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
 
                         {/* Page header */}
