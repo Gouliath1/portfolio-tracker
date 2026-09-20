@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import {
     MdHome, MdAccountBalance, MdSwapHoriz, MdInfoOutline,
-    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch, MdReceiptLong,
+    MdTrendingUp, MdSettings, MdAccountBalanceWallet, MdManageSearch,
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -11,7 +11,7 @@ import type { TranslationKey } from '../../i18n';
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
+    activePage: 'home' | 'deep-dive' | 'screener' | 'about';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -146,22 +146,6 @@ export function AppSidebar({
                                     style={defaultStyle}>
                                     <MdManageSearch size={17} />
                                     {t('nav.screener')}
-                                </button>
-                            )}
-
-                            {/* Taxes — standalone board for tax setup and estimates */}
-                            {activePage === 'taxes' ? (
-                                <div className={itemClass} style={activeStyle}>
-                                    <MdReceiptLong size={17} />
-                                    {t('nav.taxes')}
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => router.push('/taxes')}
-                                    className={itemClass}
-                                    style={defaultStyle}>
-                                    <MdReceiptLong size={17} />
-                                    {t('nav.taxes')}
                                 </button>
                             )}
                         </>
