@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { MdClose, MdDownload, MdRefresh, MdUpload, MdInsertDriveFile } from 'react-icons/md';
 import { importPositionSet } from '../../utils/localPositions';
 import { applyTaxSettingsFromBackup, type TaxSettingsBackup } from '../../utils/taxSettingsBackup';
+import { TAX_RESIDENCE_STORAGE_KEY } from '../../hooks/useTaxResidence';
 import { Transaction } from '@portfolio/types';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -52,6 +53,15 @@ interface ImportSetModalProps {
     onClose: () => void;
 }
 
+/** Staged data waiting on the user to confirm it's OK to overwrite their existing tax residence. */
+interface PendingTaxOverwrite {
+    idName: string;
+    displayName: string;
+    description: string;
+    records: unknown[];
+    taxSettings?: TaxSettingsBackup;
+}
+
 export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
     const { t } = useTranslation();
     const [fields, setFields] = useState({ name: '', set_as_active: false });
@@ -59,6 +69,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
     const [importing, setImporting] = useState(false);
     const [error, setError] = useState<ImportError | null>(null);
     const [dragging, setDragging] = useState(false);
+    const [pendingTaxOverwrite, setPendingTaxOverwrite] = useState<PendingTaxOverwrite | null>(null);
 
     // Prevent the browser from navigating to a dropped file anywhere outside the drop zone.
     useEffect(() => {
@@ -106,6 +117,32 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
         if (file) stageFile(file);
     };
 
+    // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
+    const commitImport = (pending: PendingTaxOverwrite) => {
+        const { idName, displayName, description, records, taxSettings } = pending;
+        importPositionSet(
+            idName,
+            displayName,
+            description,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            records as any,
+            fields.set_as_active,
+        );
+
+        // Tax setup travels in the same file, under a key the shape check
+        // above already ignores. Applying it writes straight to localStorage;
+        // a reload is the simplest way to get the already-mounted app's tax
+        // hooks (which only hydrate once, on mount) to pick it up.
+        if (taxSettings && (taxSettings.residenceCountry || taxSettings.accountTaxSettings)) {
+            applyTaxSettingsFromBackup(taxSettings);
+            onImported(records.length, fields.set_as_active);
+            window.location.reload();
+            return;
+        }
+
+        onImported(records.length, fields.set_as_active);
+    };
+
     const handleAdd = async () => {
         if (!stagedFile) return;
         setImporting(true);
@@ -125,29 +162,29 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 return;
             }
 
-            // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
-            importPositionSet(
-                fields.name || `imported-${Date.now()}`,
-                fields.name || stagedFile.name.replace('.json', ''),
-                t('import.setDescription', { file: stagedFile.name }),
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                records as any,
-                fields.set_as_active,
-            );
-
-            // Tax setup travels in the same file, under a key the shape check
-            // above already ignores. Applying it writes straight to localStorage;
-            // a reload is the simplest way to get the already-mounted app's tax
-            // hooks (which only hydrate once, on mount) to pick it up.
             const taxSettings = jsonData.taxSettings as TaxSettingsBackup | undefined;
-            if (taxSettings && (taxSettings.residenceCountry || taxSettings.accountTaxSettings)) {
-                applyTaxSettingsFromBackup(taxSettings);
-                onImported(records.length, fields.set_as_active);
-                window.location.reload();
+            const pending: PendingTaxOverwrite = {
+                idName: fields.name || `imported-${Date.now()}`,
+                displayName: fields.name || stagedFile.name.replace('.json', ''),
+                description: t('import.setDescription', { file: stagedFile.name }),
+                records,
+                taxSettings,
+            };
+
+            // A residence value already set is the taxpayer's identity, not
+            // this portfolio's — importing overwrites it (see
+            // applyTaxSettingsFromBackup), so pause for confirmation instead
+            // of silently replacing who the app thinks the user is.
+            const existingResidence = localStorage.getItem(TAX_RESIDENCE_STORAGE_KEY);
+            const wouldOverwriteResidence =
+                !!taxSettings?.residenceCountry && !!existingResidence && existingResidence !== taxSettings.residenceCountry;
+
+            if (wouldOverwriteResidence) {
+                setPendingTaxOverwrite(pending);
                 return;
             }
 
-            onImported(records.length, fields.set_as_active);
+            commitImport(pending);
         } catch (err) {
             setError({
                 key: 'import.errFailed',
@@ -156,6 +193,12 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
         } finally {
             setImporting(false);
         }
+    };
+
+    const confirmTaxOverwrite = () => {
+        if (!pendingTaxOverwrite) return;
+        setImporting(true);
+        commitImport(pendingTaxOverwrite);
     };
 
     const inputClass = 'w-full px-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1';
@@ -188,6 +231,41 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
 
                 {/* Body */}
                 <div className="flex-1 scroll-elastic-y px-6 py-5 space-y-5">
+                    {pendingTaxOverwrite ? (
+                        <>
+                            <div className="rounded-xl px-4 py-3 text-sm space-y-2" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--text-primary)' }}>
+                                <p>
+                                    {t('import.confirmTaxOverwrite', {
+                                        country: t(
+                                            pendingTaxOverwrite.taxSettings?.residenceCountry === 'FR'
+                                                ? 'settings.taxResidenceFR'
+                                                : 'settings.taxResidenceJP',
+                                        ),
+                                    })}
+                                </p>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    onClick={() => setPendingTaxOverwrite(null)}
+                                    disabled={importing}
+                                    className="px-4 py-2 text-sm glass glass-hover rounded-lg transition-all disabled:opacity-50"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                                <button
+                                    onClick={confirmTaxOverwrite}
+                                    disabled={importing}
+                                    className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{ background: 'var(--pnl-red-dim)', color: 'var(--pnl-red)', border: '1px solid var(--pnl-red)' }}
+                                >
+                                    {importing && <MdRefresh className="w-4 h-4 animate-spin" />}
+                                    {t('import.confirmTaxOverwriteAction')}
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                    <>
                     {error && (
                         <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'var(--pnl-red-dim)', border: '1px solid var(--pnl-red)', color: 'var(--pnl-red)' }}>
                             {t(error.key)}{error.detail ? ` (${error.detail})` : ''}
@@ -275,7 +353,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                         )}
 
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {t('import.formatHelp')}
+                            {t('import.formatHelp')} {t('import.formatHelpTaxNote')}
                         </p>
                     </div>
 
@@ -302,6 +380,8 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                             {importing ? t('import.loading') : t('import.load')}
                         </button>
                     </div>
+                    </>
+                    )}
                 </div>
             </div>
         </div>
