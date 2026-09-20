@@ -516,7 +516,7 @@ export function ScreenerTable({
         <button
             key={id}
             onClick={() => handleSetView(id)}
-            className="h-full px-2.5 text-sm font-medium transition-all rounded-md flex items-center gap-1"
+            className="h-9 px-2.5 text-sm font-medium transition-all rounded-md flex items-center gap-1 flex-shrink-0 whitespace-nowrap"
             style={view === id
                 ? { background: 'var(--accent-dim)', color: 'var(--accent)' }
                 : { color: 'var(--text-secondary)' }}
@@ -596,8 +596,8 @@ export function ScreenerTable({
                     )}
                 </div>
 
-                {/* View tabs */}
-                <div className="inline-flex h-9 items-center rounded-lg p-1 gap-0.5 flex-shrink-0"
+                {/* View tabs — wraps onto a second row instead of overflowing when narrow (mobile) */}
+                <div className="flex flex-wrap items-center rounded-lg p-1 gap-0.5 min-h-9"
                     style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
                     {viewTab('all', 'common.all', constituents.length)}
                     {viewTab('loaded', 'screener.tabLoaded', loadedCount)}
