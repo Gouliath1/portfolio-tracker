@@ -135,24 +135,26 @@ body {
 *::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
 
 /* ── Elastic scroll ────────────────────────────────────────────
-   Native rubber-band bounce feels right vertically (the natural reading
-   direction) and wrong horizontally (a table swipe shouldn't spring back).
-   Three variants for the three shapes of scroll region in this app; use
-   these instead of hand-rolling overflow/overscroll-behavior combinations
-   so every screen bounces the same way. */
+   Native rubber-band bounce should be felt on every scrollable region —
+   including a table's horizontal swipe. What must NOT happen is a nested
+   region's overscroll chaining into its parent once it hits its own edge
+   (that's what turns one bounce into a compounding double-bounce, e.g. a
+   table scrolled to its limit dragging the page behind it along too).
+   `contain` keeps the local bounce but stops that chain. Three variants
+   for the three shapes of scroll region in this app; use these instead of
+   hand-rolling overflow/overscroll-behavior combinations so every screen
+   bounces the same way. */
 .scroll-elastic-y {
   overflow-y: auto;
-  overscroll-behavior-y: auto;
-  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
 }
 .scroll-elastic-x {
   overflow-x: auto;
-  overscroll-behavior-x: none;
+  overscroll-behavior-x: contain;
 }
 .scroll-elastic-xy {
   overflow: auto;
-  overscroll-behavior-y: auto;
-  overscroll-behavior-x: none;
+  overscroll-behavior: contain;
 }
 
 /* ── Data tables ───────────────────────────────────────────── */
