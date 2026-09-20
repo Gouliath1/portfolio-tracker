@@ -389,7 +389,7 @@ export default function Home() {
 
     return (
         <>
-            <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+            <div className="flex h-dvh overflow-hidden" style={{ background: 'var(--bg-base)' }}>
 
                 <AppSidebar
                     activePage="home"
@@ -402,7 +402,7 @@ export default function Home() {
                 />
 
                 {/* ── Content column ───────────────────────────────── */}
-                <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-screen overflow-hidden">
+                <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-dvh overflow-hidden">
 
                     {/* ── Main content ─────────────────────────────── */}
                     <main className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden flex flex-col">
