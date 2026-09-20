@@ -92,7 +92,7 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${name}-transactions.json`;
+            a.download = `${name}-portfolio.json`;
             document.body.appendChild(a);
             a.click();
             URL.revokeObjectURL(url);
