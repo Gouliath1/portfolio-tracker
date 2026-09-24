@@ -8,6 +8,7 @@ import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurr
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 import { ExchangeRatesSection } from './ExchangeRatesSection';
 import { ConnectAiSection } from './ConnectAiSection';
+import { WipBadge } from '../shared/WipBadge';
 import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
 
 interface SettingsPanelProps {
@@ -208,8 +209,9 @@ export const SettingsPanel = ({
                                 <div className="flex items-center gap-3 min-w-0">
                                     <MdReceiptLong size={18} style={{ color: 'var(--accent)' }} className="flex-shrink-0" />
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                        <p className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                                             {t('taxes.enableFeature')}
+                                            <WipBadge />
                                         </p>
                                         <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                                             {t('taxes.enableFeatureHelp')}
@@ -238,8 +240,9 @@ export const SettingsPanel = ({
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                            <p className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                                                 {t('nav.taxes')}
+                                                <WipBadge />
                                             </p>
                                             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                                                 {t('taxes.settingsHint')}

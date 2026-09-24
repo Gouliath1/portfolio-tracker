@@ -7,6 +7,7 @@ import {
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
+import { WipBadge } from '../shared/WipBadge';
 
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
@@ -155,17 +156,17 @@ export function AppSidebar({
                             {/* Taxes — still under development, hidden unless enabled in Settings */}
                             {taxFeatureEnabled && (
                                 activePage === 'taxes' ? (
-                                    <div className={itemClass} style={activeStyle}>
-                                        <MdReceiptLong size={17} />
-                                        {t('nav.taxes')}
+                                    <div className={`${itemClass} justify-between`} style={activeStyle}>
+                                        <span className="flex items-center gap-3"><MdReceiptLong size={17} />{t('nav.taxes')}</span>
+                                        <WipBadge />
                                     </div>
                                 ) : (
                                     <button
                                         onClick={() => router.push('/taxes')}
-                                        className={itemClass}
+                                        className={`${itemClass} justify-between`}
                                         style={defaultStyle}>
-                                        <MdReceiptLong size={17} />
-                                        {t('nav.taxes')}
+                                        <span className="flex items-center gap-3"><MdReceiptLong size={17} />{t('nav.taxes')}</span>
+                                        <WipBadge />
                                     </button>
                                 )
                             )}
