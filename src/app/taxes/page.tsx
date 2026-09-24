@@ -15,6 +15,7 @@ import { AppSidebar } from '../../components/layout/AppSidebar';
 import { SettingsPanel } from '../../components/layout/SettingsPanel';
 import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
 import { AccountTaxCard } from '../../components/taxes/AccountTaxCard';
+import { WipBadge } from '../../components/shared/WipBadge';
 import { useBaseCurrency } from '../../hooks/useBaseCurrency';
 import { useActiveSetName } from '../../hooks/useActiveSetName';
 import { usePortfolioSummaryData } from '../../hooks/usePortfolioSummaryData';
@@ -169,8 +170,9 @@ export default function TaxesPage() {
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-widest mb-1"
                                 style={{ color: 'var(--text-muted)' }}>{t('nav.taxes')}</p>
-                            <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            <h1 className="text-xl font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                                 {t('taxes.title')}
+                                <WipBadge size="md" />
                             </h1>
                             <p className="text-sm mt-1 max-w-2xl leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                                 {t('taxes.subtitle', { date: TAX_RULES_AS_OF })}

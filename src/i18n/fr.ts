@@ -16,6 +16,8 @@ export const fr: Translations = {
     'common.loading': 'Chargement...',
     'common.loadingEllipsis': 'Chargement…',
     'common.notApplicable': 'N/D',
+    'common.wip': 'WIP',
+    'common.wipTooltip': 'En cours de développement — pas encore terminé',
     'common.error': 'Erreur',
     'common.updating': 'Mise à jour…',
     'common.whatIsThis': 'Qu’est-ce que c’est ?',

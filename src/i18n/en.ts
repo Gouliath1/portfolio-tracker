@@ -27,6 +27,8 @@ export const en = {
     'common.loading': 'Loading...',
     'common.loadingEllipsis': 'Loading…',
     'common.notApplicable': 'N/A',
+    'common.wip': 'WIP',
+    'common.wipTooltip': 'Work in progress — not finished yet',
     'common.error': 'Error',
     'common.updating': 'Updating…',
     'common.whatIsThis': 'What is this?',

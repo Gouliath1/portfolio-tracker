@@ -9,6 +9,7 @@ import { Position } from '@portfolio/types';
 import { calculateAnnualizedReturn, formatBrokerDisplay, estimateCapitalGainsTax, taxLotKey, DEFAULT_ACCOUNT_TAX_SETTING } from '@portfolio/core';
 import { formatCurrencyValue, getHiddenValue } from './currencyUtils';
 import { FxRateIcon } from '../../iconsManagement/FxRateIcon';
+import { WipBadge } from '../../shared/WipBadge';
 import { MdDeleteOutline } from 'react-icons/md';
 import { translate, DEFAULT_LANGUAGE, localeTag } from '../../../i18n';
 import type { TranslationKey, TranslationParams } from '../../../i18n';
@@ -484,8 +485,9 @@ export function createTableColumns({
         ...(showTaxColumn ? [columnHelper.accessor(row => row, {
             id: 'estTaxIfSold',
             header: () => (
-                <span title={t('column.estTaxIfSoldTooltip')} className="cursor-help">
+                <span title={t('column.estTaxIfSoldTooltip')} className="cursor-help inline-flex items-center gap-1.5">
                     {t('column.estTaxIfSold')}
+                    <WipBadge />
                 </span>
             ),
             size: 140,
