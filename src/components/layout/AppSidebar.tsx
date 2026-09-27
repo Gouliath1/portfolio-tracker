@@ -12,7 +12,7 @@ import { WipBadge } from '../shared/WipBadge';
 export type SidebarViewId = 'overview' | 'assets' | 'data';
 
 interface AppSidebarProps {
-    activePage: 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
+    activePage: 'home' | 'deep-dive' | 'screener' | 'pinned' | 'taxes' | 'about';
     /** Home page only — which main view is selected */
     activeView?: SidebarViewId;
     /** Home page only — called when a main nav item is clicked */
@@ -147,11 +147,12 @@ export function AppSidebar({
                                 <button
                                     onClick={() => router.push('/screener')}
                                     className={itemClass}
-                                    style={defaultStyle}>
+                                    style={activePage === 'pinned' ? activeStyle : defaultStyle}>
                                     <MdManageSearch size={17} />
                                     {t('nav.screener')}
                                 </button>
                             )}
+
 
                             {/* Taxes — still under development, hidden unless enabled in Settings */}
                             {taxFeatureEnabled && (

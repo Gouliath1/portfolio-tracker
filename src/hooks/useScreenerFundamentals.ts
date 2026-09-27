@@ -14,6 +14,8 @@ export interface FundamentalsApi {
     map: Map<string, FundEntry>;
     refresh: (symbol: string) => void;
     loadMany: (symbols: string[]) => void;
+    /** Stops an in-flight loadMany; symbols not yet fetched revert to their previous entry. */
+    cancelLoad: () => void;
     loadCached: (symbols: string[]) => void;
     /** Silently re-fetch symbols that have existing data but are missing sector.
      *  Does NOT set loading state so the existing price/ratio data stays visible. */
@@ -131,9 +133,33 @@ export function useScreenerFundamentals(): FundamentalsApi {
         }
     }, [setEntry]);
 
+    // Bumped by every loadMany/cancelLoad so a superseded run's workers stop picking up symbols.
+    const runId = useRef(0);
+    const pendingRestore = useRef<Map<string, FundEntry | undefined>>(new Map());
+
+    const restorePending = useCallback(() => {
+        const pending = pendingRestore.current;
+        if (pending.size === 0) return;
+        pendingRestore.current = new Map();
+        _setMap(prev => {
+            const next = new Map(prev);
+            pending.forEach((entry, s) => {
+                if (entry) { next.set(s, entry); _store.map.set(s, entry); }
+                else { next.delete(s); _store.map.delete(s); requested.current.delete(s); }
+            });
+            return next;
+        });
+    }, []);
+
     const loadMany = useCallback((symbols: string[]) => {
         if (symbols.length === 0) return;
+        restorePending();
+        const myRun = ++runId.current;
         symbols.forEach(s => requested.current.add(s));
+
+        const restore = new Map<string, FundEntry | undefined>();
+        symbols.forEach(s => restore.set(s, _store.map.get(s)));
+        pendingRestore.current = restore;
 
         _setMap(prev => {
             const next = new Map(prev);
@@ -151,17 +177,25 @@ export function useScreenerFundamentals(): FundamentalsApi {
 
         let idx = 0;
         const worker = async () => {
-            while (idx < symbols.length) {
+            while (idx < symbols.length && runId.current === myRun) {
                 const sym = symbols[idx++];
+                restore.delete(sym);
                 await fetchOne(sym);
+                if (runId.current !== myRun) return;
                 done += 1;
                 setProgress({ done, total });
                 await delay(BULK_GAP_MS);
             }
         };
         void Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, total) }, worker))
-            .finally(() => setProgress(null));
-    }, [fetchOne]);
+            .finally(() => { if (runId.current === myRun) setProgress(null); });
+    }, [fetchOne, restorePending]);
+
+    const cancelLoad = useCallback(() => {
+        runId.current += 1;
+        restorePending();
+        setProgress(null);
+    }, [restorePending]);
 
     const refresh = useCallback((symbol: string) => {
         requested.current.add(symbol);
@@ -218,5 +252,5 @@ export function useScreenerFundamentals(): FundamentalsApi {
         });
     }, [fetchOne]);
 
-    return { map, refresh, loadMany, loadCached, backfillSector, progress };
+    return { map, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress };
 }
