@@ -223,7 +223,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
