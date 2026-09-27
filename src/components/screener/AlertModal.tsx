@@ -124,7 +124,7 @@ export function AlertModal({ symbol, name, existing, onSave, onClear, onClose }:
     );
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="relative w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl flex flex-col"

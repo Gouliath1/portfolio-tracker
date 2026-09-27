@@ -112,7 +112,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         >
@@ -122,7 +122,7 @@ export default function SellPositionModal({ setId, position, onSaved, onClose }:
                     background: 'var(--surface-popover)',
                     border: '1px solid var(--border-strong)',
                     boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
-                    maxHeight: '90vh',
+                    maxHeight: '90dvh',
                 }}
             >
                 <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
