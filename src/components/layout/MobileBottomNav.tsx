@@ -7,7 +7,7 @@ import {
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 
-export type MobileNavPage = 'home' | 'deep-dive' | 'screener' | 'taxes' | 'about';
+export type MobileNavPage = 'home' | 'deep-dive' | 'screener' | 'pinned' | 'taxes' | 'about';
 export type HomeView = 'overview' | 'assets' | 'data';
 
 interface MobileBottomNavProps {
@@ -78,7 +78,7 @@ export function MobileBottomNav({
             <button
                 onClick={() => activePage === 'screener' ? handleCurrentPage() : router.push('/screener')}
                 className={BTN}
-                style={c(noSettings && activePage === 'screener')}
+                style={c(noSettings && (activePage === 'screener' || activePage === 'pinned'))}
             >
                 <MdManageSearch size={20} /><span>{t('nav.screener')}</span>
             </button>

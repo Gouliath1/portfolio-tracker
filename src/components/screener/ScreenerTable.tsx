@@ -17,7 +17,7 @@ import {
     MdSearch, MdClose, MdChevronLeft, MdChevronRight, MdRefresh,
     MdStar, MdStarBorder, MdNotificationsActive, MdNotificationsNone,
     MdShowChart, MdInfoOutline, MdDownload, MdFilterList, MdExpandMore, MdCheck, MdAddShoppingCart,
-    MdStickyNote2, MdOutlineStickyNote2,
+    MdStickyNote2, MdOutlineStickyNote2, MdStop, MdAdd,
 } from 'react-icons/md';
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
@@ -77,12 +77,16 @@ interface ScreenerTableProps {
     onEditNote: (c: IndexConstituent) => void;
     onOpenChart: (c: IndexConstituent, currency: string | null) => void;
     onBuy?: (c: IndexConstituent) => void;
+    /** 'pinned' — the dedicated pinned-list page: no view tabs, no pagination, rows auto-load. */
+    variant?: 'screener' | 'pinned';
 }
 
 export function ScreenerTable({
     constituents, onRemove, removableSymbols,
     pinnedSymbols, onTogglePin, alerts, onEditAlert, notes, onEditNote, onOpenChart, onBuy,
+    variant = 'screener',
 }: ScreenerTableProps) {
+    const isPinnedPage = variant === 'pinned';
     const { t, locale } = useTranslation();
     const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
     const [filter, setFilter] = useState('');
@@ -92,6 +96,7 @@ export function ScreenerTable({
     const [selectedSectors, setSelectedSectors] = useState<Set<string> | null>(null);
     const [sectorOpen, setSectorOpen] = useState(false);
     const [pageIndex, setPageIndex] = useState(0);
+    const [refreshOpen, setRefreshOpen] = useState(false);
     const bp = useBreakpoints();
 
     const mapRef = useRef<Map<string, FundEntry>>(new Map());
@@ -102,12 +107,12 @@ export function ScreenerTable({
     const refreshRef = useRef<(symbol: string) => void>(() => {});
     const nameCacheRef = useRef<Map<string, string>>(new Map());
 
-    const { map: fundMap, refresh, loadMany, loadCached, backfillSector, progress } = useScreenerFundamentals();
+    const { map: fundMap, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress } = useScreenerFundamentals();
     mapRef.current = fundMap;
     refreshRef.current = refresh;
 
     // Effective page size: flat (no pagination) when not on All view, or when showAll is toggled.
-    const effectivePageSize = view !== 'all' || showAll ? 99999 : PAGE_SIZE;
+    const effectivePageSize = isPinnedPage || view !== 'all' || showAll ? 99999 : PAGE_SIZE;
 
     const handleSetView = (v: View) => { setView(v); setShowAll(false); setPageIndex(0); };
 
@@ -425,6 +430,11 @@ export function ScreenerTable({
             pagination: { pageIndex, pageSize: effectivePageSize },
         },
         onSortingChange: setSorting,
+        // Shift/Cmd/Ctrl-click a header adds it as a secondary sort key.
+        isMultiSortEvent: e => {
+            const m = e as React.MouseEvent;
+            return m.shiftKey || m.metaKey || m.ctrlKey;
+        },
         onGlobalFilterChange: setFilter,
         onPaginationChange: updater => {
             const prev = { pageIndex, pageSize: effectivePageSize };
@@ -447,7 +457,6 @@ export function ScreenerTable({
     const pageRows = table.getRowModel().rows;
     const pageSymbolsKey = pageRows.map(r => r.original.symbol).join(',');
     const pageSymbols = useMemo(() => (pageSymbolsKey ? pageSymbolsKey.split(',') : []), [pageSymbolsKey]);
-    const pageLoading = progress !== null;
 
     // Restore from DB cache for all constituents on mount and universe changes.
     useEffect(() => {
@@ -461,11 +470,15 @@ export function ScreenerTable({
     // to avoid a render loop.
     //   - No entry or ratiosPending → full fetch (loadMany shows loading, like Refresh)
     //   - Has full data but no sector → silent backfill (keeps existing data visible)
+    const autoLoadSymbols = useMemo(
+        () => (isPinnedPage ? new Set(constituents.map(c => c.symbol)) : removableSymbols),
+        [isPinnedPage, constituents, removableSymbols],
+    );
     useEffect(() => {
-        if (!removableSymbols || removableSymbols.size === 0) return;
+        if (!autoLoadSymbols || autoLoadSymbols.size === 0) return;
         const toFetch: string[] = [];
         const toBackfill: string[] = [];
-        for (const s of removableSymbols) {
+        for (const s of autoLoadSymbols) {
             const e = mapRef.current.get(s);
             if (!e || (e.status === 'done' && e.ratiosPending)) {
                 toFetch.push(s);
@@ -476,10 +489,21 @@ export function ScreenerTable({
         if (toFetch.length > 0) loadMany(toFetch);
         if (toBackfill.length > 0) backfillSector(toBackfill);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [removableSymbols]);
+    }, [autoLoadSymbols]);
 
     // Per-page cache probe — skipped in show-all mode (all already loaded above).
     useEffect(() => { if (!showAll) loadCached(pageSymbols); }, [pageSymbols, loadCached, showAll]);
+
+    // Every row matching the current view/sector/search filters, in display order.
+    const filteredSymbols = table.getPrePaginationRowModel().rows.map(r => r.original.symbol);
+    const missingSymbols = filteredSymbols.filter(s => fundMap.get(s)?.status !== 'done');
+    const runRefresh = (symbols: string[]) => { setRefreshOpen(false); loadMany(symbols); };
+
+    const sortableColumns = table.getAllLeafColumns().filter(c => c.getCanSort());
+    const columnLabel = (id: string) => {
+        const h = table.getColumn(id)?.columnDef.header;
+        return typeof h === 'string' ? h : id;
+    };
 
     const exportToExcel = useCallback((scope: 'page' | 'all') => {
         const rows = scope === 'page'
@@ -602,29 +626,66 @@ export function ScreenerTable({
                 </div>
 
                 {/* View tabs — wraps onto a second row instead of overflowing when narrow (mobile) */}
-                <div className="flex flex-wrap items-center rounded-lg p-1 gap-0.5 min-h-9"
-                    style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
-                    {viewTab('all', 'common.all', constituents.length)}
-                    {viewTab('loaded', 'screener.tabLoaded', loadedCount)}
-                    {viewTab('unloaded', 'screener.tabNotLoaded', unloadedCount)}
-                    {viewTab('pinned', 'screener.tabPinned', pinnedSymbols.size)}
-                    {viewTab('alerts', 'screener.tabAlerts', alertsCount)}
-                    {viewTab('notes', 'screener.tabNotes', notesCount)}
-                </div>
+                {!isPinnedPage && (
+                    <div className="flex flex-wrap items-center rounded-lg p-1 gap-0.5 min-h-9"
+                        style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+                        {viewTab('all', 'common.all', constituents.length)}
+                        {viewTab('loaded', 'screener.tabLoaded', loadedCount)}
+                        {viewTab('unloaded', 'screener.tabNotLoaded', unloadedCount)}
+                        {viewTab('pinned', 'screener.tabPinned', pinnedSymbols.size)}
+                        {viewTab('alerts', 'screener.tabAlerts', alertsCount)}
+                        {viewTab('notes', 'screener.tabNotes', notesCount)}
+                    </div>
+                )}
 
                 {/* Actions — pushed to the right */}
                 <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
-                    <button onClick={() => loadMany(pageSymbols)} disabled={pageLoading || pageSymbols.length === 0}
-                        className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                        <MdRefresh size={14} className={pageLoading ? 'animate-spin' : ''} />
-                        <span className="hidden sm:inline">
-                            {progress
-                                ? `${progress.done}/${progress.total}…`
-                                : showAll ? t('screener.refreshAll') : t('screener.refreshPage')}
-                        </span>
-                        {progress && <span className="sm:hidden">{progress.done}/{progress.total}</span>}
-                    </button>
+                    {progress ? (
+                        <button onClick={cancelLoad}
+                            className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all"
+                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                            title={t('screener.stopLoading')}>
+                            <MdRefresh size={14} className="animate-spin" />
+                            <span className="tabular-nums">{progress.done}/{progress.total}</span>
+                            <MdStop size={14} />
+                        </button>
+                    ) : (
+                        <div className="relative">
+                            <button onClick={() => setRefreshOpen(o => !o)} disabled={filteredSymbols.length === 0}
+                                className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}
+                                aria-haspopup="menu" aria-expanded={refreshOpen}>
+                                <MdRefresh size={14} />
+                                <span className="hidden sm:inline">{t('screener.refresh')}</span>
+                                <MdExpandMore size={13} />
+                            </button>
+                            {refreshOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setRefreshOpen(false)} />
+                                    <div role="menu" className="absolute right-0 top-full mt-1 z-20 rounded-lg overflow-hidden shadow-lg"
+                                        style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', minWidth: 200 }}>
+                                        {!isPinnedPage && pageSymbols.length < filteredSymbols.length && (
+                                            <button role="menuitem" onClick={() => runRefresh(pageSymbols)}
+                                                className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
+                                                style={{ color: 'var(--text-primary)' }}>
+                                                {t('screener.refreshPageCount', { count: pageSymbols.length })}
+                                            </button>
+                                        )}
+                                        <button role="menuitem" onClick={() => runRefresh(missingSymbols)} disabled={missingSymbols.length === 0}
+                                            className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all disabled:opacity-40"
+                                            style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
+                                            {t('screener.loadMissing', { count: missingSymbols.length })}
+                                        </button>
+                                        <button role="menuitem" onClick={() => runRefresh(filteredSymbols)}
+                                            className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all"
+                                            style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
+                                            {t('screener.refreshAllFiltered', { count: filteredSymbols.length })}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                     <div className="relative group/export">
                         <button className="h-9 flex items-center gap-1 px-3 rounded-lg text-sm font-medium transition-all"
                             style={{ color: 'var(--text-secondary)', background: 'var(--glass-bg)', border: '1px solid var(--border)' }}
@@ -710,8 +771,8 @@ export function ScreenerTable({
                         <div className="flex flex-col gap-0.5" style={{ padding: '0 1.25rem', borderRight: '1px solid var(--border)' }}>
                             <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.loading')}</p>
                             <span><strong>{t('info.onOpen')}</strong> — {t('info.onOpenBody')}</span>
-                            <span><strong>{t('screener.refreshPage')}</strong> — {t('info.refreshPageBody')}</span>
-                            <span><strong>{t('screener.refreshAll')}</strong> — {t('info.refreshAllBody')}</span>
+                            <span><strong>{t('screener.refresh')}</strong> — {t('info.refreshMenuBody')}</span>
+                            <span><strong>{t('info.stop')}</strong> — {t('info.stopBody')}</span>
                             <span><strong>{t('info.perRowRefresh')}</strong> — {t('info.perRowRefreshBody')}</span>
                             <span><strong>{t('info.cartIcon')}</strong> — {t('info.cartIconBody')}</span>
                             <span><strong>{t('info.loadedTab')}</strong> — {t('info.loadedTabBody')}</span>
@@ -719,6 +780,12 @@ export function ScreenerTable({
                             <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
                                 {t('info.expiry')}
                             </p>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.sorting')}</p>
+                                <span className="block"><strong>{t('info.sortClick')}</strong> — {t('info.sortClickBody')}</span>
+                                <span className="block"><strong>{t('info.sortShift')}</strong> — {t('info.sortShiftBody')}</span>
+                                <span className="block"><strong>{t('screener.sortThenBy')}</strong> — {t('info.sortThenByBody')}</span>
+                            </div>
                         </div>
                         {/* Col 4 — Price alerts */}
                         <div className="flex flex-col gap-0.5" style={{ paddingLeft: '1.25rem' }}>
@@ -735,10 +802,60 @@ export function ScreenerTable({
                                 <span><strong>{t('info.noteIcon')}</strong> — {t('info.noteIconBody')}</span>
                                 <span><strong>{t('info.notesTab')}</strong> — {t('info.notesTabBody')}</span>
                             </div>
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('info.pinnedList')}</p>
+                                <span className="block"><strong>{t('info.starIcon')}</strong> — {t('info.starIconBody')}</span>
+                                <span className="block"><strong>{t('info.pinnedPage')}</strong> — {t('info.pinnedPageBody')}</span>
+                                <span className="block"><strong>{t('info.pinnedBackup')}</strong> — {t('info.pinnedBackupBody')}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Sort chain — priority order; Shift-click a header or use "Then by" to add a key */}
+            <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <span>{t('screener.sortedBy')}</span>
+                {sorting.length === 0 && <span>{t('screener.sortNone')}</span>}
+                {sorting.map((s, i) => (
+                    <span key={s.id} className="flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full"
+                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                        {sorting.length > 1 && <span style={{ opacity: 0.7 }}>{i + 1}.</span>}
+                        <button onClick={() => setSorting(prev => prev.map(p => p.id === s.id ? { ...p, desc: !p.desc } : p))}
+                            className="hover:opacity-70" title={t('screener.sortToggleDirection')}>
+                            {columnLabel(s.id)} {s.desc ? '↓' : '↑'}
+                        </button>
+                        <button onClick={() => setSorting(prev => prev.filter(p => p.id !== s.id))}
+                            className="hover:opacity-70 leading-none" style={{ opacity: 0.7 }}
+                            aria-label={t('screener.sortRemove', { column: columnLabel(s.id) })}>
+                            <MdClose size={11} />
+                        </button>
+                    </span>
+                ))}
+                {sortableColumns.some(c => !sorting.some(s => s.id === c.id)) && (
+                    <label className="relative flex items-center gap-0.5 px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80"
+                        style={{ border: '1px dashed var(--border-strong)', color: 'var(--text-secondary)' }}>
+                        <MdAdd size={12} />
+                        {sorting.length === 0 ? t('screener.sortAdd') : t('screener.sortThenBy')}
+                        <select value="" aria-label={t('screener.sortThenBy')}
+                            onChange={e => {
+                                const id = e.target.value;
+                                if (id) setSorting(prev => [...prev.filter(p => p.id !== id), { id, desc: false }]);
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer">
+                            <option value="" />
+                            {sortableColumns.filter(c => !sorting.some(s => s.id === c.id)).map(c => (
+                                <option key={c.id} value={c.id}>{columnLabel(c.id)}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
+                {sorting.length > 1 && (
+                    <button onClick={() => setSorting(prev => prev.slice(0, 1))} className="hover:opacity-70 underline">
+                        {t('screener.sortClearExtra')}
+                    </button>
+                )}
+            </div>
 
             {/* Table */}
             <div className="flex-1 min-h-0 scroll-elastic-xy rounded-xl">
@@ -753,6 +870,7 @@ export function ScreenerTable({
                                         <th key={header.id}
                                             className={`px-2 py-2 sm:py-3 text-left text-xs font-semibold uppercase tracking-widest select-none relative align-top ${canSort ? 'cursor-pointer' : ''}`}
                                             style={{ color: 'var(--text-muted)', width: header.getSize() }}
+                                            title={canSort ? t('screener.sortHint') : undefined}
                                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}>
                                             <span className="inline-flex items-start gap-1" style={{ maxWidth: '100%' }}>
                                                 <span style={{ wordBreak: 'break-word' }}>
@@ -767,6 +885,9 @@ export function ScreenerTable({
                                                             opacity: sorted ? 1 : 0.4,
                                                         }}>
                                                             {sorted === 'asc' ? '↑' : sorted === 'desc' ? '↓' : '⇅'}
+                                                            {sorted && sorting.length > 1 && (
+                                                                <sup style={{ fontSize: 9, marginLeft: 1 }}>{header.column.getSortIndex() + 1}</sup>
+                                                            )}
                                                         </span>
                                                     );
                                                 })()}
@@ -819,7 +940,8 @@ export function ScreenerTable({
                 </table>
                 {totalCount === 0 && (
                     <div className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        {view === 'loaded' ? t('screener.emptyLoaded') :
+                        {isPinnedPage ? t('screener.emptyPinned') :
+                        view === 'loaded' ? t('screener.emptyLoaded') :
                             view === 'unloaded' ? t('screener.emptyUnloaded') :
                             view === 'pinned' ? t('screener.emptyPinned') :
                             view === 'alerts' ? t('screener.emptyAlerts') :
@@ -832,14 +954,15 @@ export function ScreenerTable({
             {/* Footer */}
             <div className="flex items-center justify-between gap-3 flex-shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <span>
-                    {view === 'all' && !showAll && t('screener.pageOf', { page: curPageIndex + 1, total: pageCount })}
-                    {view === 'all' && showAll && t('screener.countNames', { count: totalCount.toLocaleString(locale) })}
+                    {isPinnedPage && t('screener.countPinned', { count: totalCount.toLocaleString(locale) })}
+                    {!isPinnedPage && view === 'all' && !showAll && t('screener.pageOf', { page: curPageIndex + 1, total: pageCount })}
+                    {!isPinnedPage && view === 'all' && showAll && t('screener.countNames', { count: totalCount.toLocaleString(locale) })}
                     {view === 'loaded' && t('screener.countWithData', { count: totalCount.toLocaleString(locale) })}
                     {view === 'unloaded' && t('screener.countWithoutData', { count: totalCount.toLocaleString(locale) })}
                     {view === 'pinned' && t('screener.countPinned', { count: totalCount.toLocaleString(locale) })}
                     {view === 'alerts' && t('screener.countWithAlerts', { count: totalCount.toLocaleString(locale) })}
                     {view === 'notes' && t('screener.countWithNotes', { count: totalCount.toLocaleString(locale) })}
-                    {loadedCount > 0 && view === 'all' && (
+                    {loadedCount > 0 && view === 'all' && !isPinnedPage && (
                         <span style={{ color: 'var(--pnl-green)', marginLeft: 8 }}>
                             · {t('screener.countLoaded', { count: loadedCount.toLocaleString(locale) })}
                         </span>
@@ -847,7 +970,7 @@ export function ScreenerTable({
                 </span>
                 <div className="flex items-center gap-2">
                     {/* Show all / Paginate toggle — only for All view */}
-                    {view === 'all' && (
+                    {view === 'all' && !isPinnedPage && (
                         <button
                             onClick={() => startTransition(() => { setShowAll(o => !o); })}
                             className="px-2.5 py-1.5 rounded-lg transition-all"
@@ -857,7 +980,7 @@ export function ScreenerTable({
                         </button>
                     )}
                     {/* Prev / Next — only when paginated */}
-                    {view === 'all' && !showAll && pageCount > 1 && (
+                    {view === 'all' && !isPinnedPage && !showAll && pageCount > 1 && (
                         <>
                             <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
                                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40"

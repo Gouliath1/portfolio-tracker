@@ -276,3 +276,28 @@ describe('loadMany', () => {
         await waitFor(() => expect(result.current.map.get('BADTICKER.T')?.status).toBe('error'));
     });
 });
+
+// ── 7. cancelLoad ─────────────────────────────────────────────────────────
+
+describe('cancelLoad', () => {
+    it('stops a bulk load and reverts unfetched symbols to their previous entry', async () => {
+        localStorage.setItem(LS_KEY, JSON.stringify([['KEEP.T', DONE_ENTRY]]));
+        // Never resolves — the first 3 fetches stay in flight.
+        mockFetch.mockImplementation(() => new Promise(() => {}));
+
+        const { result } = renderHook(() => useScreenerFundamentals());
+        const symbols = ['A.T', 'B.T', 'C.T', 'KEEP.T', 'NEW.T'];
+
+        act(() => { result.current.loadMany(symbols); });
+        expect(result.current.progress).toEqual({ done: 0, total: 5 });
+        expect(result.current.map.get('KEEP.T')?.status).toBe('loading');
+
+        act(() => { result.current.cancelLoad(); });
+
+        expect(result.current.progress).toBeNull();
+        expect(result.current.map.get('KEEP.T')).toMatchObject({ status: 'done' });
+        expect(result.current.map.has('NEW.T')).toBe(false);
+        // Only the first worker batch was ever requested.
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+});

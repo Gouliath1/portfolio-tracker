@@ -11,6 +11,7 @@ import {
     exportSetTransactions,
     PositionSetLocal,
 } from '../../utils/localPositions';
+import { buildScreenerBackup, readScreenerState } from '../../utils/screenerState';
 import { readTaxSettingsForBackup } from '../../utils/taxSettingsBackup';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -87,12 +88,16 @@ const PositionSetManager: React.FC<PositionSetManagerProps> = ({ onPositionSetCh
             // Tax setup lives outside the transaction list — bundled in here (under
             // a key the importer already tolerates) so exporting stays a full backup.
             const taxSettings = readTaxSettingsForBackup();
-            const payload = taxSettings ? { transactions, taxSettings } : transactions;
+            // Screener data (pins, custom tickers, notes, alerts) travels the same way.
+            const screener = buildScreenerBackup(readScreenerState());
+            const payload = taxSettings || screener
+                ? { transactions, ...(taxSettings && { taxSettings }), ...(screener && { screener }) }
+                : transactions;
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${name}-portfolio.json`;
+            a.download = `${name}-workspace.json`;
             document.body.appendChild(a);
             a.click();
             URL.revokeObjectURL(url);

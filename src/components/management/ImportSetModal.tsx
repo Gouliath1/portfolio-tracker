@@ -5,6 +5,7 @@ import { MdClose, MdDownload, MdRefresh, MdUpload, MdInsertDriveFile } from 'rea
 import { importPositionSet } from '../../utils/localPositions';
 import { applyTaxSettingsFromBackup, type TaxSettingsBackup } from '../../utils/taxSettingsBackup';
 import { TAX_RESIDENCE_STORAGE_KEY } from '../../hooks/useTaxResidence';
+import { mergeScreenerBackup, mergeWatchlist, parseWatchlistBackup, readScreenerState, writeScreenerState, type WatchlistItem } from '../../utils/screenerState';
 import { Transaction } from '@portfolio/types';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
@@ -60,6 +61,9 @@ interface PendingTaxOverwrite {
     description: string;
     records: unknown[];
     taxSettings?: TaxSettingsBackup;
+    screener?: unknown;
+    /** Older exports carried only the pinned list, under this key. */
+    watchlist?: WatchlistItem[] | null;
 }
 
 export default function ImportSetModal({ onImported, onClose }: ImportSetModalProps) {
@@ -118,7 +122,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
     };
 
     // importPositionSet auto-migrates legacy RawPosition[] to Transaction[].
-    const commitImport = (pending: PendingTaxOverwrite) => {
+    const commitImport = async (pending: PendingTaxOverwrite) => {
         const { idName, displayName, description, records, taxSettings } = pending;
         importPositionSet(
             idName,
@@ -128,6 +132,15 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
             records as any,
             fields.set_as_active,
         );
+
+        // Screener data is merged (never replaces existing pins/notes); the
+        // screener pages read localStorage on mount, so no reload is needed.
+        if (pending.screener) {
+            writeScreenerState(mergeScreenerBackup(readScreenerState(), pending.screener));
+        } else if (pending.watchlist) {
+            const { ALL_INDEX_CONSTITUENTS } = await import('../../data/indices/registry');
+            writeScreenerState(mergeWatchlist(readScreenerState(), pending.watchlist, ALL_INDEX_CONSTITUENTS));
+        }
 
         // Tax setup travels in the same file, under a key the shape check
         // above already ignores. Applying it writes straight to localStorage;
@@ -169,6 +182,8 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 description: t('import.setDescription', { file: stagedFile.name }),
                 records,
                 taxSettings,
+                screener: jsonData.screener,
+                watchlist: jsonData.watchlist ? parseWatchlistBackup(jsonData.watchlist) : null,
             };
 
             // A residence value already set is the taxpayer's identity, not
@@ -184,7 +199,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
                 return;
             }
 
-            commitImport(pending);
+            await commitImport(pending);
         } catch (err) {
             setError({
                 key: 'import.errFailed',
@@ -198,7 +213,7 @@ export default function ImportSetModal({ onImported, onClose }: ImportSetModalPr
     const confirmTaxOverwrite = () => {
         if (!pendingTaxOverwrite) return;
         setImporting(true);
-        commitImport(pendingTaxOverwrite);
+        void commitImport(pendingTaxOverwrite);
     };
 
     const inputClass = 'w-full px-3 py-2 rounded-lg text-sm glass outline-none focus:ring-1';

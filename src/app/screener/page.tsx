@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { MdClose, MdExpandMore } from 'react-icons/md';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { MdClose, MdExpandMore, MdStar, MdChevronRight } from 'react-icons/md';
 import { AppSidebar } from '../../components/layout/AppSidebar';
 import { SettingsPanel } from '../../components/layout/SettingsPanel';
 import { ScreenerTable } from '../../components/screener/ScreenerTable';
@@ -16,41 +17,10 @@ import { useTaxFeatureEnabled } from '../../hooks/useTaxFeatureEnabled';
 import { MobileBottomNav } from '../../components/layout/MobileBottomNav';
 import AddPositionModal from '../../components/management/AddPositionModal';
 import { getActiveSetId } from '../../utils/localPositions';
-import topix from '../../data/indices/topix.json';
-import type { IndexConstituent, IndexConstituentsFile, PriceAlert } from '../../types/screener';
+import { INDICES } from '../../data/indices/registry';
+import { useScreenerState } from '../../hooks/useScreenerState';
+import type { IndexConstituent, PriceAlert } from '../../types/screener';
 import { useTranslation } from '../../i18n';
-
-const INDICES: Record<string, IndexConstituentsFile> = {
-    topix: topix as IndexConstituentsFile,
-};
-
-const STORAGE_KEY = 'screener:state';
-
-interface ScreenerState {
-    index: string;
-    indexLoaded: boolean;
-    added: IndexConstituent[];
-    pinned: string[];
-    alerts: Record<string, PriceAlert>;
-    notes: Record<string, string>;
-}
-
-function migrateAlert(raw: unknown): PriceAlert | null {
-    if (!raw || typeof raw !== 'object') return null;
-    const a = raw as Record<string, unknown>;
-    // New format
-    if ('targetAbove' in a || 'targetBelow' in a) {
-        const result: PriceAlert = {};
-        if (typeof a.targetAbove === 'number') result.targetAbove = a.targetAbove;
-        if (typeof a.targetBelow === 'number') result.targetBelow = a.targetBelow;
-        return Object.keys(result).length > 0 ? result : null;
-    }
-    // Old format: { target: number, direction: 'above' | 'below' }
-    if (typeof a.target === 'number') {
-        return a.direction === 'below' ? { targetBelow: a.target } : { targetAbove: a.target };
-    }
-    return null;
-}
 
 function OverflowPill({ added, onRemove }: { added: IndexConstituent[]; onRemove: (s: string) => void }) {
     const { t } = useTranslation();
@@ -104,53 +74,16 @@ export default function ScreenerPage() {
     const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
 
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [indexKey, setIndexKey] = useState('topix');
-    const [indexLoaded, setIndexLoaded] = useState(true);
-    const [added, setAdded] = useState<IndexConstituent[]>([]);
-    const [pinned, setPinned] = useState<string[]>([]);
-    const [alerts, setAlerts] = useState<Record<string, PriceAlert>>({});
-    const [notes, setNotes] = useState<Record<string, string>>({});
-    const [loaded, setLoaded] = useState(false);
+    const router = useRouter();
+    const screener = useScreenerState();
+    const { indexLoaded, added, pinned, alerts, notes } = screener;
+    const indexKey = INDICES[screener.index] ? screener.index : 'topix';
 
     const [alertTarget, setAlertTarget] = useState<IndexConstituent | null>(null);
     const [noteTarget, setNoteTarget] = useState<IndexConstituent | null>(null);
     const [chartTarget, setChartTarget] = useState<IndexConstituent | null>(null);
     const [chartCurrency, setChartCurrency] = useState<string | null>(null);
     const [buyTarget, setBuyTarget] = useState<IndexConstituent | null>(null);
-
-    useEffect(() => {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw) as Partial<ScreenerState>;
-                if (parsed.index && INDICES[parsed.index]) setIndexKey(parsed.index);
-                if (typeof parsed.indexLoaded === 'boolean') setIndexLoaded(parsed.indexLoaded);
-                if (Array.isArray(parsed.added)) setAdded(parsed.added);
-                if (Array.isArray(parsed.pinned)) setPinned(parsed.pinned);
-                if (parsed.alerts && typeof parsed.alerts === 'object') {
-                    const migrated: Record<string, PriceAlert> = {};
-                    for (const [sym, raw] of Object.entries(parsed.alerts)) {
-                        const alert = migrateAlert(raw);
-                        if (alert) migrated[sym] = alert;
-                    }
-                    setAlerts(migrated);
-                }
-                if (parsed.notes && typeof parsed.notes === 'object') {
-                    const cleaned: Record<string, string> = {};
-                    for (const [sym, note] of Object.entries(parsed.notes)) {
-                        if (typeof note === 'string' && note.trim()) cleaned[sym] = note;
-                    }
-                    setNotes(cleaned);
-                }
-            }
-        } catch { /* ignore corrupt state */ }
-        setLoaded(true);
-    }, []);
-
-    useEffect(() => {
-        if (!loaded) return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ index: indexKey, indexLoaded, added, pinned, alerts, notes }));
-    }, [loaded, indexKey, indexLoaded, added, pinned, alerts, notes]);
 
     const file = INDICES[indexKey];
     const pinnedSet = useMemo(() => new Set(pinned), [pinned]);
@@ -163,22 +96,10 @@ export default function ScreenerPage() {
         return { allRows: merged, addedSymbols: addedSet };
     }, [added, file, indexLoaded]);
 
-    const handleAdd = useCallback((c: IndexConstituent) => {
-        setAdded(prev => (prev.some(p => p.symbol === c.symbol) ? prev : [c, ...prev]));
-    }, []);
-    const handleRemove = useCallback((symbol: string) => {
-        setAdded(prev => prev.filter(p => p.symbol !== symbol));
-    }, []);
-    const handleTogglePin = useCallback((symbol: string) => {
-        setPinned(prev => (prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]));
-    }, []);
-    const handleAddMany = useCallback((cs: IndexConstituent[]) => {
-        setAdded(prev => {
-            const have = new Set(prev.map(p => p.symbol));
-            const fresh = cs.filter(c => !have.has(c.symbol));
-            return fresh.length ? [...fresh, ...prev] : prev;
-        });
-    }, []);
+    const handleAdd = screener.addTicker;
+    const handleRemove = screener.removeTicker;
+    const handleTogglePin = screener.togglePin;
+    const handleAddMany = screener.addMany;
     useAlertPoller(alerts);
 
     const handleEditAlert = useCallback((c: IndexConstituent) => setAlertTarget(c), []);
@@ -191,7 +112,7 @@ export default function ScreenerPage() {
 
     const saveAlert = (alert: PriceAlert) => {
         if (!alertTarget) return;
-        setAlerts(prev => ({ ...prev, [alertTarget.symbol]: alert }));
+        screener.setAlert(alertTarget.symbol, alert);
         setAlertTarget(null);
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             void Notification.requestPermission();
@@ -199,18 +120,18 @@ export default function ScreenerPage() {
     };
     const clearAlert = () => {
         if (!alertTarget) return;
-        setAlerts(prev => { const next = { ...prev }; delete next[alertTarget.symbol]; return next; });
+        screener.setAlert(alertTarget.symbol, null);
         setAlertTarget(null);
     };
 
     const saveNote = (note: string) => {
         if (!noteTarget) return;
-        setNotes(prev => ({ ...prev, [noteTarget.symbol]: note }));
+        screener.setNote(noteTarget.symbol, note);
         setNoteTarget(null);
     };
     const clearNote = () => {
         if (!noteTarget) return;
-        setNotes(prev => { const next = { ...prev }; delete next[noteTarget.symbol]; return next; });
+        screener.setNote(noteTarget.symbol, null);
         setNoteTarget(null);
     };
 
@@ -236,6 +157,15 @@ export default function ScreenerPage() {
                                     {file.asOf ? ` · ${t('screenerPage.listSnapshot', { date: file.asOf })}` : ''}
                                 </span>
                             )}
+                            <button
+                                onClick={() => router.push('/screener/pinned')}
+                                className="ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:opacity-80"
+                                style={{ color: 'var(--text-secondary)', background: 'var(--glass-bg)', border: '1px solid var(--border)' }}
+                            >
+                                <MdStar size={13} style={{ color: 'var(--accent)' }} />
+                                {t('pinnedPage.open', { count: pinned.length })}
+                                <MdChevronRight size={14} />
+                            </button>
                         </div>
 
                         {/* Universe strip */}
@@ -248,7 +178,7 @@ export default function ScreenerPage() {
                                 >
                                     {file.index} · {file.count.toLocaleString(locale)}
                                     <button
-                                        onClick={() => setIndexLoaded(false)}
+                                        onClick={() => screener.setIndexLoaded(false)}
                                         className="hover:opacity-70 leading-none"
                                         style={{ color: 'var(--accent)', opacity: 0.6 }}
                                         title={t('screenerPage.removeUniverse', { index: file.index })}
@@ -281,7 +211,7 @@ export default function ScreenerPage() {
                                 <AddMenu
                                     indices={INDICES}
                                     currentIndexKey={indexLoaded ? indexKey : null}
-                                    onLoadIndex={key => { setIndexKey(key); setIndexLoaded(true); }}
+                                    onLoadIndex={key => screener.setIndex(key, true)}
                                     onAddTicker={handleAdd}
                                     onAddMany={handleAddMany}
                                 />
