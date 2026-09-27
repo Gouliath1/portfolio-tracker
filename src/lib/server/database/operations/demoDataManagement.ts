@@ -229,7 +229,7 @@ export const initializeDemoPositions = async (): Promise<void> => {
     // Create the demo position set
     const positionSetId = await createPositionSet({
       name: 'demo',
-      display_name: 'Demo Portfolio',
+      display_name: 'Demo Workspace',
       description: 'Sample portfolio data for demonstration purposes',
       info_type: 'warning',
       is_active: true

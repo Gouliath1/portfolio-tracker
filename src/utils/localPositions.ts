@@ -258,11 +258,11 @@ function touchSet(id: string): void {
  * Not translated: once written it is stored user data, so the UI that
  * announces the promotion quotes this exact name in every language.
  */
-export const MY_PORTFOLIO_NAME = 'My Portfolio';
+export const MY_PORTFOLIO_NAME = 'My Workspace';
 
 /**
  * Append a transaction to a set. If acting on the demo set, promotes it to
- * a real "My Portfolio" set first. Returns the id of the set written to.
+ * a real "My Workspace" set first. Returns the id of the set written to.
  */
 export function addTransactionToSet(setId: string, tx: Transaction): string {
     if (setId !== DEMO_SET_ID) {
