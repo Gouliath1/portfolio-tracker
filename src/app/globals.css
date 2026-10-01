@@ -23,6 +23,11 @@
   --pnl-red:          oklch(47% 0.16 16);
   --pnl-red-dim:      oklch(47% 0.16 16 / 0.11);
 
+  /* Blocked / degraded — a state that is neither healthy nor a loss. */
+  --warn:             oklch(60% 0.14 70);
+  --warn-dim:         oklch(60% 0.14 70 / 0.12);
+  --warn-glow:        oklch(60% 0.14 70 / 0.40);
+
   --text-primary:     oklch(16% 0.010 275);
   --text-secondary:   oklch(40% 0.010 275);
   --text-muted:       oklch(56% 0.008 275);
@@ -70,6 +75,10 @@
   --pnl-green-dim:    oklch(63% 0.14 158 / 0.11);
   --pnl-red:          oklch(64% 0.16 16);
   --pnl-red-dim:      oklch(64% 0.16 16 / 0.16);
+
+  --warn:             oklch(76% 0.14 75);
+  --warn-dim:         oklch(76% 0.14 75 / 0.14);
+  --warn-glow:        oklch(76% 0.14 75 / 0.40);
 
   --text-primary:     oklch(94% 0.006 275);
   --text-secondary:   oklch(65% 0.008 275);
