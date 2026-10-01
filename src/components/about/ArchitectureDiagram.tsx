@@ -224,9 +224,9 @@ function Legend() {
 
 /** Widths are set per node so a card is as wide as it needs to be, no wider. */
 const SPINE = 'w-full max-w-[20rem]';
-const STORE = 'w-full sm:w-[13.5rem]';
-const PROVIDER = 'w-full sm:w-[12rem]';
-const CLIENT = 'w-full sm:w-[13.5rem]';
+const STORE = 'w-full';
+const PROVIDER = 'w-full';
+const CLIENT = 'w-full';
 
 export function ArchitectureDiagram() {
     const { t, locale } = useTranslation();
@@ -325,7 +325,7 @@ export function ArchitectureDiagram() {
                             is where the portfolio lives; an assistant is a second
                             client reading a snapshot, not a stage after prices. */}
                         <Group labelKey="about.groupClients">
-                            <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full items-stretch">
                                 <Node className={CLIENT} node={{
                                     icon: MdLaptopMac,
                                     titleKey: 'about.layerBrowser',
@@ -355,11 +355,11 @@ export function ArchitectureDiagram() {
 
                         {/* One arrow per client, kept under its own card so each
                             says what that client sends and whether it is sending. */}
-                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                            <div className={`${CLIENT} flex justify-center`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                            <div className="flex justify-center">
                                 <Flow labelKey="about.flowToServer" />
                             </div>
-                            <div className={`${CLIENT} flex justify-center`}>
+                            <div className="flex justify-center">
                                 <Flow labelKey="about.flowMcp" live={!!browser?.aiConnected} />
                             </div>
                         </div>
@@ -385,7 +385,7 @@ export function ArchitectureDiagram() {
                             live depends only on whether the machine running the
                             app has a disk it may write to. */}
                         <Group labelKey="about.groupDatabase" detail={t('about.subStores')}>
-                            <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full items-stretch">
                                 <Node className={STORE} node={{
                                     icon: MdStorage,
                                     titleKey: 'about.boxSqliteFiles',
@@ -416,7 +416,7 @@ export function ArchitectureDiagram() {
 
                 <div className="w-full md:w-[13.5rem] md:flex-shrink-0">
                     <Group labelKey="about.groupThirdParty">
-                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                        <div className="grid grid-cols-1 gap-2.5 w-full">
                             <Node className={PROVIDER} node={{
                                 icon: MdShowChart,
                                 titleKey: 'about.boxYahoo',
