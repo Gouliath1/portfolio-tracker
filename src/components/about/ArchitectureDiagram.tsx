@@ -1,47 +1,39 @@
 'use client';
 
 /**
- * The app's architecture, drawn top-to-bottom in the order data travels:
- * browser → server → market data providers.
+ * The app's architecture, as the system that is running right now.
  *
- * The server step has two forms, and the difference is the whole point of the
- * storage design, so both are drawn side by side rather than one being folded
- * away: on a laptop the database is a file on the same disk, and on Vercel the
- * disk is read-only so the database is Turso, a separate service reached over
- * the network. Whichever one is serving this page is lit; the other stays dim.
+ * Read top to bottom: your browser, the server it talks to, the databases that
+ * server keeps, and the providers it falls back to. Every node reports its own
+ * state — carrying traffic, idle in this environment, or blocked — so the
+ * drawing cannot quietly claim a piece works when it does not. The state comes
+ * from /api/architecture and from localStorage, on mount.
  *
- * It draws the running system, not a picture of one — states resolve on mount
- * from localStorage and /api/architecture. Built from layout elements rather
- * than an SVG because the labels are translated, and text that wraps is the
- * only version that survives French.
+ * Laid out with elements rather than an SVG: the labels are translated, and a
+ * French string runs half again as long as its English original, so text that
+ * wraps is the only version that survives. It also inherits the theme tokens,
+ * which keeps one drawing correct in light and dark.
  */
 
 import { useEffect, useState } from 'react';
-import { MdArrowDownward } from 'react-icons/md';
+import {
+    MdArrowDownward, MdLaptopMac, MdDns, MdStorage, MdCloudQueue,
+    MdShowChart, MdInsights, MdListAlt, MdSmartToy,
+} from 'react-icons/md';
+import type { IconType } from 'react-icons';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import { getActiveSetId, getActivePositions } from '../../utils/localPositions';
 import { readToken } from '../../utils/aiConnection';
 
-/** Lit, dimmed, or not yet known. */
-type State = 'live' | 'off' | 'unknown';
-
-interface Box {
-    key: string;
-    titleKey: TranslationKey;
-    state: State;
-    /** One short line — a count, a mode, a reason. Never a sentence. */
-    detail?: string;
-    /** Where it physically sits: a file path, a host, a service name. */
-    location?: string;
-    /**
-     * Labelled rows, for the two database boxes. They hold the same kinds of
-     * fact — tech, job, placement, current state — so they are described with
-     * the same fields in the same order, and a reader can compare them line
-     * for line instead of re-reading two differently-shaped blurbs.
-     */
-    fields?: { labelKey: TranslationKey; value: string; mono?: boolean }[];
-}
+/**
+ * What a node is doing, which is also what colours it.
+ *  - `live`    — carrying traffic right now
+ *  - `idle`    — real, but unused in this environment (the other database)
+ *  - `blocked` — meant to be working and is not
+ *  - `unknown` — the status probe has not answered yet
+ */
+type State = 'live' | 'idle' | 'blocked' | 'unknown';
 
 type Storage = 'turso' | 'sqlite' | 'unavailable';
 
@@ -50,190 +42,166 @@ interface ServerStatus {
     host: 'local' | 'vercel';
     region: string | null;
     cache: { kind: Storage; location: string | null; rows: number | null; reason: string | null };
-    shares: { available: boolean; kind: Storage; location: string | null };
+    shares: { available: boolean; kind: Storage; location: string | null; reason: string | null };
     providers: { yahoo: boolean; jquants: boolean };
 }
 
-function StatusBox({ box }: { box: Box }) {
+const palette: Record<State, { border: string; background: string; dot: string; title: string }> = {
+    live:    { border: 'var(--accent-glow)', background: 'var(--surface)',    dot: 'var(--accent)',     title: 'var(--text-primary)' },
+    idle:    { border: 'var(--border)',      background: 'transparent',       dot: 'var(--text-muted)', title: 'var(--text-secondary)' },
+    blocked: { border: 'var(--warn-glow)',   background: 'var(--warn-dim)',   dot: 'var(--warn)',       title: 'var(--text-primary)' },
+    unknown: { border: 'var(--border)',      background: 'transparent',       dot: 'var(--text-muted)', title: 'var(--text-secondary)' },
+};
+
+/** A labelled fact inside a node — the same labels in the same order across peers. */
+interface Field {
+    labelKey: TranslationKey;
+    value: string;
+    mono?: boolean;
+}
+
+interface NodeSpec {
+    key: string;
+    icon: IconType;
+    titleKey: TranslationKey;
+    /** One line under the title, saying what it does. */
+    subtitleKey?: TranslationKey;
+    /** Who runs it — the corner tag. Not translated: these are proper names. */
+    tag?: string;
+    state: State;
+    /** Free lines, for nodes that need no field labels. */
+    lines?: string[];
+    /** Labelled rows, for nodes that are meant to be compared with a peer. */
+    fields?: Field[];
+}
+
+function Node({ node }: { node: NodeSpec }) {
     const { t } = useTranslation();
-    const live = box.state === 'live';
+    const tone = palette[node.state];
+    const Icon = node.icon;
 
     return (
         <div
-            className="rounded-xl px-3 py-2.5"
+            className="rounded-2xl px-3.5 py-3 h-full"
             style={{
-                border: `1px solid ${live ? 'var(--accent-glow)' : 'var(--border)'}`,
-                background: live ? 'var(--surface)' : 'transparent',
-                opacity: box.state === 'off' ? 0.55 : 1,
+                border: `1.5px solid ${tone.border}`,
+                background: tone.background,
+                opacity: node.state === 'idle' ? 0.7 : 1,
             }}
         >
-            <div className="flex items-center gap-2">
-                <span
-                    className="flex-shrink-0 rounded-full"
-                    style={{ width: 6, height: 6, background: live ? 'var(--pnl-green)' : 'var(--text-muted)' }}
-                    aria-hidden="true"
-                />
-                <p className="text-[13px] font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>
-                    {t(box.titleKey)}
-                </p>
+            <div className="flex items-start gap-2.5">
+                <Icon size={18} style={{ color: tone.dot }} className="flex-shrink-0 mt-px" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-[13px] font-semibold leading-tight" style={{ color: tone.title }}>
+                            {t(node.titleKey)}
+                        </p>
+                        {node.tag && (
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] flex-shrink-0"
+                                style={{ color: 'var(--text-muted)' }}>
+                                {node.tag}
+                            </span>
+                        )}
+                    </div>
+                    {node.subtitleKey && (
+                        <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--text-secondary)' }}>
+                            {t(node.subtitleKey)}
+                        </p>
+                    )}
+                </div>
             </div>
-            {box.fields && (
-                <dl className="pl-3.5 mt-1.5 grid gap-x-2 gap-y-1"
+
+            {node.lines && node.lines.length > 0 && (
+                <div className="mt-2 pl-[28px] space-y-0.5">
+                    {node.lines.map(line => (
+                        <p key={line} className="text-[10.5px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+                            {line}
+                        </p>
+                    ))}
+                </div>
+            )}
+
+            {node.fields && (
+                <dl className="mt-2 pl-[28px] grid gap-x-2 gap-y-1"
                     style={{ gridTemplateColumns: 'auto minmax(0, 1fr)' }}>
-                    {box.fields.map(field => (
+                    {node.fields.map(field => (
                         <div key={field.labelKey} className="contents">
-                            <dt className="text-[10px] font-semibold uppercase tracking-wider leading-tight pt-px"
+                            <dt className="text-[9px] font-semibold uppercase tracking-[0.12em] leading-tight pt-px"
                                 style={{ color: 'var(--text-muted)' }}>
                                 {t(field.labelKey)}
                             </dt>
-                            <dd className={`text-[11px] leading-tight break-words m-0 ${field.mono ? 'font-mono text-[10px]' : ''}`}
-                                style={{ color: 'var(--text-secondary)' }}>
+                            <dd className={`m-0 leading-snug break-words ${field.mono ? 'font-mono text-[10px]' : 'text-[10.5px]'}`}
+                                style={{ color: 'var(--text-muted)' }}>
                                 {field.value}
                             </dd>
                         </div>
                     ))}
                 </dl>
             )}
-            {!box.fields && (box.detail || box.location) && (
-                <div className="pl-3.5 mt-1 space-y-0.5">
-                    {box.detail && (
-                        <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>{box.detail}</p>
-                    )}
-                    {box.location && (
-                        <p className="text-[10px] font-mono leading-tight break-all" style={{ color: 'var(--text-muted)' }}>
-                            {box.location}
-                        </p>
-                    )}
-                </div>
-            )}
         </div>
     );
 }
 
-function Layer({
-    labelKey,
-    detail,
-    boxes,
-    highlight = false,
-}: {
-    labelKey: TranslationKey;
-    detail?: string;
-    boxes: Box[];
-    highlight?: boolean;
-}) {
+/** The step between two nodes, labelled with what actually crosses. */
+function Flow({ labelKey, live = true }: { labelKey: TranslationKey; live?: boolean }) {
     const { t } = useTranslation();
+    const color = live ? 'var(--accent)' : 'var(--text-muted)';
     return (
-        <div
-            className="rounded-2xl p-3 sm:p-4"
-            style={{
-                border: `1px solid ${highlight ? 'var(--accent-glow)' : 'var(--border)'}`,
-                background: highlight ? 'var(--accent-dim)' : 'transparent',
-            }}
-        >
-            <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
-                <p className="text-[10px] font-semibold uppercase tracking-widest"
-                    style={{ color: highlight ? 'var(--accent)' : 'var(--text-muted)' }}>
-                    {t(labelKey)}
-                </p>
-                {detail && <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{detail}</p>}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {boxes.map(box => <StatusBox key={box.key} box={box} />)}
-            </div>
-        </div>
-    );
-}
-
-/** The labelled arrow between layers — three or four words, no more. */
-function Connector({ labelKey, emphasis = false }: { labelKey: TranslationKey; emphasis?: boolean }) {
-    const { t } = useTranslation();
-    const color = emphasis ? 'var(--accent)' : 'var(--text-muted)';
-    return (
-        <div className="flex items-center gap-2 py-1.5 pl-4">
-            <MdArrowDownward size={14} style={{ color }} aria-hidden="true" className="flex-shrink-0" />
+        <div className="flex items-center gap-2 py-2 pl-5">
+            <MdArrowDownward size={15} style={{ color }} className="flex-shrink-0" aria-hidden="true" />
             <p className="text-[11px]" style={{ color }}>{t(labelKey)}</p>
         </div>
     );
 }
 
-/**
- * One of the two places the server can run, as a box containing everything
- * that server is made of.
- *
- * Deployed, it is made of two pieces from two companies: Vercel runs the code,
- * Turso holds the database. Both sit inside the "on server" box because both
- * are the server, but each keeps its own sub-box, and the read-only disk
- * belongs to Vercel's — it is Vercel's constraint, not Turso's, and stating it
- * at the outer level would wrongly imply the database is read-only too.
- */
-function Branch({
-    titleKey,
-    host,
-    platformKey,
-    diskKey,
-    active,
-    runtime,
-    callKey,
-    store,
+/** A dashed enclosure — everything inside it is one place or one role. */
+function Group({
+    labelKey,
+    detail,
+    children,
 }: {
-    titleKey: TranslationKey;
-    host: string;
-    /** The company or machine running the code. */
-    platformKey: TranslationKey;
-    /** Whether that platform's disk can be written to. */
-    diskKey: TranslationKey;
-    active: boolean;
-    runtime: Box;
-    callKey: TranslationKey;
-    store: Box;
+    labelKey: TranslationKey;
+    detail?: string;
+    children: React.ReactNode;
 }) {
     const { t } = useTranslation();
-
     return (
-        <div
-            className="rounded-2xl p-3 sm:p-4"
-            style={{
-                border: `1px solid ${active ? 'var(--accent-glow)' : 'var(--border)'}`,
-                background: active ? 'var(--accent-dim)' : 'transparent',
-                opacity: active ? 1 : 0.62,
-            }}
-        >
+        <div className="rounded-2xl p-3 sm:p-4" style={{ border: '1px dashed var(--border-strong)' }}>
             <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
-                <p className="text-[10px] font-semibold uppercase tracking-widest"
-                    style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}>
-                    {t(titleKey)}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                    style={{ color: 'var(--text-muted)' }}>
+                    {t(labelKey)}
                 </p>
-                {host && <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{host}</p>}
-                {active && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded"
-                        style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
-                        {t('about.branchServingThis')}
-                    </span>
-                )}
+                {detail && <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{detail}</p>}
             </div>
+            {children}
+        </div>
+    );
+}
 
-            {/* The platform that runs the code — the read-only disk is its
-                property, so the chip lives here rather than on the outer box. */}
-            <div className="rounded-xl p-2.5" style={{ border: '1px dashed var(--border)' }}>
-                <div className="flex items-baseline gap-2 mb-2 flex-wrap">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest"
-                        style={{ color: 'var(--text-muted)' }}>
-                        {t(platformKey)}
-                    </p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded"
-                        style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                        {t(diskKey)}
-                    </span>
-                </div>
-                <StatusBox box={runtime} />
-            </div>
-
-            <div className="flex items-center gap-2 py-1.5 pl-4">
-                <MdArrowDownward size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" className="flex-shrink-0" />
-                <p className="text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>{t(callKey)}</p>
-            </div>
-
-            <StatusBox box={store} />
+function Legend() {
+    const { t } = useTranslation();
+    const entries: { state: State; labelKey: TranslationKey }[] = [
+        { state: 'live', labelKey: 'about.legendLive' },
+        { state: 'idle', labelKey: 'about.legendIdle' },
+        { state: 'blocked', labelKey: 'about.legendBlocked' },
+    ];
+    return (
+        <div className="flex items-center gap-4 flex-wrap">
+            {entries.map(entry => (
+                <span key={entry.state} className="flex items-center gap-1.5 text-[10.5px]"
+                    style={{ color: 'var(--text-muted)' }}>
+                    <span className="rounded-[3px]"
+                        style={{
+                            width: 10, height: 10,
+                            border: `1.5px solid ${palette[entry.state].border}`,
+                            background: palette[entry.state].background,
+                        }}
+                        aria-hidden="true"
+                    />
+                    {t(entry.labelKey)}
+                </span>
+            ))}
         </div>
     );
 }
@@ -241,17 +209,16 @@ function Branch({
 export function ArchitectureDiagram() {
     const { t, locale } = useTranslation();
     const [server, setServer] = useState<ServerStatus | null>(null);
-    const [browser, setBrowser] = useState<{ positions: number; aiConnected: boolean; host: string } | null>(null);
+    const [browser, setBrowser] = useState<{ positions: number; aiConnected: boolean } | null>(null);
 
     useEffect(() => {
         try {
             setBrowser({
                 positions: getActivePositions().length,
                 aiConnected: !!readToken(getActiveSetId()),
-                host: window.location.host,
             });
         } catch {
-            setBrowser({ positions: 0, aiConnected: false, host: '' });
+            setBrowser({ positions: 0, aiConnected: false });
         }
 
         let cancelled = false;
@@ -262,7 +229,7 @@ export function ArchitectureDiagram() {
                 const data = (await res.json()) as ServerStatus;
                 if (!cancelled) setServer(data);
             } catch {
-                // A failed probe leaves the server boxes unknown, which is the
+                // A failed probe leaves the server nodes unknown, which is the
                 // truthful answer.
             }
         })();
@@ -270,177 +237,162 @@ export function ArchitectureDiagram() {
     }, []);
 
     const n = (value: number) => value.toLocaleString(locale);
-    const serverState = (ok: boolean | undefined): State =>
-        server === null ? 'unknown' : ok ? 'live' : 'off';
-
-    const onLocal = server?.host === 'local';
-    const onVercel = server?.host === 'vercel';
 
     /**
-     * The store the environment is configured to use. When the cache reports
-     * itself unavailable it has no kind of its own, so the share store — which
-     * reads the same credentials — says which one was meant.
+     * The database this environment is configured to use. A cache that failed
+     * to open reports no kind of its own, so the share store — which reads the
+     * same credentials — says which one was meant.
      */
-    const intendedKind: Storage | undefined = server
+    const intended: Storage | undefined = server
         ? (server.cache.kind !== 'unavailable' ? server.cache.kind : server.shares.kind)
         : undefined;
 
-    /** Lit when this environment actually uses it, whichever branch it sits under. */
     const storeState = (kind: Storage): State => {
         if (!server) return 'unknown';
-        return kind === intendedKind || server.shares.kind === kind ? 'live' : 'off';
+        if (kind !== intended) return 'idle';
+        // The configured store failing is the case worth shouting about: it
+        // means every request goes to the provider with nothing kept.
+        return server.cache.kind === 'unavailable' ? 'blocked' : 'live';
     };
 
-    /** What it holds right now, or why it holds nothing. */
     const storeNow = (kind: Storage): string => {
         if (!server) return '—';
-        const parts: string[] = [];
-        if (kind === intendedKind) {
-            parts.push(server.cache.kind === 'unavailable'
-                ? t('about.detailCacheDown')
-                : t('about.detailRows', { rows: n(server.cache.rows ?? 0) }));
-        }
-        if (server.shares.kind === kind) parts.push(t('about.detailHoldsSnapshots'));
-        return parts.length ? parts.join(' · ') : t('about.nowUnused');
+        if (kind !== intended) return t('about.nowUnused');
+        if (server.cache.kind === 'unavailable') return t('about.nowWritesBlocked');
+        const parts = [t('about.detailRows', { rows: n(server.cache.rows ?? 0) })];
+        if (server.shares.available) parts.push(t('about.detailHoldsSnapshots'));
+        return parts.join(' · ');
     };
 
-    /** Both databases answer the same four questions, in the same order. */
-    const storeFields = (kind: Storage, techKey: TranslationKey, whereKey: TranslationKey, address: string) => [
-        { labelKey: 'about.fieldTech' as TranslationKey, value: t(techKey) },
-        { labelKey: 'about.fieldDoes' as TranslationKey, value: t('about.storeDoes') },
-        { labelKey: 'about.fieldWhere' as TranslationKey, value: t(whereKey) },
-        { labelKey: 'about.fieldAddress' as TranslationKey, value: address, mono: true },
-        { labelKey: 'about.fieldNow' as TranslationKey, value: storeNow(kind) },
+    /** Both databases answer the same questions in the same order, so they compare. */
+    const storeFields = (kind: Storage, techKey: TranslationKey, whereKey: TranslationKey, address: string): Field[] => [
+        { labelKey: 'about.fieldTech', value: t(techKey) },
+        { labelKey: 'about.fieldWhere', value: t(whereKey) },
+        { labelKey: 'about.fieldAddress', value: address, mono: true },
+        { labelKey: 'about.fieldNow', value: storeNow(kind) },
     ];
 
-    const browserBoxes: Box[] = [
-        { key: 'pages', titleKey: 'about.boxPages', state: 'live' },
-        { key: 'engine', titleKey: 'about.boxEngine', state: 'live' },
+    const serverDetail = server
+        ? [t(server.host === 'vercel' ? 'about.hostVercel' : 'about.hostLocal'), server.region]
+            .filter(Boolean).join(' · ')
+        : undefined;
+
+    const providerState = (ok: boolean | undefined): State =>
+        server === null ? 'unknown' : ok ? 'live' : 'idle';
+
+    const providers: NodeSpec[] = [
         {
-            key: 'storage',
-            titleKey: 'about.boxStorage',
-            state: 'live',
-            detail: browser
-                ? t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) })
-                : undefined,
+            key: 'yahoo', icon: MdShowChart, titleKey: 'about.boxYahoo', tag: 'YAHOO',
+            subtitleKey: 'about.subYahoo', state: providerState(server?.providers.yahoo),
         },
-    ];
-
-    const providerBoxes: Box[] = [
-        { key: 'yahoo', titleKey: 'about.boxYahoo', state: serverState(server?.providers.yahoo) },
         {
-            key: 'jquants',
-            titleKey: 'about.boxJquants',
-            state: serverState(server?.providers.jquants),
-            detail: server && !server.providers.jquants ? t('about.detailNoKey') : undefined,
+            key: 'jquants', icon: MdInsights, titleKey: 'about.boxJquants', tag: 'JPX',
+            subtitleKey: 'about.subJquants', state: providerState(server?.providers.jquants),
+            lines: server && !server.providers.jquants ? [t('about.detailNoKey')] : undefined,
         },
-        { key: 'topix', titleKey: 'about.boxTopix', state: 'live', detail: t('about.detailStatic') },
-    ];
-
-    const aiBoxes: Box[] = [
         {
-            key: 'mcp',
-            titleKey: 'about.boxMcp',
-            state: browser?.aiConnected ? 'live' : 'off',
-            detail: browser ? t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') : undefined,
+            key: 'topix', icon: MdListAlt, titleKey: 'about.boxTopix', tag: 'BLACKROCK',
+            subtitleKey: 'about.subTopix', state: 'live', lines: [t('about.detailStatic')],
         },
     ];
 
     return (
         <figure className="m-0">
-            <Layer
-                labelKey="about.layerBrowser"
-                detail={browser?.host || undefined}
-                boxes={browserBoxes}
-                highlight
-            />
-            <Connector labelKey="about.flowToServer" emphasis />
+            <div className="mb-4"><Legend /></div>
 
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2 pl-1"
-                style={{ color: 'var(--text-muted)' }}>
-                {t('about.branchesLabel')}
-            </p>
+            {/* 1 — the browser, which is where the portfolio actually lives */}
+            <Node node={{
+                key: 'browser',
+                icon: MdLaptopMac,
+                titleKey: 'about.layerBrowser',
+                subtitleKey: 'about.subBrowser',
+                tag: 'YOU',
+                state: 'live',
+                lines: browser
+                    ? [
+                        t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }),
+                        t('about.detailBrowserMath'),
+                    ]
+                    : undefined,
+            }} />
 
-            {/* Same code, two places it can run — and the databases differ only
-                because one of those places has no writable disk. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
-                <Branch
-                    titleKey="about.branchLocal"
-                    host="localhost:3000"
-                    platformKey="about.platformNode"
-                    diskKey="about.diskWritable"
-                    active={!!onLocal}
-                    runtime={{
-                        key: 'local-runtime',
-                        titleKey: 'about.boxRuntime',
-                        state: onLocal ? 'live' : 'off',
-                        detail: t('about.detailRoutes'),
-                    }}
-                    callKey="about.callFile"
-                    store={{
-                        key: 'local-store',
-                        titleKey: 'about.boxSqliteFiles',
-                        state: storeState('sqlite'),
-                        fields: storeFields(
-                            'sqlite',
-                            'about.techSqliteFile',
-                            'about.whereSameMachine',
-                            './data/marketCache.db · ./data/shares.db',
-                        ),
-                    }}
-                />
-                <Branch
-                    titleKey="about.branchServer"
-                    host={server?.region ?? ''}
-                    platformKey="about.platformVercel"
-                    diskKey="about.diskReadOnly"
-                    active={!!onVercel}
-                    runtime={{
-                        key: 'vercel-runtime',
-                        titleKey: 'about.boxRuntime',
-                        state: onVercel ? 'live' : 'off',
-                        detail: t('about.detailRoutes'),
-                    }}
-                    callKey="about.callHttps"
-                    store={{
-                        key: 'turso',
-                        titleKey: 'about.boxTursoService',
-                        state: storeState('turso'),
-                        fields: storeFields(
-                            'turso',
-                            'about.techSqliteHosted',
-                            'about.whereTurso',
-                            'libsql://….turso.io',
-                        ),
-                    }}
-                />
-            </div>
+            <Flow labelKey="about.flowToServer" />
 
-            <p className="text-[11px] mt-2.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                {t('about.branchesNote')}
-            </p>
+            {/* 2 — the server and the database it keeps, in one enclosure */}
+            <Group labelKey="about.groupServer" detail={serverDetail}>
+                <Node node={{
+                    key: 'app',
+                    icon: MdDns,
+                    titleKey: 'about.boxRuntime',
+                    subtitleKey: 'about.detailRoutes',
+                    tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
+                    state: server ? 'live' : 'unknown',
+                }} />
 
-            <Connector labelKey="about.flowToProviders" />
-            <Layer labelKey="about.layerProviders" boxes={providerBoxes} />
+                <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
 
-            {/* A branch off the server rather than a link in the chain: nothing
-                here runs until the user connects an assistant. */}
-            <div className="mt-4 pt-4" style={{ borderTop: '1px dashed var(--border)' }}>
-                <Layer labelKey="about.layerAi" boxes={aiBoxes} />
-                <p className="text-[11px] mt-2.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                    {t('about.aiNote')}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2"
+                    style={{ color: 'var(--text-muted)' }}>
+                    {t('about.subStores')}
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-stretch">
+                    <Node node={{
+                        key: 'sqlite',
+                        icon: MdStorage,
+                        titleKey: 'about.boxSqliteFiles',
+                        tag: 'LOCAL',
+                        state: storeState('sqlite'),
+                        fields: storeFields('sqlite', 'about.techSqliteFile', 'about.whereSameMachine',
+                            './data/marketCache.db · ./data/shares.db'),
+                    }} />
+                    <Node node={{
+                        key: 'turso',
+                        icon: MdCloudQueue,
+                        titleKey: 'about.boxTursoService',
+                        tag: 'TURSO',
+                        state: storeState('turso'),
+                        fields: storeFields('turso', 'about.techSqliteHosted', 'about.whereTurso',
+                            'libsql://….turso.io'),
+                    }} />
+                </div>
+            </Group>
+
+            <Flow labelKey="about.flowToProviders" />
+
+            {/* 3 — where the numbers originally come from */}
+            <Group labelKey="about.layerProviders">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-stretch">
+                    {providers.map(provider => <Node key={provider.key} node={provider} />)}
+                </div>
+            </Group>
+
+            {/* 4 — the opt-in branch, which is off until the user turns it on */}
+            <div className="mt-4 pt-4" style={{ borderTop: '1px dashed var(--border)' }}>
+                <Group labelKey="about.layerAi">
+                    <Node node={{
+                        key: 'mcp',
+                        icon: MdSmartToy,
+                        titleKey: 'about.boxMcp',
+                        subtitleKey: 'about.subMcp',
+                        tag: 'MCP',
+                        state: browser?.aiConnected ? 'live' : 'idle',
+                        lines: browser
+                            ? [t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected')]
+                            : undefined,
+                    }} />
+                </Group>
             </div>
 
-            <figcaption className="flex items-center gap-4 mt-4 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                <span className="flex items-center gap-1.5">
-                    <span className="rounded-full" style={{ width: 6, height: 6, background: 'var(--pnl-green)' }} aria-hidden="true" />
-                    {t('about.legendLive')}
-                </span>
-                <span className="flex items-center gap-1.5">
-                    <span className="rounded-full" style={{ width: 6, height: 6, background: 'var(--text-muted)' }} aria-hidden="true" />
-                    {t('about.legendOff')}
-                </span>
+            {/* The failure the drawing is currently reporting, in words. */}
+            {server?.cache.reason && (
+                <p className="text-[10.5px] mt-3 leading-relaxed font-mono break-words"
+                    style={{ color: 'var(--warn)' }}>
+                    {server.cache.reason}
+                </p>
+            )}
+
+            <figcaption className="text-[11px] mt-3 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                {t('about.diagramNote')}
             </figcaption>
         </figure>
     );

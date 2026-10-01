@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCacheStatus } from '@portfolio/server/marketDataDb';
-import { getShareStoreStatus, storageUnavailableReason } from '@portfolio/server/shareStore';
+import { getShareStoreStatus } from '@portfolio/server/shareStore';
 
 /**
  * Which server-side pieces are actually live right now — what the About
@@ -19,25 +19,21 @@ export interface ArchitectureStatus {
     region: string | null;
     /** Where market data is cached, and how many rows it holds. */
     cache: { kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null; rows: number | null; reason: string | null };
-    /** Where opt-in AI snapshots are stored. */
-    shares: { available: boolean; kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null };
+    /** Where opt-in AI snapshots are stored, and whether it can take one. */
+    shares: { available: boolean; kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null; reason: string | null };
     /** Providers the server can reach with its current configuration. */
     providers: { yahoo: boolean; jquants: boolean };
 }
 
 export async function GET() {
-    const shares = getShareStoreStatus();
+    const shares = await getShareStoreStatus();
 
     const status: ArchitectureStatus = {
         environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
         host: process.env.VERCEL ? 'vercel' : 'local',
         region: process.env.VERCEL_REGION ?? null,
         cache: await getCacheStatus(),
-        shares: {
-            available: shares.kind !== 'unavailable' && storageUnavailableReason() === null,
-            kind: shares.kind,
-            location: shares.location,
-        },
+        shares,
         providers: {
             // Yahoo needs no key — it is the baseline and is always reachable.
             yahoo: true,

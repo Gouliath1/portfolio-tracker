@@ -272,11 +272,40 @@ export function resetShareStoreForTests(): void {
 
 // ── Status ───────────────────────────────────────────────────────────────────
 
-/** Where published snapshots are stored, for the About page's diagram. */
-export function getShareStoreStatus(): { kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null } {
-    if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
-        return { kind: 'turso', location: null };
+/**
+ * Where published snapshots are stored, and whether the store can actually
+ * take one, for the About page's diagram.
+ *
+ * Credentials being present is not the same as the database accepting a write:
+ * a Turso database over its plan's quota answers reads and refuses writes.
+ * Reporting "available" from the environment alone claimed sharing worked when
+ * it could not, so this opens the store — which creates its table, a write —
+ * and reports what actually happened.
+ */
+export async function getShareStoreStatus(): Promise<{
+    kind: 'turso' | 'sqlite' | 'unavailable';
+    location: string | null;
+    available: boolean;
+    reason: string | null;
+}> {
+    const configured: 'turso' | 'sqlite' | 'unavailable' =
+        process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN ? 'turso'
+        : process.env.VERCEL ? 'unavailable'
+        : 'sqlite';
+
+    const location = configured === 'sqlite'
+        ? (process.env.SHARE_DB_PATH ?? DEFAULT_LOCAL_PATH)
+        : null;
+
+    if (configured === 'unavailable') {
+        return { kind: 'unavailable', location: null, available: false, reason: _unavailableReason };
     }
-    if (process.env.VERCEL) return { kind: 'unavailable', location: null };
-    return { kind: 'sqlite', location: process.env.SHARE_DB_PATH ?? DEFAULT_LOCAL_PATH };
+
+    const client = await ensureInit();
+    return {
+        kind: configured,
+        location,
+        available: client !== null,
+        reason: client === null ? _unavailableReason : null,
+    };
 }
