@@ -657,13 +657,14 @@ export const en = {
 
     'about.layerBrowser': 'Your browser',
     'about.layerProviders': 'Market data',
-    'about.layerAi': 'AI assistant — opt-in',
 
     'about.boxYahoo': 'Yahoo Finance',
     'about.boxJquants': 'J-Quants',
     'about.boxTopix': 'TOPIX list',
     'about.boxMcp': 'MCP connector',
 
+    'about.groupClients': 'Clients',
+    'about.flowMcp': 'secret link, read-only',
     'about.flowToServer': 'tickers and dates only',
     'about.flowToProviders': 'only on a miss',
 
@@ -695,7 +696,7 @@ export const en = {
 
     'about.subBrowser': 'Pages, calculations and your portfolio',
     'about.detailBrowserMath': 'every figure is computed here, not on the server',
-    'about.subMcp': 'Reads a published snapshot over a secret link',
+    'about.subMcp': 'An assistant reading a published snapshot — opt-in',
     'about.subYahoo': 'Prices, history, FX rates',
     'about.subJquants': 'Japanese fundamentals',
     'about.subTopix': 'Screener universe',
