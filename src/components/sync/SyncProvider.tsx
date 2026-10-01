@@ -23,7 +23,7 @@ import {
     buildJoinLink, readJoinTokenFromHash, planSync, pullSync, pushSync, revokeSync,
     type ServerSnapshot,
 } from '../../utils/syncClient';
-import { collectSyncBlob, applySyncBlob, isLocalStateEmpty } from '../../utils/syncState';
+import { collectSyncBlob, applySyncBlob, isLocalStateEmpty, stashBackup } from '../../utils/syncState';
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error' | 'conflict';
 
@@ -114,6 +114,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
     /** Adopt the server's blob locally, record it, and reload. */
     const adoptCloud = useCallback((token: string, server: ServerSnapshot) => {
+        if (!isLocalStateEmpty()) stashBackup();
         if (!applySyncBlob(server.blob)) {
             fail(t('sync.errBadBlob'));
             return false;

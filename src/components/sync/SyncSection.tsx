@@ -12,6 +12,7 @@ import { MdSync, MdContentCopy, MdCheck, MdSyncDisabled, MdDownload } from 'reac
 import { useTranslation } from '../../i18n';
 import { copyToClipboard } from '../../utils/clipboard';
 import { readJoinTokenFromHash } from '../../utils/syncClient';
+import { hasBackup, restoreBackup, summarizeBlob, collectSyncBlob } from '../../utils/syncState';
 import { useOptionalSync, type SyncContextValue } from './SyncProvider';
 
 function extractToken(input: string): string | null {
@@ -33,6 +34,12 @@ const SyncSectionInner = ({ sync }: { sync: SyncContextValue }) => {
     const [joinInput, setJoinInput] = useState('');
     const [joinError, setJoinError] = useState<string | null>(null);
     const working = status === 'syncing';
+    const [confirming, setConfirming] = useState(false);
+    const [backupAvailable, setBackupAvailable] = useState(() => typeof window !== 'undefined' && hasBackup());
+    const restore = () => {
+        if (restoreBackup()) window.location.reload();
+        else setBackupAvailable(false);
+    };
 
     const copyLink = async () => {
         if (link && await copyToClipboard(link)) {
@@ -123,12 +130,43 @@ const SyncSectionInner = ({ sync }: { sync: SyncContextValue }) => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    <button onClick={() => void enable()} disabled={working}
-                        className="h-9 w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
-                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                        <MdSync size={16} />
-                        {working ? t('sync.enabling') : t('sync.enable')}
-                    </button>
+                    {confirming ? (
+                        <div className="rounded-xl p-3 space-y-2"
+                            style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
+                            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                {t('sync.confirmTitle')}
+                            </p>
+                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                {(() => {
+                                    const sum = summarizeBlob(collectSyncBlob());
+                                    return t('sync.confirmContents', {
+                                        workspaces: sum?.workspaces.length ?? 0,
+                                        count: sum?.transactions ?? 0,
+                                    });
+                                })()}
+                            </p>
+                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('sync.confirmBody')}</p>
+                            <div className="flex gap-2">
+                                <button onClick={() => setConfirming(false)}
+                                    className="h-8 px-3 rounded-lg text-xs font-medium"
+                                    style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                                    {t('sync.cancel')}
+                                </button>
+                                <button onClick={() => { setConfirming(false); void enable(); }} disabled={working}
+                                    className="h-8 px-3 rounded-lg text-xs font-medium disabled:opacity-50"
+                                    style={{ background: 'var(--accent)', color: 'var(--bg-base)' }}>
+                                    {t('sync.confirmUpload')}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button onClick={() => setConfirming(true)} disabled={working}
+                            className="h-9 w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
+                            style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                            <MdSync size={16} />
+                            {working ? t('sync.enabling') : t('sync.enable')}
+                        </button>
+                    )}
 
                     <div className="space-y-1.5">
                         <label className="text-xs" style={{ color: 'var(--text-secondary)' }} htmlFor="sync-join">
@@ -150,6 +188,17 @@ const SyncSectionInner = ({ sync }: { sync: SyncContextValue }) => {
                         </div>
                         {joinError && <p className="text-xs" style={{ color: 'var(--pnl-red)' }}>{joinError}</p>}
                     </div>
+                </div>
+            )}
+
+            {backupAvailable && (
+                <div className="space-y-1">
+                    <button onClick={restore}
+                        className="h-8 px-3 rounded-lg text-xs font-medium transition-all"
+                        style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+                        {t('sync.restoreBackup')}
+                    </button>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('sync.restoreBackupHint')}</p>
                 </div>
             )}
 

@@ -92,6 +92,70 @@ export function applySyncBlob(raw: string): boolean {
     for (const [key, value] of Object.entries(blob.entries)) {
         localStorage.setItem(key, value);
     }
+    ensureActiveSet(blob.entries['pt_sets']);
+    return true;
+}
+
+const ACTIVE_SET_KEY = 'pt_active_set'; // per-device choice, not synced
+
+/**
+ * The active workspace is a per-device preference, so it isn't carried. A
+ * device that has never picked one falls back to the demo workspace — which
+ * made a freshly joined device look empty even though the synced workspaces
+ * were all there. Point it at a synced workspace instead.
+ */
+function ensureActiveSet(rawSets: string | undefined): void {
+    if (localStorage.getItem(ACTIVE_SET_KEY) !== null || !rawSets) return;
+    try {
+        const sets = JSON.parse(rawSets) as Array<{ id?: string; is_active?: boolean }>;
+        const pick = sets.find(x => x.is_active && x.id) ?? sets.find(x => x.id);
+        if (pick?.id) localStorage.setItem(ACTIVE_SET_KEY, pick.id);
+    } catch { /* leave the default */ }
+}
+
+// ── Summaries (so the user can tell the two copies apart) ───────────────────
+
+export interface BlobSummary {
+    workspaces: string[];
+    transactions: number;
+}
+
+export function summarizeBlob(raw: string): BlobSummary | null {
+    const blob = parseSyncBlob(raw);
+    if (!blob) return null;
+    let workspaces: string[] = [];
+    try {
+        const sets = JSON.parse(blob.entries['pt_sets'] ?? '[]') as Array<{ display_name?: string; name?: string }>;
+        workspaces = sets.map(x => x.display_name || x.name || '?');
+    } catch { /* leave empty */ }
+    let transactions = 0;
+    for (const [key, value] of Object.entries(blob.entries)) {
+        if (!key.startsWith('pt_positions_')) continue;
+        try {
+            const arr = JSON.parse(value);
+            if (Array.isArray(arr)) transactions += arr.length;
+        } catch { /* skip */ }
+    }
+    return { workspaces, transactions };
+}
+
+// ── Safety net before the cloud copy replaces this device ───────────────────
+
+const BACKUP_KEY = 'pt_sync_backup'; // not in the synced allowlist
+
+/** Keep what this device had, so "use the cloud copy" is never a one-way door. */
+export function stashBackup(): void {
+    try { localStorage.setItem(BACKUP_KEY, collectSyncBlob()); } catch { /* quota — best effort */ }
+}
+
+export function hasBackup(): boolean {
+    return localStorage.getItem(BACKUP_KEY) !== null;
+}
+
+export function restoreBackup(): boolean {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw || !applySyncBlob(raw)) return false;
+    localStorage.removeItem(BACKUP_KEY);
     return true;
 }
 
