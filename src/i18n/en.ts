@@ -656,13 +656,19 @@ export const en = {
     'about.architecture': 'Architecture',
 
     'about.layerBrowser': 'Your browser',
-    'about.layerProviders': 'Market data',
 
     'about.boxYahoo': 'Yahoo Finance',
     'about.boxJquants': 'J-Quants',
     'about.boxTopix': 'TOPIX list',
     'about.boxMcp': 'MCP connector',
 
+    'about.groupThirdParty': 'Third party — market data',
+    'about.groupDatabase': 'Database',
+    'about.flowToDb': 'nothing is written here',
+    'about.dbEmptyTitle': 'No application database',
+    'about.dbEmptySubtitle': 'Nothing on the server stores your portfolio',
+    'about.dbEmptyLine1': 'positions, costs and accounts live in your browser',
+    'about.dbEmptyLine2': 'the only server-side copy is the opt-in AI snapshot above',
     'about.groupClients': 'Clients',
     'about.flowMcp': 'secret link, read-only',
     'about.flowToServer': 'tickers and dates only',

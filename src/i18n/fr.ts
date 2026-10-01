@@ -645,13 +645,19 @@ export const fr: Translations = {
     'about.architecture': 'Architecture',
 
     'about.layerBrowser': 'Votre navigateur',
-    'about.layerProviders': 'Données de marché',
 
     'about.boxYahoo': 'Yahoo Finance',
     'about.boxJquants': 'J-Quants',
     'about.boxTopix': 'Liste TOPIX',
     'about.boxMcp': 'Connecteur MCP',
 
+    'about.groupThirdParty': 'Tiers — données de marché',
+    'about.groupDatabase': 'Base de données',
+    'about.flowToDb': 'rien n’y est écrit',
+    'about.dbEmptyTitle': 'Aucune base applicative',
+    'about.dbEmptySubtitle': 'Rien sur le serveur ne stocke votre portefeuille',
+    'about.dbEmptyLine1': 'positions, coûts et comptes vivent dans votre navigateur',
+    'about.dbEmptyLine2': 'la seule copie côté serveur est l’instantané IA ci-dessus',
     'about.groupClients': 'Clients',
     'about.flowMcp': 'lien secret, lecture seule',
     'about.flowToServer': 'symboles et dates uniquement',
