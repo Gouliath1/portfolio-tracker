@@ -664,11 +664,7 @@ export const en = {
 
     'about.groupThirdParty': 'Third party — market data',
     'about.groupDatabase': 'Database',
-    'about.flowToDb': 'nothing is written here',
-    'about.dbEmptyTitle': 'No application database',
-    'about.dbEmptySubtitle': 'Nothing on the server stores your portfolio',
-    'about.dbEmptyLine1': 'positions, costs and accounts live in your browser',
-    'about.dbEmptyLine2': 'the only server-side copy is the opt-in AI snapshot above',
+    'about.dbNote': 'No table here holds your positions, costs or account names. This tier caches public prices and, if you connect an assistant, keeps one snapshot you can delete.',
     'about.groupClients': 'Clients',
     'about.flowMcp': 'secret link, read-only',
     'about.flowToServer': 'tickers and dates only',
