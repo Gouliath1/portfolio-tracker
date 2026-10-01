@@ -42,6 +42,9 @@ export interface SyncContextValue {
     conflict: Conflict | null;
     /** A `#sync=` link was opened; the user hasn't yet decided to join. */
     pendingJoin: string | null;
+    /** The cloud copy changed on another device; applying it reloads the page. */
+    remoteUpdate: boolean;
+    applyRemoteUpdate: () => Promise<void>;
     enable: () => Promise<void>;
     join: (token: string) => Promise<void>;
     disable: () => Promise<void>;
@@ -65,6 +68,8 @@ export function useSync(): SyncContextValue {
 
 const CHECK_INTERVAL_MS = 5_000;
 const REMOTE_POLL_MS = 60_000;
+const BACKOFF_BASE_MS = 5_000;
+const BACKOFF_MAX_MS = 5 * 60_000;
 
 export function SyncProvider({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
@@ -74,10 +79,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const [link, setLink] = useState<string | null>(null);
     const [conflict, setConflict] = useState<Conflict | null>(null);
     const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+    const [remoteUpdate, setRemoteUpdate] = useState(false);
 
     const busy = useRef(false);
     const conflictRef = useRef<Conflict | null>(null);
     const lastRemoteCheck = useRef(0);
+    // Exponential backoff after failures, so an outage or an unsyncable blob
+    // (e.g. over the size cap) doesn't hammer the API every tick.
+    const failures = useRef(0);
+    const retryAfter = useRef(0);
 
     const setConflictState = useCallback((c: Conflict | null) => {
         conflictRef.current = c;
@@ -90,11 +100,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         setError(null);
         setLastSyncedAt(new Date());
         lastRemoteCheck.current = Date.now();
+        failures.current = 0;
+        retryAfter.current = 0;
     }, []);
 
     const fail = useCallback((message: string) => {
         setStatus('error');
         setError(message);
+        failures.current += 1;
+        retryAfter.current = Date.now()
+            + Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** failures.current);
     }, []);
 
     /** Adopt the server's blob locally, record it, and reload. */
@@ -108,7 +123,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         return true;
     }, [fail, t]);
 
-    const runPass = useCallback(async () => {
+    /**
+     * One sync pass. `applyPull` decides what happens when the cloud copy is
+     * newer: true (boot, "Sync now", the banner's Reload) applies it and
+     * reloads; false (background polling) only raises `remoteUpdate`, so a
+     * reload never lands on someone mid-edit.
+     */
+    const runPass = useCallback(async (applyPull = false) => {
         const device = readDeviceState();
         if (!device || busy.current || conflictRef.current) return;
         busy.current = true;
@@ -120,6 +141,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
             const localBlob = collectSyncBlob();
             const server = pulled.found ? { version: pulled.version, blob: pulled.blob } : null;
             const action = planSync({ localBlob, device, server });
+            if (action !== 'pull') setRemoteUpdate(false);
 
             switch (action) {
                 case 'noop':
@@ -129,16 +151,30 @@ export function SyncProvider({ children }: { children: ReactNode }) {
                     writeDeviceState({ ...device, version: server!.version, lastBlob: localBlob });
                     markSynced();
                     break;
+                case 'ended':
+                    // Revoked from another device, or expired. Never re-create it:
+                    // that would resurrect a copy the user deliberately deleted.
+                    // Local data is untouched; this device just stops syncing.
+                    clearDeviceState();
+                    setLink(null);
+                    setLastSyncedAt(null);
+                    setStatus('off');
+                    setError(t('sync.endedNotice'));
+                    break;
                 case 'pull':
-                    adoptCloud(device.token, server!);
+                    if (applyPull) {
+                        adoptCloud(device.token, server!);
+                    } else {
+                        setRemoteUpdate(true);
+                        setStatus('idle');
+                        lastRemoteCheck.current = Date.now();
+                    }
                     break;
                 case 'conflict':
                     setConflictState({ token: device.token, server: server! });
                     break;
-                case 'push':
-                case 'recreate': {
-                    const base = action === 'push' ? device.version : 0;
-                    const res = await pushSync(device.token, localBlob, base);
+                case 'push': {
+                    const res = await pushSync(device.token, localBlob, device.version);
                     if (res.ok) {
                         writeDeviceState({ ...device, version: res.version, lastBlob: localBlob });
                         markSynced();
@@ -153,7 +189,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         } finally {
             busy.current = false;
         }
-    }, [adoptCloud, fail, markSynced, setConflictState]);
+    }, [adoptCloud, fail, markSynced, setConflictState, t]);
 
     // Pick up a `#sync=` link. A layout effect, because page-level effects
     // rewrite the URL (dropping the hash) and layout effects run before any
@@ -178,7 +214,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         if (device) {
             setLink(buildJoinLink(device.token));
             setStatus('idle');
-            void runPass();
+            void runPass(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -190,11 +226,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
             if (document.hidden) return;
             const device = readDeviceState();
             if (!device || busy.current || conflictRef.current) return;
+            if (Date.now() < retryAfter.current) return;
             const localChanged = collectSyncBlob() !== device.lastBlob;
             const remoteDue = Date.now() - lastRemoteCheck.current > REMOTE_POLL_MS;
             if (localChanged || remoteDue) void runPass();
         };
-        const onVisible = () => { if (!document.hidden) void runPass(); };
+        const onVisible = () => {
+            if (!document.hidden && Date.now() >= retryAfter.current) void runPass();
+        };
         const id = window.setInterval(tick, CHECK_INTERVAL_MS);
         document.addEventListener('visibilitychange', onVisible);
         return () => {
@@ -266,20 +305,28 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
     const disable = useCallback(async () => {
         const device = readDeviceState();
-        if (device) await revokeSync(device.token);
+        if (device) {
+            setStatus('syncing');
+            // Keep the key if the server didn't confirm: dropping it would leave
+            // an undeletable cloud copy while the UI claims it's gone.
+            if (!(await revokeSync(device.token))) return fail(t('sync.errDisable'));
+        }
         clearDeviceState();
         setLink(null);
         setConflictState(null);
         setError(null);
         setLastSyncedAt(null);
         setStatus('off');
-    }, [setConflictState]);
+    }, [fail, setConflictState, t]);
+
+    const applyRemoteUpdate = useCallback(() => runPass(true), [runPass]);
 
     const value = useMemo<SyncContextValue>(() => ({
         status, enabled: status !== 'off', error, lastSyncedAt, link, conflict, pendingJoin,
-        enable, join, disable, syncNow: runPass, resolveConflict,
+        remoteUpdate, applyRemoteUpdate,
+        enable, join, disable, syncNow: applyRemoteUpdate, resolveConflict,
         dismissPendingJoin: () => setPendingJoin(null),
-    }), [status, error, lastSyncedAt, link, conflict, pendingJoin, enable, join, disable, runPass, resolveConflict]);
+    }), [status, error, lastSyncedAt, link, conflict, pendingJoin, remoteUpdate, applyRemoteUpdate, enable, join, disable, resolveConflict]);
 
     return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }

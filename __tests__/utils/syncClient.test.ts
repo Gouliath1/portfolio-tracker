@@ -18,8 +18,8 @@ describe('planSync', () => {
     it('adopt when server moved but holds identical content', () => {
         expect(planSync({ localBlob: 'B', device: dev, server: { version: 4, blob: 'B' } })).toBe('adopt');
     });
-    it('recreate when the server row is gone', () => {
-        expect(planSync({ localBlob: 'A', device: dev, server: null })).toBe('recreate');
+    it('ended when the server row is gone (never recreated)', () => {
+        expect(planSync({ localBlob: 'A', device: dev, server: null })).toBe('ended');
     });
 });
 

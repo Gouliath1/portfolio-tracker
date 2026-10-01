@@ -33,7 +33,9 @@ const btn = 'h-9 px-4 rounded-lg text-sm font-medium transition-all';
 
 export function SyncDialogs() {
     const { t } = useTranslation();
-    const { conflict, pendingJoin, join, resolveConflict, dismissPendingJoin } = useSync();
+    const {
+        conflict, pendingJoin, remoteUpdate, join, resolveConflict, dismissPendingJoin, applyRemoteUpdate,
+    } = useSync();
 
     if (conflict) {
         return (
@@ -58,6 +60,21 @@ export function SyncDialogs() {
                     {t('sync.join')}
                 </button>
             </Dialog>
+        );
+    }
+
+    if (remoteUpdate) {
+        // Non-blocking: applying the update reloads the page, so the user picks the moment.
+        return (
+            <div className="fixed bottom-20 sm:bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm"
+                role="status"
+                style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <span>{t('sync.remoteUpdate')}</span>
+                <button className="h-8 px-3 rounded-lg text-xs font-medium" style={primary}
+                    onClick={() => void applyRemoteUpdate()}>
+                    {t('sync.reload')}
+                </button>
+            </div>
         );
     }
 
