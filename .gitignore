@@ -89,3 +89,5 @@ data/portfolio-snapshot.json
 # AI share store — local mirror of shared portfolios
 data/shares.db
 data/shares.db-*
+data/sync.db
+data/sync.db-*
