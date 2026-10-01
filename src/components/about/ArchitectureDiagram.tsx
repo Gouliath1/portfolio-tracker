@@ -23,7 +23,8 @@
 
 import { useEffect, useState } from 'react';
 import {
-    MdArrowDownward, MdLaptopMac, MdDns, MdStorage, MdCloudQueue,
+    MdArrowDownward, MdArrowForward, MdLaptopMac, MdDns, MdStorage, MdCloudQueue,
+    MdOutlineDataset,
     MdShowChart, MdInsights, MdListAlt, MdSmartToy,
 } from 'react-icons/md';
 import type { IconType } from 'react-icons';
@@ -145,6 +146,28 @@ function Flow({ labelKey, live = true }: { labelKey: TranslationKey; live?: bool
             <MdArrowDownward size={15} style={{ color }} className="flex-shrink-0" aria-hidden="true" />
             <p className="text-[11px]" style={{ color }}>{t(labelKey)}</p>
         </div>
+    );
+}
+
+/**
+ * The same step drawn sideways, for a tier that sits beside the server rather
+ * than under it. Third parties are not a stage the data passes through on its
+ * way down: they are off to one side, reached only when the cache misses.
+ */
+function SideFlow({ labelKey }: { labelKey: TranslationKey }) {
+    const { t } = useTranslation();
+    return (
+        <>
+            <div className="hidden md:flex flex-col items-center gap-1 px-1 self-center">
+                <MdArrowForward size={15} style={{ color: 'var(--accent)' }} aria-hidden="true" />
+                <p className="text-[10px] text-center max-w-[5.5rem] leading-tight" style={{ color: 'var(--accent)' }}>
+                    {t(labelKey)}
+                </p>
+            </div>
+            <div className="md:hidden w-full flex justify-center">
+                <Flow labelKey={labelKey} />
+            </div>
+        </>
     );
 }
 
@@ -335,76 +358,99 @@ export function ArchitectureDiagram() {
                     </div>
                 </div>
 
-                {/* 2 — the server and the database it keeps, in one enclosure */}
-                <Group labelKey="about.groupServer" detail={serverDetail}>
+                {/* 2 — the server, with the third parties beside it rather than
+                    beneath: they are not a stage the data flows through, they are
+                    where it comes from when the cache cannot answer. */}
+                <div className="w-full flex flex-col md:flex-row items-stretch gap-2 md:gap-1">
+                    <div className="flex-1 min-w-0">
+                    <Group labelKey="about.groupServer" detail={serverDetail}>
+                        <Node className={SPINE} node={{
+                            icon: MdDns,
+                            titleKey: 'about.boxRuntime',
+                            subtitleKey: 'about.detailRoutes',
+                            tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
+                            state: server ? 'live' : 'unknown',
+                            lines: [
+                                { text: t('about.lineAppCacheFirst') },
+                                { text: t('about.lineAppNoHoldings') },
+                            ],
+                        }} />
+
+                        <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
+
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
+                            style={{ color: 'var(--text-muted)' }}>
+                            {t('about.subStores')}
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                            <Node className={STORE} node={{
+                                icon: MdStorage,
+                                titleKey: 'about.boxSqliteFiles',
+                                tag: 'LOCAL',
+                                state: storeState('sqlite'),
+                                lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
+                            }} />
+                            <Node className={STORE} node={{
+                                icon: MdCloudQueue,
+                                titleKey: 'about.boxTursoService',
+                                tag: 'TURSO',
+                                state: storeState('turso'),
+                                lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
+                            }} />
+                        </div>
+                    </Group>
+                    </div>
+
+                    <SideFlow labelKey="about.flowToProviders" />
+
+                    <div className="w-full md:w-[14.5rem] md:self-start">
+                        <Group labelKey="about.groupThirdParty">
+                            <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                                <Node className={PROVIDER} node={{
+                                    icon: MdShowChart,
+                                    titleKey: 'about.boxYahoo',
+                                    subtitleKey: 'about.subYahoo',
+                                    tag: 'YAHOO',
+                                    state: providerState(server?.providers.yahoo),
+                                    lines: [{ text: t('about.lineNoKeyNeeded') }],
+                                }} />
+                                <Node className={PROVIDER} node={{
+                                    icon: MdInsights,
+                                    titleKey: 'about.boxJquants',
+                                    subtitleKey: 'about.subJquants',
+                                    tag: 'JPX',
+                                    state: providerState(server?.providers.jquants),
+                                    lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
+                                }} />
+                                <Node className={PROVIDER} node={{
+                                    icon: MdListAlt,
+                                    titleKey: 'about.boxTopix',
+                                    subtitleKey: 'about.subTopix',
+                                    tag: 'BLACKROCK',
+                                    state: 'live',
+                                    lines: [{ text: t('about.lineBundled') }],
+                                }} />
+                            </div>
+                        </Group>
+                    </div>
+                </div>
+
+                <Flow labelKey="about.flowToDb" live={false} />
+
+                {/* 3 — the database tier, which is empty, and whose emptiness is
+                    the point rather than an omission. */}
+                <Group labelKey="about.groupDatabase">
                     <Node className={SPINE} node={{
-                        icon: MdDns,
-                        titleKey: 'about.boxRuntime',
-                        subtitleKey: 'about.detailRoutes',
-                        tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
-                        state: server ? 'live' : 'unknown',
+                        icon: MdOutlineDataset,
+                        titleKey: 'about.dbEmptyTitle',
+                        subtitleKey: 'about.dbEmptySubtitle',
+                        state: 'idle',
                         lines: [
-                            { text: t('about.lineAppCacheFirst') },
-                            { text: t('about.lineAppNoHoldings') },
+                            { text: t('about.dbEmptyLine1') },
+                            { text: t('about.dbEmptyLine2') },
                         ],
                     }} />
-
-                    <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
-
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
-                        style={{ color: 'var(--text-muted)' }}>
-                        {t('about.subStores')}
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                        <Node className={STORE} node={{
-                            icon: MdStorage,
-                            titleKey: 'about.boxSqliteFiles',
-                            tag: 'LOCAL',
-                            state: storeState('sqlite'),
-                            lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
-                        }} />
-                        <Node className={STORE} node={{
-                            icon: MdCloudQueue,
-                            titleKey: 'about.boxTursoService',
-                            tag: 'TURSO',
-                            state: storeState('turso'),
-                            lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
-                        }} />
-                    </div>
                 </Group>
-
-                <Flow labelKey="about.flowToProviders" />
-
-                {/* 3 — where the numbers originally come from */}
-                <Group labelKey="about.layerProviders">
-                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                        <Node className={PROVIDER} node={{
-                            icon: MdShowChart,
-                            titleKey: 'about.boxYahoo',
-                            subtitleKey: 'about.subYahoo',
-                            tag: 'YAHOO',
-                            state: providerState(server?.providers.yahoo),
-                            lines: [{ text: t('about.lineNoKeyNeeded') }],
-                        }} />
-                        <Node className={PROVIDER} node={{
-                            icon: MdInsights,
-                            titleKey: 'about.boxJquants',
-                            subtitleKey: 'about.subJquants',
-                            tag: 'JPX',
-                            state: providerState(server?.providers.jquants),
-                            lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
-                        }} />
-                        <Node className={PROVIDER} node={{
-                            icon: MdListAlt,
-                            titleKey: 'about.boxTopix',
-                            subtitleKey: 'about.subTopix',
-                            tag: 'BLACKROCK',
-                            state: 'live',
-                            lines: [{ text: t('about.lineBundled') }],
-                        }} />
-                    </div>
-                </Group>
-
             </div>
 
             {/* The failure the drawing is currently reporting, in words. */}
