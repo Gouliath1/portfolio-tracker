@@ -24,7 +24,6 @@
 import { useEffect, useState } from 'react';
 import {
     MdArrowDownward, MdArrowForward, MdLaptopMac, MdDns, MdStorage, MdCloudQueue,
-    MdOutlineDataset,
     MdShowChart, MdInsights, MdListAlt, MdSmartToy,
 } from 'react-icons/md';
 import type { IconType } from 'react-icons';
@@ -375,29 +374,6 @@ export function ArchitectureDiagram() {
                                 { text: t('about.lineAppNoHoldings') },
                             ],
                         }} />
-
-                        <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
-
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
-                            style={{ color: 'var(--text-muted)' }}>
-                            {t('about.subStores')}
-                        </p>
-                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                            <Node className={STORE} node={{
-                                icon: MdStorage,
-                                titleKey: 'about.boxSqliteFiles',
-                                tag: 'LOCAL',
-                                state: storeState('sqlite'),
-                                lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
-                            }} />
-                            <Node className={STORE} node={{
-                                icon: MdCloudQueue,
-                                titleKey: 'about.boxTursoService',
-                                tag: 'TURSO',
-                                state: storeState('turso'),
-                                lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
-                            }} />
-                        </div>
                     </Group>
                     </div>
 
@@ -435,21 +411,35 @@ export function ArchitectureDiagram() {
                     </div>
                 </div>
 
-                <Flow labelKey="about.flowToDb" live={false} />
+                <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
 
-                {/* 3 — the database tier, which is empty, and whose emptiness is
-                    the point rather than an omission. */}
-                <Group labelKey="about.groupDatabase">
-                    <Node className={SPINE} node={{
-                        icon: MdOutlineDataset,
-                        titleKey: 'about.dbEmptyTitle',
-                        subtitleKey: 'about.dbEmptySubtitle',
-                        state: 'idle',
-                        lines: [
-                            { text: t('about.dbEmptyLine1') },
-                            { text: t('about.dbEmptyLine2') },
-                        ],
-                    }} />
+                {/* 3 — the database tier. Both entries are SQLite; which one is
+                    live depends only on whether the machine running the app has
+                    a disk it may write to. */}
+                <Group labelKey="about.groupDatabase" detail={t('about.subStores')}>
+                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                        <Node className={STORE} node={{
+                            icon: MdStorage,
+                            titleKey: 'about.boxSqliteFiles',
+                            tag: 'LOCAL',
+                            state: storeState('sqlite'),
+                            lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
+                        }} />
+                        <Node className={STORE} node={{
+                            icon: MdCloudQueue,
+                            titleKey: 'about.boxTursoService',
+                            tag: 'TURSO',
+                            state: storeState('turso'),
+                            lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
+                        }} />
+                    </div>
+
+                    {/* What the tier does not contain, which is the claim the
+                        rest of the page rests on. */}
+                    <p className="text-[10.5px] mt-2.5 leading-snug text-center max-w-[32rem]"
+                        style={{ color: 'var(--text-muted)' }}>
+                        {t('about.dbNote')}
+                    </p>
                 </Group>
             </div>
 
