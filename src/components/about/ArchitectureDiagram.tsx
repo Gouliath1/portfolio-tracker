@@ -204,6 +204,7 @@ function Legend() {
 const SPINE = 'w-full max-w-[22rem]';
 const STORE = 'w-full sm:w-[17rem]';
 const PROVIDER = 'w-full sm:w-[13rem]';
+const CLIENT = 'w-full sm:w-[19rem]';
 
 export function ArchitectureDiagram() {
     const { t, locale } = useTranslation();
@@ -291,22 +292,47 @@ export function ArchitectureDiagram() {
 
             <div className="flex flex-col items-center">
 
-                {/* 1 — the browser, which is where the portfolio actually lives */}
-                <Node className={SPINE} node={{
-                    icon: MdLaptopMac,
-                    titleKey: 'about.layerBrowser',
-                    subtitleKey: 'about.subBrowser',
-                    tag: 'YOU',
-                    state: 'live',
-                    lines: [
-                        browser
-                            ? { text: t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }) }
-                            : null,
-                        { text: t('about.detailBrowserMath') },
-                    ],
-                }} />
+                {/* 1 — the two things that talk to the server. The browser is
+                    where the portfolio lives; an assistant is a second client
+                    reading a snapshot, not something downstream of prices. */}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
+                    style={{ color: 'var(--text-muted)' }}>
+                    {t('about.groupClients')}
+                </p>
+                <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
+                    <div className={`${CLIENT} flex flex-col`}>
+                        <Node className="flex-1" node={{
+                            icon: MdLaptopMac,
+                            titleKey: 'about.layerBrowser',
+                            subtitleKey: 'about.subBrowser',
+                            tag: 'YOU',
+                            state: 'live',
+                            lines: [
+                                browser
+                                    ? { text: t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }) }
+                                    : null,
+                                { text: t('about.detailBrowserMath') },
+                            ],
+                        }} />
+                        <Flow labelKey="about.flowToServer" />
+                    </div>
 
-                <Flow labelKey="about.flowToServer" />
+                    <div className={`${CLIENT} flex flex-col`}>
+                        <Node className="flex-1" node={{
+                            icon: MdSmartToy,
+                            titleKey: 'about.boxMcp',
+                            subtitleKey: 'about.subMcp',
+                            tag: 'MCP',
+                            state: browser?.aiConnected ? 'live' : 'idle',
+                            lines: [
+                                { text: '/api/mcp/<token>', mono: true },
+                                browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
+                            ],
+                        }} />
+                        <Flow labelKey="about.flowMcp" live={!!browser?.aiConnected} />
+                    </div>
+                </div>
+
 
                 {/* 2 — the server and the database it keeps, in one enclosure */}
                 <Group labelKey="about.groupServer" detail={serverDetail}>
@@ -378,21 +404,6 @@ export function ArchitectureDiagram() {
                     </div>
                 </Group>
 
-                {/* 4 — the opt-in branch, which is off until the user turns it on */}
-                <div className="w-full mt-4 pt-4" style={{ borderTop: '1px dashed var(--border)' }}>
-                    <Group labelKey="about.layerAi">
-                        <Node className={SPINE} node={{
-                            icon: MdSmartToy,
-                            titleKey: 'about.boxMcp',
-                            subtitleKey: 'about.subMcp',
-                            tag: 'MCP',
-                            state: browser?.aiConnected ? 'live' : 'idle',
-                            lines: [
-                                browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
-                            ],
-                        }} />
-                    </Group>
-                </div>
             </div>
 
             {/* The failure the drawing is currently reporting, in words. */}

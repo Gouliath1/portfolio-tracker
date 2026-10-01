@@ -646,13 +646,14 @@ export const fr: Translations = {
 
     'about.layerBrowser': 'Votre navigateur',
     'about.layerProviders': 'Données de marché',
-    'about.layerAi': 'Assistant IA — sur activation',
 
     'about.boxYahoo': 'Yahoo Finance',
     'about.boxJquants': 'J-Quants',
     'about.boxTopix': 'Liste TOPIX',
     'about.boxMcp': 'Connecteur MCP',
 
+    'about.groupClients': 'Clients',
+    'about.flowMcp': 'lien secret, lecture seule',
     'about.flowToServer': 'symboles et dates uniquement',
     'about.flowToProviders': 'seulement si absent',
 
@@ -684,7 +685,7 @@ export const fr: Translations = {
 
     'about.subBrowser': 'Pages, calculs et votre portefeuille',
     'about.detailBrowserMath': 'chaque chiffre est calculé ici, pas sur le serveur',
-    'about.subMcp': 'Lit un instantané publié via un lien secret',
+    'about.subMcp': 'Un assistant lisant un instantané publié — sur activation',
     'about.subYahoo': 'Cours, historiques, taux de change',
     'about.subJquants': 'Fondamentaux japonais',
     'about.subTopix': 'Univers du screener',
