@@ -666,9 +666,9 @@ export const en = {
     'about.groupDatabase': 'Database',
     'about.dbNote': 'No table here holds your positions, costs or account names. This tier caches public prices and, if you connect an assistant, keeps one snapshot you can delete.',
     'about.groupClients': 'Clients',
-    'about.flowMcp': 'secret link, read-only',
-    'about.flowToServer': 'tickers and dates only',
-    'about.flowToProviders': 'only on a miss',
+    'about.flowMcp': 'reads the snapshot via a secret link',
+    'about.flowToServer': 'asks for prices by ticker and date',
+    'about.flowToProviders': 'fetches it only if missing',
 
     'about.detailPositions': '{count} positions',
     'about.detailPosition': '{count} position',
@@ -703,7 +703,7 @@ export const en = {
     'about.subJquants': 'Japanese fundamentals',
     'about.subTopix': 'Screener universe',
 
-    'about.flowToStore': 'cache first',
+    'about.flowToStore': 'checks here for the price first',
     'about.nowWritesBlocked': 'cannot write — every request goes upstream',
 
     'about.legendIdle': 'idle here',

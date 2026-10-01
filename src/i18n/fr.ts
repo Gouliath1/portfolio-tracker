@@ -655,9 +655,9 @@ export const fr: Translations = {
     'about.groupDatabase': 'Base de données',
     'about.dbNote': 'Aucune table n’y contient vos positions, vos coûts ni vos noms de compte. Cette couche met en cache des cours publics et, si vous connectez un assistant, conserve un instantané que vous pouvez supprimer.',
     'about.groupClients': 'Clients',
-    'about.flowMcp': 'lien secret, lecture seule',
-    'about.flowToServer': 'symboles et dates uniquement',
-    'about.flowToProviders': 'seulement si absent',
+    'about.flowMcp': 'lit l’instantané via un lien secret',
+    'about.flowToServer': 'demande les cours par symbole et date',
+    'about.flowToProviders': 'ne le récupère que s’il manque',
 
     'about.detailPositions': '{count} positions',
     'about.detailPosition': '{count} position',
@@ -692,7 +692,7 @@ export const fr: Translations = {
     'about.subJquants': 'Fondamentaux japonais',
     'about.subTopix': 'Univers du screener',
 
-    'about.flowToStore': 'cache d’abord',
+    'about.flowToStore': 'y cherche le cours d’abord',
     'about.nowWritesBlocked': 'écriture impossible — chaque requête part à la source',
 
     'about.legendIdle': 'inactif ici',
