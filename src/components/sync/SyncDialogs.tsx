@@ -12,8 +12,9 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from '../../i18n';
 import { useSync } from './SyncProvider';
+import { collectSyncBlob, summarizeBlob, type BlobSummary } from '../../utils/syncState';
 
-function Dialog({ title, body, children }: { title: string; body: string; children: ReactNode }) {
+function Dialog({ title, body, extra, children }: { title: string; body: string; extra?: ReactNode; children: ReactNode }) {
     return (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4"
             style={{ background: 'rgba(0,0,0,0.5)' }} role="dialog" aria-modal="true" aria-label={title}>
@@ -21,6 +22,7 @@ function Dialog({ title, body, children }: { title: string; body: string; childr
                 style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
                 <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{body}</p>
+                {extra}
                 <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">{children}</div>
             </div>
         </div>
@@ -29,6 +31,26 @@ function Dialog({ title, body, children }: { title: string; body: string; childr
 
 const primary = { background: 'var(--accent)', color: 'var(--bg-base)' } as const;
 const secondary = { color: 'var(--text-secondary)', border: '1px solid var(--border)' } as const;
+function CopyCard({ label, summary }: { label: string; summary: BlobSummary | null }) {
+    const { t } = useTranslation();
+    const empty = !summary || (summary.workspaces.length === 0 && summary.transactions === 0);
+    return (
+        <div className="rounded-lg p-3 text-sm" style={{ background: 'var(--glass-bg)', border: '1px solid var(--border)' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
+            {empty ? (
+                <div style={{ color: 'var(--text-secondary)' }}>{t('sync.summaryEmpty')}</div>
+            ) : (
+                <div style={{ color: 'var(--text-primary)' }}>
+                    {summary!.workspaces.join(', ') || '—'}
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                        {' · '}{t('sync.summaryTx', { count: summary!.transactions })}
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+}
+
 const btn = 'h-9 px-4 rounded-lg text-sm font-medium transition-all';
 
 export function SyncDialogs() {
@@ -39,7 +61,12 @@ export function SyncDialogs() {
 
     if (conflict) {
         return (
-            <Dialog title={t('sync.conflictTitle')} body={t('sync.conflictBody')}>
+            <Dialog title={t('sync.conflictTitle')} body={t('sync.conflictBody')} extra={
+                <div className="space-y-2">
+                    <CopyCard label={t('sync.thisDevice')} summary={summarizeBlob(collectSyncBlob())} />
+                    <CopyCard label={t('sync.cloud')} summary={summarizeBlob(conflict.server.blob)} />
+                </div>
+            }>
                 <button className={btn} style={secondary} onClick={() => void resolveConflict('local')}>
                     {t('sync.keepThisDevice')}
                 </button>

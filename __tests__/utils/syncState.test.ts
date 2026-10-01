@@ -1,5 +1,6 @@
 import {
     collectSyncBlob, applySyncBlob, parseSyncBlob, isSyncedKey, isLocalStateEmpty,
+    summarizeBlob, stashBackup, hasBackup, restoreBackup,
 } from '../../src/utils/syncState';
 
 describe('syncState', () => {
@@ -67,5 +68,36 @@ describe('syncState', () => {
     it('classifies keys', () => {
         expect(isSyncedKey('pt_positions_123')).toBe(true);
         expect(isSyncedKey('pt_pnl_v1_x')).toBe(false);
+    });
+});
+
+describe('joining a device', () => {
+    beforeEach(() => localStorage.clear());
+    const blob = JSON.stringify({ v: 1, entries: {
+        pt_sets: JSON.stringify([{ id: 'a', display_name: 'Main', is_active: false }, { id: 'b', display_name: 'Alt', is_active: true }]),
+        pt_positions_a: JSON.stringify([1, 2, 3]),
+    } });
+
+    it('activates a synced workspace on a device that never picked one', () => {
+        applySyncBlob(blob);
+        expect(localStorage.getItem('pt_active_set')).toBe('b');
+    });
+    it('keeps an existing active choice', () => {
+        localStorage.setItem('pt_active_set', 'demo');
+        applySyncBlob(blob);
+        expect(localStorage.getItem('pt_active_set')).toBe('demo');
+    });
+    it('summarises a blob', () => {
+        expect(summarizeBlob(blob)).toEqual({ workspaces: ['Main', 'Alt'], transactions: 3 });
+        expect(summarizeBlob('nope')).toBeNull();
+    });
+    it('stashes and restores what the device had', () => {
+        localStorage.setItem('pt_sets', '[1]');
+        stashBackup();
+        expect(hasBackup()).toBe(true);
+        applySyncBlob(blob);
+        expect(restoreBackup()).toBe(true);
+        expect(localStorage.getItem('pt_sets')).toBe('[1]');
+        expect(hasBackup()).toBe(false);
     });
 });
