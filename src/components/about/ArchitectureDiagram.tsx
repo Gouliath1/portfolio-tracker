@@ -141,7 +141,7 @@ function Flow({ labelKey, live = true }: { labelKey: TranslationKey; live?: bool
     const { t } = useTranslation();
     const color = live ? 'var(--accent)' : 'var(--text-muted)';
     return (
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex items-center gap-2 py-1.5">
             <MdArrowDownward size={15} style={{ color }} className="flex-shrink-0" aria-hidden="true" />
             <p className="text-[11px]" style={{ color }}>{t(labelKey)}</p>
         </div>
@@ -182,8 +182,8 @@ function Group({
 }) {
     const { t } = useTranslation();
     return (
-        <div className="w-full rounded-2xl py-3 px-3 sm:px-4" style={{ border: '1px dashed var(--border-strong)' }}>
-            <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+        <div className="w-full rounded-2xl py-2.5 px-3 sm:px-4" style={{ border: '1px dashed var(--border-strong)' }}>
+            <div className="flex items-baseline gap-2 mb-2 flex-wrap">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em]"
                     style={{ color: 'var(--text-muted)' }}>
                     {t(labelKey)}
@@ -223,10 +223,10 @@ function Legend() {
 }
 
 /** Widths are set per node so a card is as wide as it needs to be, no wider. */
-const SPINE = 'w-full max-w-[22rem]';
-const STORE = 'w-full sm:w-[17rem]';
-const PROVIDER = 'w-full sm:w-[13rem]';
-const CLIENT = 'w-full sm:w-[19rem]';
+const SPINE = 'w-full max-w-[20rem]';
+const STORE = 'w-full sm:w-[13.5rem]';
+const PROVIDER = 'w-full sm:w-[12rem]';
+const CLIENT = 'w-full sm:w-[13.5rem]';
 
 export function ArchitectureDiagram() {
     const { t, locale } = useTranslation();
@@ -310,142 +310,145 @@ export function ArchitectureDiagram() {
 
     return (
         <figure className="m-0">
-            <div className="mb-4"><Legend /></div>
+            <div className="mb-3"><Legend /></div>
 
-            <div className="flex flex-col items-center">
+            {/* The three tiers are one system and are boxed as one; the third
+                parties are someone else's and sit outside that boundary,
+                alongside the server that calls them. */}
+            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-1">
 
-                {/* 1 — the two things that talk to the server. The browser is
-                    where the portfolio lives; an assistant is a second client
-                    reading a snapshot, not something downstream of prices. */}
-                <Group labelKey="about.groupClients">
-                    <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
-                        <Node className={CLIENT} node={{
-                            icon: MdLaptopMac,
-                            titleKey: 'about.layerBrowser',
-                            subtitleKey: 'about.subBrowser',
-                            tag: 'YOU',
-                            state: 'live',
-                            lines: [
-                                browser
-                                    ? { text: t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }) }
-                                    : null,
-                                { text: t('about.detailBrowserMath') },
-                            ],
-                        }} />
-                        <Node className={CLIENT} node={{
-                            icon: MdSmartToy,
-                            titleKey: 'about.boxMcp',
-                            subtitleKey: 'about.subMcp',
-                            tag: 'MCP',
-                            state: browser?.aiConnected ? 'live' : 'idle',
-                            lines: [
-                                { text: '/api/mcp/<token>', mono: true },
-                                browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
-                            ],
-                        }} />
-                    </div>
-                </Group>
+                <div className="flex-1 min-w-0 rounded-2xl p-2 sm:p-3"
+                    style={{ border: '1px solid var(--border-strong)' }}>
+                    <div className="flex flex-col items-center">
 
-                {/* One arrow per client, kept under its own card so each says
-                    what that client sends and whether it is sending it. */}
-                <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                    <div className={`${CLIENT} flex justify-center`}>
-                        <Flow labelKey="about.flowToServer" />
-                    </div>
-                    <div className={`${CLIENT} flex justify-center`}>
-                        <Flow labelKey="about.flowMcp" live={!!browser?.aiConnected} />
-                    </div>
-                </div>
-
-                {/* 2 — the server, with the third parties beside it rather than
-                    beneath: they are not a stage the data flows through, they are
-                    where it comes from when the cache cannot answer. */}
-                <div className="w-full flex flex-col md:flex-row items-stretch gap-2 md:gap-1">
-                    <div className="flex-1 min-w-0">
-                    <Group labelKey="about.groupServer" detail={serverDetail}>
-                        <Node className={SPINE} node={{
-                            icon: MdDns,
-                            titleKey: 'about.boxRuntime',
-                            subtitleKey: 'about.detailRoutes',
-                            tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
-                            state: server ? 'live' : 'unknown',
-                            lines: [
-                                { text: t('about.lineAppCacheFirst') },
-                                { text: t('about.lineAppNoHoldings') },
-                            ],
-                        }} />
-                    </Group>
-                    </div>
-
-                    <SideFlow labelKey="about.flowToProviders" />
-
-                    <div className="w-full md:w-[14.5rem] md:self-start">
-                        <Group labelKey="about.groupThirdParty">
-                            <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                                <Node className={PROVIDER} node={{
-                                    icon: MdShowChart,
-                                    titleKey: 'about.boxYahoo',
-                                    subtitleKey: 'about.subYahoo',
-                                    tag: 'YAHOO',
-                                    state: providerState(server?.providers.yahoo),
-                                    lines: [{ text: t('about.lineNoKeyNeeded') }],
-                                }} />
-                                <Node className={PROVIDER} node={{
-                                    icon: MdInsights,
-                                    titleKey: 'about.boxJquants',
-                                    subtitleKey: 'about.subJquants',
-                                    tag: 'JPX',
-                                    state: providerState(server?.providers.jquants),
-                                    lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
-                                }} />
-                                <Node className={PROVIDER} node={{
-                                    icon: MdListAlt,
-                                    titleKey: 'about.boxTopix',
-                                    subtitleKey: 'about.subTopix',
-                                    tag: 'BLACKROCK',
+                        {/* 1 — the two things that talk to the server. The browser
+                            is where the portfolio lives; an assistant is a second
+                            client reading a snapshot, not a stage after prices. */}
+                        <Group labelKey="about.groupClients">
+                            <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
+                                <Node className={CLIENT} node={{
+                                    icon: MdLaptopMac,
+                                    titleKey: 'about.layerBrowser',
+                                    subtitleKey: 'about.subBrowser',
+                                    tag: 'YOU',
                                     state: 'live',
-                                    lines: [{ text: t('about.lineBundled') }],
+                                    lines: [
+                                        browser
+                                            ? { text: t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }) }
+                                            : null,
+                                        { text: t('about.detailBrowserMath') },
+                                    ],
+                                }} />
+                                <Node className={CLIENT} node={{
+                                    icon: MdSmartToy,
+                                    titleKey: 'about.boxMcp',
+                                    subtitleKey: 'about.subMcp',
+                                    tag: 'MCP',
+                                    state: browser?.aiConnected ? 'live' : 'idle',
+                                    lines: [
+                                        { text: '/api/mcp/<token>', mono: true },
+                                        browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
+                                    ],
                                 }} />
                             </div>
+                        </Group>
+
+                        {/* One arrow per client, kept under its own card so each
+                            says what that client sends and whether it is sending. */}
+                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                            <div className={`${CLIENT} flex justify-center`}>
+                                <Flow labelKey="about.flowToServer" />
+                            </div>
+                            <div className={`${CLIENT} flex justify-center`}>
+                                <Flow labelKey="about.flowMcp" live={!!browser?.aiConnected} />
+                            </div>
+                        </div>
+
+                        {/* 2 — the code */}
+                        <Group labelKey="about.groupServer" detail={serverDetail}>
+                            <Node className={SPINE} node={{
+                                icon: MdDns,
+                                titleKey: 'about.boxRuntime',
+                                subtitleKey: 'about.detailRoutes',
+                                tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
+                                state: server ? 'live' : 'unknown',
+                                lines: [
+                                    { text: t('about.lineAppCacheFirst') },
+                                    { text: t('about.lineAppNoHoldings') },
+                                ],
+                            }} />
+                        </Group>
+
+                        <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
+
+                        {/* 3 — the storage. Both entries are SQLite; which one is
+                            live depends only on whether the machine running the
+                            app has a disk it may write to. */}
+                        <Group labelKey="about.groupDatabase" detail={t('about.subStores')}>
+                            <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                                <Node className={STORE} node={{
+                                    icon: MdStorage,
+                                    titleKey: 'about.boxSqliteFiles',
+                                    tag: 'LOCAL',
+                                    state: storeState('sqlite'),
+                                    lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
+                                }} />
+                                <Node className={STORE} node={{
+                                    icon: MdCloudQueue,
+                                    titleKey: 'about.boxTursoService',
+                                    tag: 'TURSO',
+                                    state: storeState('turso'),
+                                    lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
+                                }} />
+                            </div>
+
+                            {/* What the tier does not contain, which is the claim
+                                the rest of the page rests on. */}
+                            <p className="text-[10.5px] mt-2 leading-snug text-center max-w-[32rem]"
+                                style={{ color: 'var(--text-muted)' }}>
+                                {t('about.dbNote')}
+                            </p>
                         </Group>
                     </div>
                 </div>
 
-                <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
+                <SideFlow labelKey="about.flowToProviders" />
 
-                {/* 3 — the database tier. Both entries are SQLite; which one is
-                    live depends only on whether the machine running the app has
-                    a disk it may write to. */}
-                <Group labelKey="about.groupDatabase" detail={t('about.subStores')}>
-                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
-                        <Node className={STORE} node={{
-                            icon: MdStorage,
-                            titleKey: 'about.boxSqliteFiles',
-                            tag: 'LOCAL',
-                            state: storeState('sqlite'),
-                            lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
-                        }} />
-                        <Node className={STORE} node={{
-                            icon: MdCloudQueue,
-                            titleKey: 'about.boxTursoService',
-                            tag: 'TURSO',
-                            state: storeState('turso'),
-                            lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
-                        }} />
-                    </div>
-
-                    {/* What the tier does not contain, which is the claim the
-                        rest of the page rests on. */}
-                    <p className="text-[10.5px] mt-2.5 leading-snug text-center max-w-[32rem]"
-                        style={{ color: 'var(--text-muted)' }}>
-                        {t('about.dbNote')}
-                    </p>
-                </Group>
+                <div className="w-full md:w-[13.5rem] md:flex-shrink-0">
+                    <Group labelKey="about.groupThirdParty">
+                        <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                            <Node className={PROVIDER} node={{
+                                icon: MdShowChart,
+                                titleKey: 'about.boxYahoo',
+                                subtitleKey: 'about.subYahoo',
+                                tag: 'YAHOO',
+                                state: providerState(server?.providers.yahoo),
+                                lines: [{ text: t('about.lineNoKeyNeeded') }],
+                            }} />
+                            <Node className={PROVIDER} node={{
+                                icon: MdInsights,
+                                titleKey: 'about.boxJquants',
+                                subtitleKey: 'about.subJquants',
+                                tag: 'JPX',
+                                state: providerState(server?.providers.jquants),
+                                lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
+                            }} />
+                            <Node className={PROVIDER} node={{
+                                icon: MdListAlt,
+                                titleKey: 'about.boxTopix',
+                                subtitleKey: 'about.subTopix',
+                                tag: 'BLACKROCK',
+                                state: 'live',
+                                lines: [{ text: t('about.lineBundled') }],
+                            }} />
+                        </div>
+                    </Group>
+                </div>
             </div>
 
             {/* The failure the drawing is currently reporting, in words. */}
             {server?.cache.reason && (
-                <p className="text-[10.5px] mt-4 leading-relaxed font-mono break-words"
+                <p className="text-[10.5px] mt-3 leading-relaxed font-mono break-words"
                     style={{ color: 'var(--warn)' }}>
                     {server.cache.reason}
                 </p>
