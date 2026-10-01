@@ -295,13 +295,9 @@ export function ArchitectureDiagram() {
                 {/* 1 — the two things that talk to the server. The browser is
                     where the portfolio lives; an assistant is a second client
                     reading a snapshot, not something downstream of prices. */}
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
-                    style={{ color: 'var(--text-muted)' }}>
-                    {t('about.groupClients')}
-                </p>
-                <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
-                    <div className={`${CLIENT} flex flex-col`}>
-                        <Node className="flex-1" node={{
+                <Group labelKey="about.groupClients">
+                    <div className="flex flex-wrap justify-center items-stretch gap-2.5 w-full">
+                        <Node className={CLIENT} node={{
                             icon: MdLaptopMac,
                             titleKey: 'about.layerBrowser',
                             subtitleKey: 'about.subBrowser',
@@ -314,11 +310,7 @@ export function ArchitectureDiagram() {
                                 { text: t('about.detailBrowserMath') },
                             ],
                         }} />
-                        <Flow labelKey="about.flowToServer" />
-                    </div>
-
-                    <div className={`${CLIENT} flex flex-col`}>
-                        <Node className="flex-1" node={{
+                        <Node className={CLIENT} node={{
                             icon: MdSmartToy,
                             titleKey: 'about.boxMcp',
                             subtitleKey: 'about.subMcp',
@@ -329,10 +321,19 @@ export function ArchitectureDiagram() {
                                 browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
                             ],
                         }} />
+                    </div>
+                </Group>
+
+                {/* One arrow per client, kept under its own card so each says
+                    what that client sends and whether it is sending it. */}
+                <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                    <div className={`${CLIENT} flex justify-center`}>
+                        <Flow labelKey="about.flowToServer" />
+                    </div>
+                    <div className={`${CLIENT} flex justify-center`}>
                         <Flow labelKey="about.flowMcp" live={!!browser?.aiConnected} />
                     </div>
                 </div>
-
 
                 {/* 2 — the server and the database it keeps, in one enclosure */}
                 <Group labelKey="about.groupServer" detail={serverDetail}>
