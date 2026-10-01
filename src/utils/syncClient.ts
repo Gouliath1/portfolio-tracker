@@ -22,7 +22,7 @@ export interface ServerSnapshot {
     blob: string;
 }
 
-export type SyncAction = 'noop' | 'push' | 'pull' | 'conflict' | 'adopt' | 'recreate';
+export type SyncAction = 'noop' | 'push' | 'pull' | 'conflict' | 'adopt' | 'ended';
 
 // ── Key + device state ──────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ export function planSync(args: {
     const { localBlob, device, server } = args;
     const localChanged = localBlob !== device.lastBlob;
 
-    if (!server) return 'recreate'; // expired or revoked elsewhere — re-create from this device
+    if (!server) return 'ended'; // expired or revoked elsewhere — stop syncing, never re-create
     if (server.blob === localBlob) {
         return server.version === device.version ? 'noop' : 'adopt';
     }
