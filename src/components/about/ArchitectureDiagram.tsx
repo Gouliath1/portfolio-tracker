@@ -52,11 +52,17 @@ interface ServerStatus {
     providers: { yahoo: boolean; jquants: boolean };
 }
 
-const palette: Record<State, { border: string; background: string; icon: string; title: string }> = {
-    live:    { border: 'var(--accent-glow)', background: 'var(--surface)',  icon: 'var(--accent)',     title: 'var(--text-primary)' },
-    idle:    { border: 'var(--border)',      background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
-    blocked: { border: 'var(--warn-glow)',   background: 'var(--warn-dim)', icon: 'var(--warn)',       title: 'var(--text-primary)' },
-    unknown: { border: 'var(--border)',      background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
+/**
+ * A node's colour carries its state, so the states have to be separable at a
+ * glance: the two that matter — carrying traffic, and failing — take the full
+ * accent and warning colours at double width, while the ones that are merely
+ * present stay hairline and grey.
+ */
+const palette: Record<State, { border: string; width: string; background: string; icon: string; title: string }> = {
+    live:    { border: 'var(--accent)',  width: '2px', background: 'var(--surface)',  icon: 'var(--accent)',     title: 'var(--text-primary)' },
+    idle:    { border: 'var(--border)',  width: '1px', background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
+    blocked: { border: 'var(--warn)',    width: '2px', background: 'var(--warn-dim)', icon: 'var(--warn)',       title: 'var(--text-primary)' },
+    unknown: { border: 'var(--border)',  width: '1px', background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
 };
 
 /** A small grey line of specifics under a node's name. */
@@ -87,9 +93,10 @@ function Node({ node, className = '' }: { node: NodeSpec; className?: string }) 
         <div
             className={`rounded-2xl px-3.5 py-3 ${className}`}
             style={{
-                border: `1.5px solid ${tone.border}`,
+                border: `${tone.width} solid ${tone.border}`,
                 background: tone.background,
-                opacity: node.state === 'idle' ? 0.7 : 1,
+                opacity: node.state === 'idle' ? 0.65 : 1,
+                boxShadow: node.state === 'live' ? '0 1px 3px var(--accent-dim)' : undefined,
             }}
         >
             <div className="flex items-start gap-2.5">
@@ -180,8 +187,8 @@ function Legend() {
                     style={{ color: 'var(--text-muted)' }}>
                     <span className="rounded-[3px]"
                         style={{
-                            width: 10, height: 10,
-                            border: `1.5px solid ${palette[entry.state].border}`,
+                            width: 11, height: 11,
+                            border: `${palette[entry.state].width} solid ${palette[entry.state].border}`,
                             background: palette[entry.state].background,
                         }}
                         aria-hidden="true"
