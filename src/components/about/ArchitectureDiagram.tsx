@@ -3,11 +3,17 @@
 /**
  * The app's architecture, as the system that is running right now.
  *
- * Read top to bottom: your browser, the server it talks to, the databases that
+ * Read top to bottom: your browser, the server it talks to, the database that
  * server keeps, and the providers it falls back to. Every node reports its own
  * state — carrying traffic, idle in this environment, or blocked — so the
  * drawing cannot quietly claim a piece works when it does not. The state comes
  * from /api/architecture and from localStorage, on mount.
+ *
+ * Nodes are sized to their contents and centred under one another rather than
+ * stretched to the page, so the flow reads as a line of cards instead of a
+ * stack of bars. Within a node the lines keep a fixed order — what it is,
+ * where it sits, its address, what it holds now — which is what lets the two
+ * databases be compared at a glance without labelling every row.
  *
  * Laid out with elements rather than an SVG: the labels are translated, and a
  * French string runs half again as long as its English original, so text that
@@ -46,22 +52,21 @@ interface ServerStatus {
     providers: { yahoo: boolean; jquants: boolean };
 }
 
-const palette: Record<State, { border: string; background: string; dot: string; title: string }> = {
-    live:    { border: 'var(--accent-glow)', background: 'var(--surface)',    dot: 'var(--accent)',     title: 'var(--text-primary)' },
-    idle:    { border: 'var(--border)',      background: 'transparent',       dot: 'var(--text-muted)', title: 'var(--text-secondary)' },
-    blocked: { border: 'var(--warn-glow)',   background: 'var(--warn-dim)',   dot: 'var(--warn)',       title: 'var(--text-primary)' },
-    unknown: { border: 'var(--border)',      background: 'transparent',       dot: 'var(--text-muted)', title: 'var(--text-secondary)' },
+const palette: Record<State, { border: string; background: string; icon: string; title: string }> = {
+    live:    { border: 'var(--accent-glow)', background: 'var(--surface)',  icon: 'var(--accent)',     title: 'var(--text-primary)' },
+    idle:    { border: 'var(--border)',      background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
+    blocked: { border: 'var(--warn-glow)',   background: 'var(--warn-dim)', icon: 'var(--warn)',       title: 'var(--text-primary)' },
+    unknown: { border: 'var(--border)',      background: 'transparent',     icon: 'var(--text-muted)', title: 'var(--text-secondary)' },
 };
 
-/** A labelled fact inside a node — the same labels in the same order across peers. */
-interface Field {
-    labelKey: TranslationKey;
-    value: string;
+/** A small grey line of specifics under a node's name. */
+interface Line {
+    text: string;
+    /** Paths, hostnames and anything else meant to be read as an identifier. */
     mono?: boolean;
 }
 
 interface NodeSpec {
-    key: string;
     icon: IconType;
     titleKey: TranslationKey;
     /** One line under the title, saying what it does. */
@@ -69,20 +74,18 @@ interface NodeSpec {
     /** Who runs it — the corner tag. Not translated: these are proper names. */
     tag?: string;
     state: State;
-    /** Free lines, for nodes that need no field labels. */
-    lines?: string[];
-    /** Labelled rows, for nodes that are meant to be compared with a peer. */
-    fields?: Field[];
+    lines?: (Line | null)[];
 }
 
-function Node({ node }: { node: NodeSpec }) {
+function Node({ node, className = '' }: { node: NodeSpec; className?: string }) {
     const { t } = useTranslation();
     const tone = palette[node.state];
     const Icon = node.icon;
+    const lines = (node.lines ?? []).filter((line): line is Line => line !== null);
 
     return (
         <div
-            className="rounded-2xl px-3.5 py-3 h-full"
+            className={`rounded-2xl px-3.5 py-3 ${className}`}
             style={{
                 border: `1.5px solid ${tone.border}`,
                 background: tone.background,
@@ -90,7 +93,7 @@ function Node({ node }: { node: NodeSpec }) {
             }}
         >
             <div className="flex items-start gap-2.5">
-                <Icon size={18} style={{ color: tone.dot }} className="flex-shrink-0 mt-px" aria-hidden="true" />
+                <Icon size={17} style={{ color: tone.icon }} className="flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                         <p className="text-[13px] font-semibold leading-tight" style={{ color: tone.title }}>
@@ -111,32 +114,16 @@ function Node({ node }: { node: NodeSpec }) {
                 </div>
             </div>
 
-            {node.lines && node.lines.length > 0 && (
-                <div className="mt-2 pl-[28px] space-y-0.5">
-                    {node.lines.map(line => (
-                        <p key={line} className="text-[10.5px] leading-snug" style={{ color: 'var(--text-muted)' }}>
-                            {line}
+            {lines.length > 0 && (
+                <div className="mt-2 space-y-0.5">
+                    {lines.map(line => (
+                        <p key={line.text}
+                            className={`leading-snug break-words ${line.mono ? 'font-mono text-[10px]' : 'text-[10.5px]'}`}
+                            style={{ color: 'var(--text-muted)' }}>
+                            {line.text}
                         </p>
                     ))}
                 </div>
-            )}
-
-            {node.fields && (
-                <dl className="mt-2 pl-[28px] grid gap-x-2 gap-y-1"
-                    style={{ gridTemplateColumns: 'auto minmax(0, 1fr)' }}>
-                    {node.fields.map(field => (
-                        <div key={field.labelKey} className="contents">
-                            <dt className="text-[9px] font-semibold uppercase tracking-[0.12em] leading-tight pt-px"
-                                style={{ color: 'var(--text-muted)' }}>
-                                {t(field.labelKey)}
-                            </dt>
-                            <dd className={`m-0 leading-snug break-words ${field.mono ? 'font-mono text-[10px]' : 'text-[10.5px]'}`}
-                                style={{ color: 'var(--text-muted)' }}>
-                                {field.value}
-                            </dd>
-                        </div>
-                    ))}
-                </dl>
             )}
         </div>
     );
@@ -147,7 +134,7 @@ function Flow({ labelKey, live = true }: { labelKey: TranslationKey; live?: bool
     const { t } = useTranslation();
     const color = live ? 'var(--accent)' : 'var(--text-muted)';
     return (
-        <div className="flex items-center gap-2 py-2 pl-5">
+        <div className="flex items-center gap-2 py-2">
             <MdArrowDownward size={15} style={{ color }} className="flex-shrink-0" aria-hidden="true" />
             <p className="text-[11px]" style={{ color }}>{t(labelKey)}</p>
         </div>
@@ -166,15 +153,15 @@ function Group({
 }) {
     const { t } = useTranslation();
     return (
-        <div className="rounded-2xl p-3 sm:p-4" style={{ border: '1px dashed var(--border-strong)' }}>
-            <div className="flex items-baseline gap-2 mb-2.5 flex-wrap">
+        <div className="w-full rounded-2xl py-3 px-3 sm:px-4" style={{ border: '1px dashed var(--border-strong)' }}>
+            <div className="flex items-baseline gap-2 mb-3 flex-wrap">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em]"
                     style={{ color: 'var(--text-muted)' }}>
                     {t(labelKey)}
                 </p>
                 {detail && <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{detail}</p>}
             </div>
-            {children}
+            <div className="flex flex-col items-center">{children}</div>
         </div>
     );
 }
@@ -205,6 +192,11 @@ function Legend() {
         </div>
     );
 }
+
+/** Widths are set per node so a card is as wide as it needs to be, no wider. */
+const SPINE = 'w-full max-w-[22rem]';
+const STORE = 'w-full sm:w-[17rem]';
+const PROVIDER = 'w-full sm:w-[13rem]';
 
 export function ArchitectureDiagram() {
     const { t, locale } = useTranslation();
@@ -264,128 +256,141 @@ export function ArchitectureDiagram() {
         return parts.join(' · ');
     };
 
-    /** Both databases answer the same questions in the same order, so they compare. */
-    const storeFields = (kind: Storage, techKey: TranslationKey, whereKey: TranslationKey, address: string): Field[] => [
-        { labelKey: 'about.fieldTech', value: t(techKey) },
-        { labelKey: 'about.fieldWhere', value: t(whereKey) },
-        { labelKey: 'about.fieldAddress', value: address, mono: true },
-        { labelKey: 'about.fieldNow', value: storeNow(kind) },
+    /**
+     * Both databases say the same things in the same order — what it is, where
+     * it sits, its address, what it holds now — so they read as two answers to
+     * one question rather than two different descriptions.
+     */
+    const storeLines = (kind: Storage, whereKey: TranslationKey, address: string): Line[] => [
+        { text: t('about.techSqlite') },
+        { text: t(whereKey) },
+        { text: address, mono: true },
+        { text: storeNow(kind) },
     ];
 
+    /** Locally the server is this machine, which is worth saying rather than implying. */
     const serverDetail = server
-        ? [t(server.host === 'vercel' ? 'about.hostVercel' : 'about.hostLocal'), server.region]
-            .filter(Boolean).join(' · ')
+        ? (server.host === 'vercel'
+            ? [t('about.hostVercel'), server.region].filter(Boolean).join(' · ')
+            : t('about.hostLocal'))
         : undefined;
 
     const providerState = (ok: boolean | undefined): State =>
         server === null ? 'unknown' : ok ? 'live' : 'idle';
 
-    const providers: NodeSpec[] = [
-        {
-            key: 'yahoo', icon: MdShowChart, titleKey: 'about.boxYahoo', tag: 'YAHOO',
-            subtitleKey: 'about.subYahoo', state: providerState(server?.providers.yahoo),
-        },
-        {
-            key: 'jquants', icon: MdInsights, titleKey: 'about.boxJquants', tag: 'JPX',
-            subtitleKey: 'about.subJquants', state: providerState(server?.providers.jquants),
-            lines: server && !server.providers.jquants ? [t('about.detailNoKey')] : undefined,
-        },
-        {
-            key: 'topix', icon: MdListAlt, titleKey: 'about.boxTopix', tag: 'BLACKROCK',
-            subtitleKey: 'about.subTopix', state: 'live', lines: [t('about.detailStatic')],
-        },
-    ];
-
     return (
         <figure className="m-0">
             <div className="mb-4"><Legend /></div>
 
-            {/* 1 — the browser, which is where the portfolio actually lives */}
-            <Node node={{
-                key: 'browser',
-                icon: MdLaptopMac,
-                titleKey: 'about.layerBrowser',
-                subtitleKey: 'about.subBrowser',
-                tag: 'YOU',
-                state: 'live',
-                lines: browser
-                    ? [
-                        t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }),
-                        t('about.detailBrowserMath'),
-                    ]
-                    : undefined,
-            }} />
+            <div className="flex flex-col items-center">
 
-            <Flow labelKey="about.flowToServer" />
-
-            {/* 2 — the server and the database it keeps, in one enclosure */}
-            <Group labelKey="about.groupServer" detail={serverDetail}>
-                <Node node={{
-                    key: 'app',
-                    icon: MdDns,
-                    titleKey: 'about.boxRuntime',
-                    subtitleKey: 'about.detailRoutes',
-                    tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
-                    state: server ? 'live' : 'unknown',
+                {/* 1 — the browser, which is where the portfolio actually lives */}
+                <Node className={SPINE} node={{
+                    icon: MdLaptopMac,
+                    titleKey: 'about.layerBrowser',
+                    subtitleKey: 'about.subBrowser',
+                    tag: 'YOU',
+                    state: 'live',
+                    lines: [
+                        browser
+                            ? { text: t(browser.positions === 1 ? 'about.detailPosition' : 'about.detailPositions', { count: n(browser.positions) }) }
+                            : null,
+                        { text: t('about.detailBrowserMath') },
+                    ],
                 }} />
 
-                <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
+                <Flow labelKey="about.flowToServer" />
 
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2"
-                    style={{ color: 'var(--text-muted)' }}>
-                    {t('about.subStores')}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-stretch">
-                    <Node node={{
-                        key: 'sqlite',
-                        icon: MdStorage,
-                        titleKey: 'about.boxSqliteFiles',
-                        tag: 'LOCAL',
-                        state: storeState('sqlite'),
-                        fields: storeFields('sqlite', 'about.techSqliteFile', 'about.whereSameMachine',
-                            './data/marketCache.db · ./data/shares.db'),
+                {/* 2 — the server and the database it keeps, in one enclosure */}
+                <Group labelKey="about.groupServer" detail={serverDetail}>
+                    <Node className={SPINE} node={{
+                        icon: MdDns,
+                        titleKey: 'about.boxRuntime',
+                        subtitleKey: 'about.detailRoutes',
+                        tag: server?.host === 'vercel' ? 'VERCEL' : 'LOCAL',
+                        state: server ? 'live' : 'unknown',
+                        lines: [
+                            { text: t('about.lineAppCacheFirst') },
+                            { text: t('about.lineAppNoHoldings') },
+                        ],
                     }} />
-                    <Node node={{
-                        key: 'turso',
-                        icon: MdCloudQueue,
-                        titleKey: 'about.boxTursoService',
-                        tag: 'TURSO',
-                        state: storeState('turso'),
-                        fields: storeFields('turso', 'about.techSqliteHosted', 'about.whereTurso',
-                            'libsql://….turso.io'),
-                    }} />
-                </div>
-            </Group>
 
-            <Flow labelKey="about.flowToProviders" />
+                    <Flow labelKey="about.flowToStore" live={server?.cache.kind !== 'unavailable'} />
 
-            {/* 3 — where the numbers originally come from */}
-            <Group labelKey="about.layerProviders">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-stretch">
-                    {providers.map(provider => <Node key={provider.key} node={provider} />)}
-                </div>
-            </Group>
-
-            {/* 4 — the opt-in branch, which is off until the user turns it on */}
-            <div className="mt-4 pt-4" style={{ borderTop: '1px dashed var(--border)' }}>
-                <Group labelKey="about.layerAi">
-                    <Node node={{
-                        key: 'mcp',
-                        icon: MdSmartToy,
-                        titleKey: 'about.boxMcp',
-                        subtitleKey: 'about.subMcp',
-                        tag: 'MCP',
-                        state: browser?.aiConnected ? 'live' : 'idle',
-                        lines: browser
-                            ? [t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected')]
-                            : undefined,
-                    }} />
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
+                        style={{ color: 'var(--text-muted)' }}>
+                        {t('about.subStores')}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                        <Node className={STORE} node={{
+                            icon: MdStorage,
+                            titleKey: 'about.boxSqliteFiles',
+                            tag: 'LOCAL',
+                            state: storeState('sqlite'),
+                            lines: storeLines('sqlite', 'about.whereSameMachine', './data/*.db'),
+                        }} />
+                        <Node className={STORE} node={{
+                            icon: MdCloudQueue,
+                            titleKey: 'about.boxTursoService',
+                            tag: 'TURSO',
+                            state: storeState('turso'),
+                            lines: storeLines('turso', 'about.whereTurso', 'libsql://….turso.io'),
+                        }} />
+                    </div>
                 </Group>
+
+                <Flow labelKey="about.flowToProviders" />
+
+                {/* 3 — where the numbers originally come from */}
+                <Group labelKey="about.layerProviders">
+                    <div className="flex flex-wrap justify-center gap-2.5 w-full">
+                        <Node className={PROVIDER} node={{
+                            icon: MdShowChart,
+                            titleKey: 'about.boxYahoo',
+                            subtitleKey: 'about.subYahoo',
+                            tag: 'YAHOO',
+                            state: providerState(server?.providers.yahoo),
+                            lines: [{ text: t('about.lineNoKeyNeeded') }],
+                        }} />
+                        <Node className={PROVIDER} node={{
+                            icon: MdInsights,
+                            titleKey: 'about.boxJquants',
+                            subtitleKey: 'about.subJquants',
+                            tag: 'JPX',
+                            state: providerState(server?.providers.jquants),
+                            lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
+                        }} />
+                        <Node className={PROVIDER} node={{
+                            icon: MdListAlt,
+                            titleKey: 'about.boxTopix',
+                            subtitleKey: 'about.subTopix',
+                            tag: 'BLACKROCK',
+                            state: 'live',
+                            lines: [{ text: t('about.lineBundled') }],
+                        }} />
+                    </div>
+                </Group>
+
+                {/* 4 — the opt-in branch, which is off until the user turns it on */}
+                <div className="w-full mt-4 pt-4" style={{ borderTop: '1px dashed var(--border)' }}>
+                    <Group labelKey="about.layerAi">
+                        <Node className={SPINE} node={{
+                            icon: MdSmartToy,
+                            titleKey: 'about.boxMcp',
+                            subtitleKey: 'about.subMcp',
+                            tag: 'MCP',
+                            state: browser?.aiConnected ? 'live' : 'idle',
+                            lines: [
+                                browser ? { text: t(browser.aiConnected ? 'about.detailConnected' : 'about.detailNotConnected') } : null,
+                            ],
+                        }} />
+                    </Group>
+                </div>
             </div>
 
             {/* The failure the drawing is currently reporting, in words. */}
             {server?.cache.reason && (
-                <p className="text-[10.5px] mt-3 leading-relaxed font-mono break-words"
+                <p className="text-[10.5px] mt-4 leading-relaxed font-mono break-words"
                     style={{ color: 'var(--warn)' }}>
                     {server.cache.reason}
                 </p>
