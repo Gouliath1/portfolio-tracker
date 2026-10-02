@@ -82,7 +82,7 @@ export function parseSyncBlob(raw: string): SyncBlob | null {
  * resurrect from another's stale copy. Returns false (and writes nothing) if
  * the blob is unusable.
  */
-export function applySyncBlob(raw: string): boolean {
+export function applySyncBlob(raw: string, opts: { freshDevice?: boolean } = {}): boolean {
     const blob = parseSyncBlob(raw);
     if (!blob) return false;
 
@@ -92,22 +92,30 @@ export function applySyncBlob(raw: string): boolean {
     for (const [key, value] of Object.entries(blob.entries)) {
         localStorage.setItem(key, value);
     }
-    ensureActiveSet(blob.entries['pt_sets']);
+    ensureActiveSet(blob.entries['pt_sets'], opts.freshDevice === true);
     return true;
 }
 
 const ACTIVE_SET_KEY = 'pt_active_set'; // per-device choice, not synced
+const DEMO_ID = 'demo';
 
 /**
- * The active workspace is a per-device preference, so it isn't carried. A
- * device that has never picked one falls back to the demo workspace — which
- * made a freshly joined device look empty even though the synced workspaces
- * were all there. Point it at a synced workspace instead.
+ * The active workspace is a per-device preference, so it isn't carried. Left
+ * alone it goes wrong two ways: a device that never picked one shows the demo
+ * (an empty-looking join), and one whose pick no longer exists after a pull
+ * (the other device deleted or re-created that workspace) falls back to the demo
+ * with no transactions — 0 P&L. So point it at a synced workspace when it is
+ * unset, stale, or (on a freshly joined device) still the demo default. A
+ * deliberate choice of an existing workspace, or of the demo, is kept.
  */
-function ensureActiveSet(rawSets: string | undefined): void {
-    if (localStorage.getItem(ACTIVE_SET_KEY) !== null || !rawSets) return;
+function ensureActiveSet(rawSets: string | undefined, freshDevice: boolean): void {
+    if (!rawSets) return;
     try {
         const sets = JSON.parse(rawSets) as Array<{ id?: string; is_active?: boolean }>;
+        const current = localStorage.getItem(ACTIVE_SET_KEY);
+        const known = current !== null && sets.some(x => x.id === current);
+        const keep = known || (current === DEMO_ID && !freshDevice);
+        if (keep) return;
         const pick = sets.find(x => x.is_active && x.id) ?? sets.find(x => x.id);
         if (pick?.id) localStorage.setItem(ACTIVE_SET_KEY, pick.id);
     } catch { /* leave the default */ }

@@ -7,6 +7,7 @@ import {
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
+import { SyncMenuButton } from '../sync/SyncMenuButton';
 import { WipBadge } from '../shared/WipBadge';
 
 export type SidebarViewId = 'overview' | 'assets' | 'data';
@@ -185,6 +186,7 @@ export function AppSidebar({
                     </span>
                     <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('sidebar.baseCurrency')}</span>
                 </div>
+                <SyncMenuButton variant="sidebar" className={itemClass} style={defaultStyle} />
                 {/* About — how the app is built, and what leaves the browser */}
                 {activePage === 'about' ? (
                     <div className={itemClass} style={activeStyle}>

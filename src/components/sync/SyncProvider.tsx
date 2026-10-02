@@ -51,6 +51,10 @@ export interface SyncContextValue {
     syncNow: () => Promise<void>;
     resolveConflict: (keep: 'local' | 'cloud') => Promise<void>;
     dismissPendingJoin: () => void;
+    /** The sync panel (opened from the menu button) is showing. */
+    panelOpen: boolean;
+    openPanel: () => void;
+    closePanel: () => void;
 }
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -80,6 +84,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const [conflict, setConflict] = useState<Conflict | null>(null);
     const [pendingJoin, setPendingJoin] = useState<string | null>(null);
     const [remoteUpdate, setRemoteUpdate] = useState(false);
+    const [panelOpen, setPanelOpen] = useState(false);
 
     const busy = useRef(false);
     const conflictRef = useRef<Conflict | null>(null);
@@ -114,8 +119,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
     /** Adopt the server's blob locally, record it, and reload. */
     const adoptCloud = useCallback((token: string, server: ServerSnapshot) => {
-        if (!isLocalStateEmpty()) stashBackup();
-        if (!applySyncBlob(server.blob)) {
+        const freshDevice = isLocalStateEmpty();
+        if (!freshDevice) stashBackup();
+        if (!applySyncBlob(server.blob, { freshDevice })) {
             fail(t('sync.errBadBlob'));
             return false;
         }
@@ -327,7 +333,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         remoteUpdate, applyRemoteUpdate,
         enable, join, disable, syncNow: applyRemoteUpdate, resolveConflict,
         dismissPendingJoin: () => setPendingJoin(null),
-    }), [status, error, lastSyncedAt, link, conflict, pendingJoin, remoteUpdate, applyRemoteUpdate, enable, join, disable, resolveConflict]);
+        panelOpen, openPanel: () => setPanelOpen(true), closePanel: () => setPanelOpen(false),
+    }), [panelOpen, status, error, lastSyncedAt, link, conflict, pendingJoin, remoteUpdate, applyRemoteUpdate, enable, join, disable, resolveConflict]);
 
     return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }
