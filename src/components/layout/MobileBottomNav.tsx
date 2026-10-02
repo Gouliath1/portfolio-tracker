@@ -6,6 +6,7 @@ import {
     MdTrendingUp, MdSettings, MdManageSearch,
 } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
+import { SyncMenuButton } from '../sync/SyncMenuButton';
 
 export type MobileNavPage = 'home' | 'deep-dive' | 'screener' | 'pinned' | 'taxes' | 'about';
 export type HomeView = 'overview' | 'assets' | 'data';
@@ -92,6 +93,8 @@ export function MobileBottomNav({
                     <MdSwapHoriz size={15} />
                 </span><span>{t('nav.portfolios')}</span>
             </button>
+            <SyncMenuButton variant="mobile" className={BTN}
+                style={{ borderLeft: '1px solid var(--border)', color: 'var(--text-muted)' }} />
             <button
                 onClick={onSettingsToggle}
                 aria-label={t('nav.settings')}
