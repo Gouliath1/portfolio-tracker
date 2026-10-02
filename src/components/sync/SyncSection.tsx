@@ -84,15 +84,20 @@ const SyncSectionInner = ({ sync }: { sync: SyncContextValue }) => {
                 {t('sync.sectionTitle')}
             </h3>
 
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {t('sync.explainer')}
-            </p>
+            {!enabled && (
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {t('sync.explainer')}
+                </p>
+            )}
 
             {enabled && link ? (
                 <div className="space-y-3">
                     <div className="rounded-xl p-3 space-y-2"
                         style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)' }}>
-                        <div className="text-xs font-medium" style={{ color: 'var(--accent)' }}>{statusText}</div>
+                        <div className="text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
+                            <MdCheck size={14} />{statusText}
+                        </div>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('sync.alreadyOn')}</p>
                         <div className="flex items-stretch gap-2">
                             <code className="flex-1 min-w-0 text-xs px-2 py-1.5 rounded-lg break-all"
                                 style={{ background: 'var(--surface-popover)', color: 'var(--text-secondary)' }}>
@@ -112,7 +117,7 @@ const SyncSectionInner = ({ sync }: { sync: SyncContextValue }) => {
                             className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
                             style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
                             <MdSync size={14} />
-                            {t('sync.syncNow')}
+                            {t('sync.checkUpdates')}
                         </button>
                         <button onClick={downloadRecovery}
                             className="h-8 flex items-center gap-1.5 px-3 rounded-lg text-xs font-medium transition-all"

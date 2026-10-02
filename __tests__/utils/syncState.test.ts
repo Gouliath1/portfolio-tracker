@@ -87,6 +87,16 @@ describe('joining a device', () => {
         applySyncBlob(blob);
         expect(localStorage.getItem('pt_active_set')).toBe('demo');
     });
+    it('repoints a stale active choice to a synced workspace', () => {
+        localStorage.setItem('pt_active_set', 'gone');
+        applySyncBlob(blob);
+        expect(localStorage.getItem('pt_active_set')).toBe('b');
+    });
+    it('replaces the demo default on a freshly joined device', () => {
+        localStorage.setItem('pt_active_set', 'demo');
+        applySyncBlob(blob, { freshDevice: true });
+        expect(localStorage.getItem('pt_active_set')).toBe('b');
+    });
     it('summarises a blob', () => {
         expect(summarizeBlob(blob)).toEqual({ workspaces: ['Main', 'Alt'], transactions: 3 });
         expect(summarizeBlob('nope')).toBeNull();

@@ -8,7 +8,6 @@ import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurr
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 import { ExchangeRatesSection } from './ExchangeRatesSection';
 import { ConnectAiSection } from './ConnectAiSection';
-import { SyncSection } from '../sync/SyncSection';
 import { WipBadge } from '../shared/WipBadge';
 import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
 
@@ -189,9 +188,6 @@ export const SettingsPanel = ({
                             </div>
                         </div>
                     </section>
-
-                    {/* Cross-device sync — opt-in; the other place holdings leave the browser */}
-                    <SyncSection />
 
                     {/* AI connection — the one opt-in that lets holdings leave the browser */}
                     {buildBrief && (

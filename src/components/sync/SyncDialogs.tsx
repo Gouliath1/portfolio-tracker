@@ -11,7 +11,10 @@
 
 import type { ReactNode } from 'react';
 import { useTranslation } from '../../i18n';
+import { useEffect } from 'react';
+import { MdClose } from 'react-icons/md';
 import { useSync } from './SyncProvider';
+import { SyncSection } from './SyncSection';
 import { collectSyncBlob, summarizeBlob, type BlobSummary } from '../../utils/syncState';
 
 function Dialog({ title, body, extra, children }: { title: string; body: string; extra?: ReactNode; children: ReactNode }) {
@@ -53,10 +56,35 @@ function CopyCard({ label, summary }: { label: string; summary: BlobSummary | nu
 
 const btn = 'h-9 px-4 rounded-lg text-sm font-medium transition-all';
 
+function SyncPanel({ onClose }: { onClose: () => void }) {
+    const { t } = useTranslation();
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', h);
+        return () => document.removeEventListener('keydown', h);
+    }, [onClose]);
+    return (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
+            style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}
+            role="dialog" aria-modal="true" aria-label={t('sync.sectionTitle')}>
+            <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-5"
+                style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)' }}
+                onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} aria-label={t('sync.closePanel')}
+                    className="float-right p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <MdClose size={18} />
+                </button>
+                <SyncSection />
+            </div>
+        </div>
+    );
+}
+
 export function SyncDialogs() {
     const { t } = useTranslation();
     const {
         conflict, pendingJoin, remoteUpdate, join, resolveConflict, dismissPendingJoin, applyRemoteUpdate,
+        panelOpen, closePanel,
     } = useSync();
 
     if (conflict) {
@@ -89,6 +117,8 @@ export function SyncDialogs() {
             </Dialog>
         );
     }
+
+    if (panelOpen) return <SyncPanel onClose={closePanel} />;
 
     if (remoteUpdate) {
         // Non-blocking: applying the update reloads the page, so the user picks the moment.
