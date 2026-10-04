@@ -21,6 +21,8 @@ interface MobileBottomNavProps {
     onSettingsToggle?: () => void;
 }
 
+// Utility actions (sync, settings) are icon-only so the five destinations keep room for their labels.
+const ICON_BTN = 'flex-none w-12 flex items-center justify-center py-2 transition-colors';
 const BTN = 'flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors';
 
 export function MobileBottomNav({
@@ -93,15 +95,15 @@ export function MobileBottomNav({
                     <MdSwapHoriz size={15} />
                 </span><span>{t('nav.portfolios')}</span>
             </button>
-            <SyncMenuButton variant="mobile" className={BTN}
+            <SyncMenuButton variant="mobile" className={ICON_BTN}
                 style={{ borderLeft: '1px solid var(--border)', color: 'var(--text-muted)' }} />
             <button
                 onClick={onSettingsToggle}
                 aria-label={t('nav.settings')}
-                className={BTN}
-                style={{ ...c(settingsOpen), borderLeft: '1px solid var(--border)' }}
+                className={ICON_BTN}
+                style={c(settingsOpen)}
             >
-                <MdSettings size={20} /><span>{t('nav.settings')}</span>
+                <MdSettings size={20} />
             </button>
         </nav>
     );
