@@ -56,7 +56,7 @@ export function SyncMenuButton({ variant, className, style }: {
     return (
         <button onClick={sync.openPanel} className={className} style={style} title={title} aria-label={title}>
             <Icon size={variant === 'sidebar' ? 17 : 20} state={state} dot={dot} />
-            <span>{label}</span>
+            {variant === 'sidebar' && <span>{label}</span>}
         </button>
     );
 }
