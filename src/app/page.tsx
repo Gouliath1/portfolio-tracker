@@ -79,6 +79,7 @@ export default function Home() {
     const [demoBannerRefresh, setDemoBannerRefresh] = useState(0);
     const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
     const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const overviewScrollRef = useRef<HTMLDivElement | null>(null);
     const [showValues, setShowValues] = useState(true);
     const [activeView, setActiveView] = useState<ViewId>('overview');
     const [assetsTab, setAssetsTab] = useState<AssetsTab>('open');
@@ -405,7 +406,16 @@ export default function Home() {
                 <div className="flex-1 min-w-0 md:ml-[200px] flex flex-col h-dvh overflow-hidden">
 
                     {/* ── Main content ─────────────────────────────── */}
-                    <main className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden flex flex-col">
+                    <main
+                        className="flex-1 min-h-0 pb-20 md:pb-0 overflow-hidden flex flex-col"
+                        onWheel={e => {
+                            // Overview scrolls from anywhere in the content area (margins, header),
+                            // not just over the inner scroller.
+                            const el = overviewScrollRef.current;
+                            if (activeView !== 'overview' || !el || el.contains(e.target as Node)) return;
+                            el.scrollTop += e.deltaY;
+                        }}
+                    >
                         <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 min-h-0 flex flex-col gap-4 sm:gap-6">
 
                             {/* Portfolio controls — portfolio name shown only on mobile (sidebar has it on desktop) */}
@@ -504,7 +514,7 @@ export default function Home() {
 
                             {/* Overview: KPIs render immediately with placeholder; chart waits for data */}
                             {activeView === 'overview' && (
-                                <div className="flex-1 min-h-0 scroll-elastic-y">
+                                <div ref={overviewScrollRef} className="flex-1 min-h-0 scroll-elastic-y">
                                 <div className="space-y-4 sm:space-y-6">
                                     {!loading && portfolioSummary && (
                                         <AssetClassFilter
