@@ -1,5 +1,5 @@
 import { Position, RawPosition, PortfolioSummary, Currency } from '@portfolio/types';
-import { fetchStockPrice, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates, fetchHistoricalDividends, type DividendEventRow } from './yahooFinanceApi';
+import { fetchStockPricesBatch, updateAllPositions, fetchCurrentFxRate, fetchHistoricalFxRates, fetchHistoricalDividends, type DividendEventRow } from './yahooFinanceApi';
 
 // Preloaded FX rates for a whole portfolio. When present, calculatePosition uses
 // these instead of making its own network calls — collapses N positions × ~2
@@ -405,11 +405,9 @@ export const calculatePortfolioSummary = async (rawPositions: RawPosition[], for
         })()
         : (async () => {
             const tp = performance.now();
-            const entries = await Promise.all(
-                openTickers.map(async ticker => [ticker, await fetchStockPrice(ticker, false)] as const)
-            );
+            const prices = await fetchStockPricesBatch(openTickers, false);
             log('prices (cached)', tp);
-            return Object.fromEntries(entries);
+            return prices;
         })();
 
     const fxPromise = (async () => {

@@ -82,6 +82,13 @@ export async function POST(request: NextRequest) {
     const result = await pushSync(token, blob, baseVersion);
     if (!result) return unavailable();
 
+    if (!result.ok && result.throttled) {
+        return NextResponse.json(
+            { ok: false, error: 'Too many writes — try again shortly' },
+            { status: 429, headers: { ...NO_STORE, 'Retry-After': String(Math.ceil(result.retryAfterMs / 1000)) } },
+        );
+    }
+
     if (!result.ok) {
         return json({
             ok: false,

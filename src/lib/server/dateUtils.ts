@@ -21,3 +21,5 @@ export function lastExpectedBusinessDay(): string {
     while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
     return d.toISOString().split('T')[0];
 }
+
+export { marketDay } from '../../utils/marketDay';

@@ -22,8 +22,19 @@ import { fetchHistoricalPrices } from '@portfolio/core';
 import {
     getCachedHistoricalPrices,
     setCachedHistoricalPrices,
+    getHistoryCoverage,
+    setHistoryCoverage,
 } from '../../../lib/server/marketDataDb';
 import { lastExpectedBusinessDay } from '../../../lib/server/dateUtils';
+import {
+    isValidSymbol,
+    isValidRange,
+    badRequest,
+    cdnCache,
+    NO_STORE,
+    expensiveRoutesDisabled,
+    disabledResponse,
+} from '../../../lib/server/requestGuards';
 
 type PriceMap = Record<string, number>;
 
@@ -48,6 +59,9 @@ async function fetchAndCache(symbol: string, startDate: string): Promise<PriceMa
     const fetched = await fetchHistoricalPrices(symbol, synthetic, '1d');
     if (fetched && Object.keys(fetched).length > 0) {
         await setCachedHistoricalPrices(symbol, fetched);
+        // Remember how far back we asked, so a short series (young ticker) isn't
+        // treated as "uncovered" and refetched on every request.
+        await setHistoryCoverage('prices', symbol, startDate);
     }
     return fetched ?? {};
 }
@@ -60,6 +74,7 @@ export async function GET(request: Request) {
     if (!symbol) {
         return NextResponse.json({ error: 'symbol is required' }, { status: 400 });
     }
+    if (!isValidSymbol(symbol) || !isValidRange(range)) return badRequest('Invalid symbol or range');
 
     const cached = await getCachedHistoricalPrices(symbol);
     const cachedDates = Object.keys(cached);
@@ -73,11 +88,18 @@ export async function GET(request: Request) {
         if (maxCached === null || d > maxCached) maxCached = d;
     }
 
-    const coversStart = minCached !== null && minCached <= requestedStart;
+    const coveredFrom = await getHistoryCoverage('prices', symbol);
+    const coversStart = (minCached !== null && minCached <= requestedStart)
+        || (coveredFrom !== null && coveredFrom <= requestedStart);
     const isFresh = maxCached !== null && maxCached >= lastBusinessDay;
 
     if (coversStart && isFresh) {
-        return NextResponse.json({ symbol, prices: cached, source: 'cache' });
+        return NextResponse.json({ symbol, prices: cached, source: 'cache' }, { headers: cdnCache(3600, 86400) });
+    }
+
+    if (expensiveRoutesDisabled()) {
+        if (cachedDates.length > 0) return NextResponse.json({ symbol, prices: cached, source: 'cache' }, { headers: NO_STORE });
+        return disabledResponse();
     }
 
     // Need to refetch. Coalesce concurrent requests for this ticker.
@@ -91,7 +113,7 @@ export async function GET(request: Request) {
     try {
         const fresh = await promise;
         const merged = { ...cached, ...fresh };
-        return NextResponse.json({ symbol, prices: merged, source: 'fresh' });
+        return NextResponse.json({ symbol, prices: merged, source: 'fresh' }, { headers: cdnCache(300, 3600) });
     } catch (error) {
         return NextResponse.json({
             symbol,

@@ -22,12 +22,23 @@ import {
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
 import { useTranslation } from '../../i18n';
+import { isPriceStale, marketDay } from '../../utils/marketDay';
 import type { TranslationKey } from '../../i18n';
 
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
 
-type View = 'all' | 'loaded' | 'unloaded' | 'pinned' | 'alerts' | 'notes';
+type View = 'all' | 'loaded' | 'unloaded' | 'stale' | 'pinned' | 'alerts' | 'notes';
+
+const STALE_COLOR = 'oklch(68% 0.14 60)';
+const RATIOS_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+
+/** A loaded row is stale when its price is from an earlier market day or its ratios are over 7 days old. */
+function isEntryStale(e: FundEntry | undefined, now: number): boolean {
+    if (e?.status !== 'done') return false;
+    const ratiosOld = !e.ratiosFetchedAt || now - new Date(e.ratiosFetchedAt).getTime() > RATIOS_MAX_AGE_MS;
+    return isPriceStale(e.fetchedAt, now) || ratiosOld;
+}
 
 const muted = (text: string) => <span style={{ color: 'var(--text-muted)' }}>{text}</span>;
 
@@ -107,7 +118,7 @@ export function ScreenerTable({
     const refreshRef = useRef<(symbol: string) => void>(() => {});
     const nameCacheRef = useRef<Map<string, string>>(new Map());
 
-    const { map: fundMap, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress } = useScreenerFundamentals();
+    const { map: fundMap, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress, lastRun } = useScreenerFundamentals();
     mapRef.current = fundMap;
     refreshRef.current = refresh;
 
@@ -121,6 +132,7 @@ export function ScreenerTable({
     const viewRows = useMemo(() => {
         if (view === 'loaded') return constituents.filter(c => fundMap.get(c.symbol)?.status === 'done');
         if (view === 'unloaded') return constituents.filter(c => fundMap.get(c.symbol)?.status !== 'done');
+        if (view === 'stale') { const now = Date.now(); return constituents.filter(c => isEntryStale(fundMap.get(c.symbol), now)); }
         if (view === 'pinned') return constituents.filter(c => pinnedSymbols.has(c.symbol));
         if (view === 'alerts') return constituents.filter(c => alerts[c.symbol] != null);
         if (view === 'notes') return constituents.filter(c => notes[c.symbol] != null);
@@ -142,6 +154,10 @@ export function ScreenerTable({
         [constituents, fundMap],
     );
     const unloadedCount = constituents.length - loadedCount;
+    const staleCount = useMemo(() => {
+        const now = Date.now();
+        return constituents.reduce((n, c) => n + (isEntryStale(fundMap.get(c.symbol), now) ? 1 : 0), 0);
+    }, [constituents, fundMap]);
     const alertsCount = useMemo(() => Object.keys(alerts).length, [alerts]);
     const notesCount = useMemo(() => Object.keys(notes).length, [notes]);
 
@@ -256,9 +272,11 @@ export function ScreenerTable({
                     const isLoaded = e?.status === 'done';
                     const fetchedAt = e?.status === 'done' ? e.fetchedAt : undefined;
                     const ratiosFetchedAt = e?.status === 'done' ? e.ratiosFetchedAt : undefined;
-                    const priceAge = fetchedAt ? Date.now() - new Date(fetchedAt).getTime() : Infinity;
+                    // Same rule the server uses: a price is current for the whole market
+                    // day it was fetched on, not for a rolling 24 h.
+                    const priceStale = isPriceStale(fetchedAt);
                     const ratioAge = ratiosFetchedAt ? Date.now() - new Date(ratiosFetchedAt).getTime() : Infinity;
-                    const isStale = priceAge > 24 * 3600 * 1000 || ratioAge > 7 * 24 * 3600 * 1000;
+                    const isStale = priceStale || ratioAge > 7 * 24 * 3600 * 1000;
                     const dotColor = !isLoaded ? 'var(--border-strong)'
                         : isStale ? 'oklch(68% 0.14 60)'
                         : 'var(--pnl-green)';
@@ -273,8 +291,9 @@ export function ScreenerTable({
                     const dotTooltip = isLoaded ? (
                         <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {fetchedAt && (
-                                <span style={{ color: priceAge < 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
+                                <span style={{ color: priceStale ? AMBER : 'var(--pnl-green)' }}>
                                     {t('screener.priceAge', { age: fmt(fetchedAt) ?? '' })}
+                                    {' — '}{priceStale ? t('screener.staleLabel') : t('screener.currentLabel')}
                                 </span>
                             )}
                             <span style={{ color: ratiosFetchedAt && ratioAge < 7 * 24 * 3600 * 1000 ? 'var(--pnl-green)' : AMBER }}>
@@ -288,7 +307,9 @@ export function ScreenerTable({
                         <div className="flex items-center gap-1.5 w-full min-w-0">
                             {/* Custom CSS tooltip — absolute, escapes via td overflow:visible */}
                             <span className="relative group/dot flex-shrink-0" style={{ display: 'inline-flex', cursor: dotTooltip ? 'help' : 'default' }}>
-                                <span className="rounded-full" style={{ width: 5, height: 5, background: dotColor, opacity: isLoaded ? 1 : 0.45 }} />
+                                <span className="rounded-full" role="img"
+                                    aria-label={!isLoaded ? t('screener.tabNotLoaded') : isStale ? t('screener.staleLabel') : t('screener.currentLabel')}
+                                    style={{ width: 5, height: 5, background: dotColor, opacity: isLoaded ? 1 : 0.45 }} />
                                 {dotTooltip && (
                                     <span className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 hidden group-hover/dot:block whitespace-nowrap rounded-md px-2 py-1 text-xs"
                                         style={{ background: 'var(--surface-popover)', border: '1px solid var(--border)' }}>
@@ -317,15 +338,32 @@ export function ScreenerTable({
                 },
             }),
             columnHelper.accessor(() => null, {
-                id: 'price', header: t('screener.price'), size: 110, minSize: 72,
+                id: 'price', header: t('screener.price'), size: 140, minSize: 90,
                 enableSorting: true, sortingFn: numSort('price'),
-                cell: props => fundCell(props.row.original.symbol, d =>
-                    d.price == null ? null : (
-                        <span className="tabular-nums">
+                cell: props => fundCell(props.row.original.symbol, d => {
+                    if (d.price == null) return null;
+                    // Only stale prices speak: the date the price is from sits next to it,
+                    // as text (not just colour), so "since when" is readable at a glance.
+                    const e = mapRef.current.get(props.row.original.symbol);
+                    const priceFetchedAt = e?.status === 'done' ? e.fetchedAt : undefined;
+                    const stale = e?.status === 'done' && isPriceStale(priceFetchedAt);
+                    const asOf = stale && priceFetchedAt
+                        ? new Date(marketDay(priceFetchedAt) + 'T12:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+                        : null;
+                    return (
+                        <span className="tabular-nums" style={stale ? { color: 'var(--text-secondary)' } : undefined}>
                             {d.currency === 'JPY' ? '¥' : ''}{fmtPrice(d.price, d.currency, locale)}{' '}
                             {d.currency !== 'JPY' && <span style={{ color: 'var(--text-muted)' }}>{d.currency ?? ''}</span>}
+                            {asOf && (
+                                <span className="ml-1 text-[10px] font-medium whitespace-nowrap"
+                                    style={{ color: STALE_COLOR }}
+                                    title={t('screener.priceAsOf', { date: asOf })}>
+                                    {asOf}
+                                </span>
+                            )}
                         </span>
-                    )),
+                    );
+                }),
             }),
             columnHelper.accessor(() => null, {
                 id: 'trailingPE', header: t('screener.per'), size: 58, minSize: 44,
@@ -499,6 +537,21 @@ export function ScreenerTable({
     const missingSymbols = filteredSymbols.filter(s => fundMap.get(s)?.status !== 'done');
     const runRefresh = (symbols: string[]) => { setRefreshOpen(false); loadMany(symbols); };
 
+    // How current is what's on screen? Same rule as the server's shared cache:
+    // prices are current for the market day they were fetched on, ratios for 7 days.
+    const freshness = (() => {
+        let current = 0, notLoaded = 0;
+        const staleSymbols: string[] = [];
+        const now = Date.now();
+        for (const s of filteredSymbols) {
+            const e = fundMap.get(s);
+            if (e?.status !== 'done') { notLoaded++; continue; }
+            if (isEntryStale(e, now)) staleSymbols.push(s); else current++;
+        }
+        return { current, stale: staleSymbols.length, notLoaded, staleSymbols };
+    })();
+    const marketDayLabel = new Date(marketDay() + 'T12:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+
     const sortableColumns = table.getAllLeafColumns().filter(c => c.getCanSort());
     const columnLabel = (id: string) => {
         const h = table.getColumn(id)?.columnDef.header;
@@ -632,6 +685,7 @@ export function ScreenerTable({
                         {viewTab('all', 'common.all', constituents.length)}
                         {viewTab('loaded', 'screener.tabLoaded', loadedCount)}
                         {viewTab('unloaded', 'screener.tabNotLoaded', unloadedCount)}
+                        {viewTab('stale', 'screener.tabStale', staleCount)}
                         {viewTab('pinned', 'screener.tabPinned', pinnedSymbols.size)}
                         {viewTab('alerts', 'screener.tabAlerts', alertsCount)}
                         {viewTab('notes', 'screener.tabNotes', notesCount)}
@@ -640,6 +694,27 @@ export function ScreenerTable({
 
                 {/* Actions — pushed to the right */}
                 <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+                    {!progress && filteredSymbols.length > 0 && (
+                        <div className="hidden md:flex flex-col items-end text-xs leading-tight mr-1"
+                            title={t('screener.freshHint')}
+                            onClick={freshness.stale > 0 ? () => handleSetView('stale') : undefined}
+                            style={freshness.stale > 0 ? { cursor: 'pointer' } : undefined}>
+                            <span className="flex items-center gap-1.5"
+                                style={{ color: freshness.stale > 0 ? 'oklch(68% 0.14 60)' : freshness.notLoaded > 0 ? 'var(--text-muted)' : 'var(--pnl-green)' }}>
+                                <span className="rounded-full" style={{ width: 6, height: 6, background: 'currentColor', display: 'inline-block' }} />
+                                {freshness.stale === 0 && freshness.notLoaded === 0
+                                    ? t('screener.freshAllCurrent', { count: freshness.current, date: marketDayLabel })
+                                    : freshness.stale > 0
+                                        ? t('screener.freshStale', { count: freshness.stale })
+                                        : t('screener.freshNotLoaded', { count: freshness.notLoaded })}
+                            </span>
+                            {lastRun && (lastRun.refreshed + lastRun.cached) > 0 && (
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                    {t('screener.lastRun', { refreshed: lastRun.refreshed, cached: lastRun.cached })}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     {progress ? (
                         <button onClick={cancelLoad}
                             className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm font-medium transition-all"
@@ -671,6 +746,11 @@ export function ScreenerTable({
                                                 {t('screener.refreshPageCount', { count: pageSymbols.length })}
                                             </button>
                                         )}
+                                        <button role="menuitem" onClick={() => runRefresh(freshness.staleSymbols)} disabled={freshness.stale === 0}
+                                            className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all disabled:opacity-40"
+                                            style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
+                                            {t('screener.refreshStale', { count: freshness.stale })}
+                                        </button>
                                         <button role="menuitem" onClick={() => runRefresh(missingSymbols)} disabled={missingSymbols.length === 0}
                                             className="w-full text-left px-3 py-2 text-xs hover:opacity-70 transition-all disabled:opacity-40"
                                             style={{ color: 'var(--text-primary)', borderTop: '1px solid var(--border)' }}>
@@ -943,6 +1023,7 @@ export function ScreenerTable({
                         {isPinnedPage ? t('screener.emptyPinned') :
                         view === 'loaded' ? t('screener.emptyLoaded') :
                             view === 'unloaded' ? t('screener.emptyUnloaded') :
+                            view === 'stale' ? t('screener.emptyStale') :
                             view === 'pinned' ? t('screener.emptyPinned') :
                             view === 'alerts' ? t('screener.emptyAlerts') :
                             view === 'notes' ? t('screener.emptyNotes') :
@@ -959,6 +1040,7 @@ export function ScreenerTable({
                     {!isPinnedPage && view === 'all' && showAll && t('screener.countNames', { count: totalCount.toLocaleString(locale) })}
                     {view === 'loaded' && t('screener.countWithData', { count: totalCount.toLocaleString(locale) })}
                     {view === 'unloaded' && t('screener.countWithoutData', { count: totalCount.toLocaleString(locale) })}
+                    {view === 'stale' && t('screener.countStale', { count: totalCount.toLocaleString(locale) })}
                     {view === 'pinned' && t('screener.countPinned', { count: totalCount.toLocaleString(locale) })}
                     {view === 'alerts' && t('screener.countWithAlerts', { count: totalCount.toLocaleString(locale) })}
                     {view === 'notes' && t('screener.countWithNotes', { count: totalCount.toLocaleString(locale) })}

@@ -28,9 +28,17 @@ export interface SyncRecord {
     expiresAt: string;
 }
 
+/**
+ * Minimum gap between two writes to one session. Every push is a Turso row
+ * write, and a client stuck in a change loop (or a script) could otherwise
+ * write continuously; a legitimate client pushes at most once per few seconds.
+ */
+export const MIN_PUSH_INTERVAL_MS = 3_000;
+
 export type PushResult =
     | { ok: true; version: number; updatedAt: string; expiresAt: string }
-    | { ok: false; conflict: SyncRecord | null };
+    | { ok: false; throttled: true; retryAfterMs: number }
+    | { ok: false; throttled?: false; conflict: SyncRecord | null };
 
 let _client: Client | null = null;
 let _initPromise: Promise<void> | null = null;
@@ -156,6 +164,9 @@ export async function pushSync(
     const expiresAt = expiryFrom(now);
     const nextVersion = baseVersion + 1;
 
+    // Updates only land if the previous write is old enough; creation has no previous write.
+    const notAfter = new Date(now.getTime() - MIN_PUSH_INTERVAL_MS).toISOString();
+
     const result = baseVersion === 0
         ? await client.execute({
             sql: `INSERT INTO sync_sessions (token_hash, blob, version, created_at, updated_at, expires_at)
@@ -166,14 +177,23 @@ export async function pushSync(
         : await client.execute({
             sql: `UPDATE sync_sessions
                   SET blob = ?, version = ?, updated_at = ?, expires_at = ?
-                  WHERE token_hash = ? AND version = ?`,
-            args: [blob, nextVersion, iso, expiresAt, hash, baseVersion],
+                  WHERE token_hash = ? AND version = ? AND updated_at <= ?`,
+            args: [blob, nextVersion, iso, expiresAt, hash, baseVersion, notAfter],
         });
 
     if (result.rowsAffected > 0) {
         return { ok: true, version: nextVersion, updatedAt: iso, expiresAt };
     }
-    return { ok: false, conflict: await getSync(token, now) };
+
+    const current = await getSync(token, now);
+    if (baseVersion > 0 && current && current.version === baseVersion) {
+        // Right version, rejected anyway: too soon after the last write.
+        const retryAfterMs = Math.max(
+            1, MIN_PUSH_INTERVAL_MS - (now.getTime() - new Date(current.updatedAt).getTime()),
+        );
+        return { ok: false, throttled: true, retryAfterMs };
+    }
+    return { ok: false, conflict: current };
 }
 
 /** Revoke a sync session. Holding the key is the only authorisation required. */

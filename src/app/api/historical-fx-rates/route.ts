@@ -9,8 +9,19 @@
 import { NextResponse } from 'next/server';
 import { fetchHistoricalFxRates, forwardFillLookup } from '@portfolio/core';
 import {
+    isValidPair,
+    parseDates,
+    badRequest,
+    cdnCache,
+    NO_STORE,
+    expensiveRoutesDisabled,
+    disabledResponse,
+} from '../../../lib/server/requestGuards';
+import {
     getCachedHistoricalFxRates,
     setCachedHistoricalFxRates,
+    getHistoryCoverage,
+    setHistoryCoverage,
 } from '../../../lib/server/marketDataDb';
 import { lastExpectedBusinessDay } from '../../../lib/server/dateUtils';
 
@@ -38,6 +49,7 @@ async function fetchAndCache(pair: string, earliestDate: string): Promise<RateMa
     const fetched = await fetchHistoricalFxRates(pair, dates);
     if (fetched && Object.keys(fetched).length > 0) {
         await setCachedHistoricalFxRates(pair, fetched);
+        await setHistoryCoverage('fx', pair, earliestDate);
     }
     return fetched ?? {};
 }
@@ -51,8 +63,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'pair is required' }, { status: 400 });
     }
 
-    const requestedDates = datesParam ? datesParam.split(',').filter(Boolean) : [];
+    if (!isValidPair(pair)) return badRequest('Invalid pair');
+    const parsedDates = parseDates(datesParam);
+    if (parsedDates === null) return badRequest('Invalid or too many dates');
+    const requestedDates: string[] = parsedDates;
     const cached = await getCachedHistoricalFxRates(pair);
+    const coveredFrom = await getHistoryCoverage('fx', pair);
     const cachedDates = Object.keys(cached);
 
     let minCached: string | null = null;
@@ -68,7 +84,8 @@ export async function GET(request: Request) {
 
     const coversStart = requestedStart === null
         ? cachedDates.length > 0
-        : minCached !== null && minCached <= requestedStart;
+        : (minCached !== null && minCached <= requestedStart)
+            || (coveredFrom !== null && coveredFrom <= requestedStart);
     const isFresh = maxCached !== null && maxCached >= lastExpectedBusinessDay();
 
     // When the caller asked for specific dates, return only those (with
@@ -86,7 +103,12 @@ export async function GET(request: Request) {
     }
 
     if (coversStart && isFresh) {
-        return NextResponse.json({ pair, rates: filterToRequested(cached), source: 'cache' });
+        return NextResponse.json({ pair, rates: filterToRequested(cached), source: 'cache' }, { headers: cdnCache(3600, 86400) });
+    }
+
+    if (expensiveRoutesDisabled()) {
+        if (cachedDates.length > 0) return NextResponse.json({ pair, rates: filterToRequested(cached), source: 'cache' }, { headers: NO_STORE });
+        return disabledResponse();
     }
 
     const earliest = requestedStart ?? minCached ?? lastExpectedBusinessDay();
@@ -101,7 +123,7 @@ export async function GET(request: Request) {
     try {
         const fresh = await promise;
         const merged = { ...cached, ...fresh };
-        return NextResponse.json({ pair, rates: filterToRequested(merged), source: 'fresh' });
+        return NextResponse.json({ pair, rates: filterToRequested(merged), source: 'fresh' }, { headers: cdnCache(300, 3600) });
     } catch (error) {
         return NextResponse.json({
             pair,
