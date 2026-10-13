@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolveAssetClasses } from '@portfolio/server';
+import { parseSymbols, badRequest, cdnCache, expensiveRoutesDisabled, disabledResponse } from '../../../lib/server/requestGuards';
 
 // Returns a { ticker: assetClass } map for the requested tickers. Asset class
 // is sourced from Yahoo (meta.instrumentType) on first request and cached in
@@ -12,11 +13,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ assetClasses: {} });
     }
 
-    const tickers = tickersParam.split(',').map(t => t.trim()).filter(Boolean);
+    // One Yahoo call per unknown ticker, so the list is capped and validated.
+    const parsed = parseSymbols(tickersParam);
+    if (parsed.rejected) return badRequest('tickers: up to 100 valid symbols');
+    const tickers = parsed.symbols;
+    if (expensiveRoutesDisabled()) return disabledResponse();
 
     try {
         const assetClasses = await resolveAssetClasses(tickers);
-        return NextResponse.json({ assetClasses });
+        return NextResponse.json({ assetClasses }, { headers: cdnCache(86400, 604800) });
     } catch (error) {
         console.error('Error resolving asset classes:', error);
         return NextResponse.json({ assetClasses: {} });

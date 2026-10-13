@@ -61,16 +61,23 @@ export const BenchmarkCard = ({ summary, baseCurrency }: BenchmarkCardProps) => 
         return [...ds].sort();
     }, [summary]);
 
-    const [benchmarkXirr, setBenchmarkXirr] = useState<number | null>(null);
-    const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+    // The fetch depends only on WHAT is needed (the date list and the currency),
+    // not on the summary object. `summary` is rebuilt on most parent renders, and
+    // keying the fetch on its identity re-requested the benchmark history 100+
+    // times per page load — every one a serverless invocation. The replay maths
+    // below re-runs on summary changes; the network does not.
+    const datesKey = useMemo(() => neededDates.join(','), [neededDates]);
+    const hasHistory = portfolioXirr !== null;
+
+    const [series, setSeries] = useState<{ prices: Record<string, number>; rates: Record<string, number> } | null>(null);
+    const [fetchState, setFetchState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 
     useEffect(() => {
-        if (portfolioXirr === null || neededDates.length === 0) return;
+        if (!hasHistory || datesKey === '') return;
         let cancelled = false;
-        setState('loading');
+        setFetchState('loading');
 
         const fxPair = `USD${baseCurrency}`;
-        const dates = neededDates.join(',');
 
         Promise.all([
             fetch(`/api/historical-prices?symbol=${BENCHMARK_SYMBOL}&range=max`)
@@ -78,34 +85,42 @@ export const BenchmarkCard = ({ summary, baseCurrency }: BenchmarkCardProps) => 
                 .then(d => (d?.prices ?? {}) as Record<string, number>),
             baseCurrency === 'USD'
                 ? Promise.resolve<Record<string, number>>({})
-                : fetch(`/api/historical-fx-rates?pair=${fxPair}&dates=${encodeURIComponent(dates)}`)
+                : fetch(`/api/historical-fx-rates?pair=${fxPair}&dates=${encodeURIComponent(datesKey)}`)
                     .then(r => r.ok ? r.json() : null)
                     .then(d => (d?.rates ?? {}) as Record<string, number>),
         ]).then(([prices, rates]) => {
             if (cancelled) return;
-            const priceMap = new Map(Object.entries(prices));
-            const fxMap = new Map(Object.entries(rates));
-
-            // Index price converted to the portfolio's base currency, forward-
-            // filled so a flow on a non-trading day maps to the prior close.
-            const indexPriceBaseOn = (date: string): number | null => {
-                const px = forwardFillLookup(priceMap, date);
-                if (px === null) return null;
-                if (baseCurrency === 'USD') return px;
-                const fx = forwardFillLookup(fxMap, date);
-                return fx === null ? null : px * fx;
-            };
-
-            const result = calculateBenchmarkReplayXirr(summary, indexPriceBaseOn);
-            setBenchmarkXirr(result?.return ?? null);
-            setState(result ? 'ready' : 'error');
+            setSeries({ prices, rates });
+            setFetchState('ready');
         }).catch(() => {
-            if (!cancelled) setState('error');
+            if (!cancelled) setFetchState('error');
         });
 
         return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [portfolioXirr, baseCurrency, neededDates]);
+    }, [hasHistory, baseCurrency, datesKey]);
+
+    const benchmark = useMemo(() => {
+        if (!series) return null;
+        const priceMap = new Map(Object.entries(series.prices));
+        const fxMap = new Map(Object.entries(series.rates));
+
+        // Index price converted to the portfolio's base currency, forward-
+        // filled so a flow on a non-trading day maps to the prior close.
+        const indexPriceBaseOn = (date: string): number | null => {
+            const px = forwardFillLookup(priceMap, date);
+            if (px === null) return null;
+            if (baseCurrency === 'USD') return px;
+            const fx = forwardFillLookup(fxMap, date);
+            return fx === null ? null : px * fx;
+        };
+        return calculateBenchmarkReplayXirr(summary, indexPriceBaseOn);
+    }, [series, summary, baseCurrency]);
+
+    const benchmarkXirr = benchmark?.return ?? null;
+    const state: 'loading' | 'ready' | 'error' =
+        fetchState === 'error' || (fetchState === 'ready' && benchmark === null) ? 'error'
+        : fetchState === 'ready' ? 'ready'
+        : 'loading';
 
     const excess = portfolioXirr === null || benchmarkXirr === null
         ? null

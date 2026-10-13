@@ -37,18 +37,20 @@ describe('syncStore', () => {
     });
 
     it('advances version on a matching base', async () => {
-        await pushSync(TOKEN, 'v1', 0);
-        const res = await pushSync(TOKEN, 'v2', 1);
+        const t0 = new Date('2026-01-01T00:00:00Z');
+        await pushSync(TOKEN, 'v1', 0, t0);
+        const res = await pushSync(TOKEN, 'v2', 1, new Date(t0.getTime() + 10_000));
         expect(res).toMatchObject({ ok: true, version: 2 });
-        expect((await getSync(TOKEN))?.blob).toBe('v2');
+        expect((await getSync(TOKEN, new Date(t0.getTime() + 11_000)))?.blob).toBe('v2');
     });
 
     it('rejects a stale base and returns the current row', async () => {
-        await pushSync(TOKEN, 'v1', 0);
-        await pushSync(TOKEN, 'v2', 1);
-        const res = await pushSync(TOKEN, 'stale', 1);
+        const t0 = new Date('2026-01-01T00:00:00Z');
+        await pushSync(TOKEN, 'v1', 0, t0);
+        await pushSync(TOKEN, 'v2', 1, new Date(t0.getTime() + 10_000));
+        const res = await pushSync(TOKEN, 'stale', 1, new Date(t0.getTime() + 20_000));
         expect(res).toMatchObject({ ok: false, conflict: { blob: 'v2', version: 2 } });
-        expect((await getSync(TOKEN))?.blob).toBe('v2');
+        expect((await getSync(TOKEN, new Date(t0.getTime() + 21_000)))?.blob).toBe('v2');
     });
 
     it('rejects create when a row already exists', async () => {
@@ -89,5 +91,39 @@ describe('syncStore', () => {
     it('purges expired rows', async () => {
         await pushSync(TOKEN, 'v1', 0, new Date('2020-01-01T00:00:00Z'));
         expect(await purgeExpiredSync()).toBe(1);
+    });
+});
+
+describe('syncStore write throttle', () => {
+    let dir: string;
+    beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), 'sync-'));
+        process.env.SYNC_DB_PATH = join(dir, 'sync.db');
+        delete process.env.TURSO_DATABASE_URL;
+        delete process.env.TURSO_AUTH_TOKEN;
+        resetSyncStoreForTests();
+    });
+    afterEach(() => {
+        delete process.env.SYNC_DB_PATH;
+        resetSyncStoreForTests();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('rejects a second write inside the minimum interval, then allows it', async () => {
+        const t0 = new Date('2026-01-01T00:00:00Z');
+        await pushSync(TOKEN, 'v1', 0, t0);
+        const tooSoon = await pushSync(TOKEN, 'v2', 1, new Date(t0.getTime() + 1_000));
+        expect(tooSoon).toMatchObject({ ok: false, throttled: true });
+        expect((await getSync(TOKEN, t0))?.blob).toBe('v1');
+        const later = await pushSync(TOKEN, 'v2', 1, new Date(t0.getTime() + 4_000));
+        expect(later).toMatchObject({ ok: true, version: 2 });
+    });
+
+    it('still reports a stale base as a conflict, not a throttle', async () => {
+        const t0 = new Date('2026-01-01T00:00:00Z');
+        await pushSync(TOKEN, 'v1', 0, t0);
+        await pushSync(TOKEN, 'v2', 1, new Date(t0.getTime() + 4_000));
+        const stale = await pushSync(TOKEN, 'x', 1, new Date(t0.getTime() + 5_000));
+        expect(stale).toMatchObject({ ok: false, conflict: { version: 2 } });
     });
 });

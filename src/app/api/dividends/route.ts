@@ -13,6 +13,16 @@
 import { NextResponse } from 'next/server';
 import { fetchHistoricalDividends } from '@portfolio/core';
 import {
+    isValidSymbol,
+    isValidRange,
+    badRequest,
+    cdnCache,
+    NO_STORE,
+    allowForcedRefresh,
+    expensiveRoutesDisabled,
+    disabledResponse,
+} from '../../../lib/server/requestGuards';
+import {
     getCachedDividendEvents,
     getDividendRefreshedAt,
     setCachedDividendEvents,
@@ -59,11 +69,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
     const range = searchParams.get('range') ?? '5y';
-    const fresh = searchParams.get('fresh') === '1';
+    const fresh = searchParams.get('fresh') === '1'
+        && !expensiveRoutesDisabled()
+        && allowForcedRefresh(`div:${symbol}`, 60_000);
 
     if (!symbol) {
         return NextResponse.json({ error: 'symbol is required' }, { status: 400 });
     }
+    if (!isValidSymbol(symbol) || !isValidRange(range)) return badRequest('Invalid symbol or range');
 
     const cached = await getCachedDividendEvents(symbol);
     const refreshedAt = await getDividendRefreshedAt(symbol);
@@ -82,7 +95,12 @@ export async function GET(request: Request) {
     const cacheFresh = isCacheFreshEnough(refreshedAt);
 
     if (!fresh && coversStart && cacheFresh) {
-        return NextResponse.json({ symbol, dividends: cached, source: 'cache' });
+        return NextResponse.json({ symbol, dividends: cached, source: 'cache' }, { headers: cdnCache(3600, 86400) });
+    }
+
+    if (expensiveRoutesDisabled()) {
+        if (Object.keys(cached).length > 0) return NextResponse.json({ symbol, dividends: cached, source: 'cache' }, { headers: NO_STORE });
+        return disabledResponse();
     }
 
     let promise = _inFlight.get(symbol);
@@ -95,7 +113,7 @@ export async function GET(request: Request) {
     try {
         const fetched = await promise;
         const merged = { ...cached, ...fetched };
-        return NextResponse.json({ symbol, dividends: merged, source: 'fresh' });
+        return NextResponse.json({ symbol, dividends: merged, source: 'fresh' }, { headers: cdnCache(300, 3600) });
     } catch (error) {
         return NextResponse.json({
             symbol,

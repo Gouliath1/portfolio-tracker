@@ -95,10 +95,9 @@ describe('localStorage save', () => {
         mockFetch.mockResolvedValueOnce({
             ok: true,
             json: async () => ({
-                ...DONE_ENTRY.data,
-                fetchedAt: NOW,
-                ratiosFetchedAt: NOW,
-                ratiosPending: false,
+                results: {
+                    '1234.T': { ...DONE_ENTRY.data, fetchedAt: NOW, ratiosFetchedAt: NOW, ratiosPending: false },
+                },
             }),
         } as Response);
 
@@ -244,11 +243,9 @@ describe('loadMany', () => {
         mockFetch.mockResolvedValueOnce({
             ok: true,
             json: async () => ({
-                ...DONE_ENTRY.data,
-                symbol: 'MANY.T',
-                fetchedAt: NOW,
-                ratiosFetchedAt: NOW,
-                ratiosPending: false,
+                results: {
+                    'MANY.T': { ...DONE_ENTRY.data, symbol: 'MANY.T', fetchedAt: NOW, ratiosFetchedAt: NOW, ratiosPending: false },
+                },
             }),
         } as Response);
 
@@ -261,6 +258,78 @@ describe('loadMany', () => {
             expect(result.current.map.get('MANY.T')?.status).toBe('done');
             expect(result.current.progress).toBeNull();
         });
+    });
+
+    it('refreshes in chunks of 50 through the batch endpoint, not one request per symbol', async () => {
+        const symbols = Array.from({ length: 120 }, (_, i) => `${6000 + i}.T`);
+        mockFetch.mockImplementation(async (_url, init) => {
+            const body = JSON.parse(String((init as RequestInit).body)) as { symbols: string[] };
+            const results = Object.fromEntries(body.symbols.map(sym => [
+                sym, { ...DONE_ENTRY.data, symbol: sym, fetchedAt: NOW, ratiosFetchedAt: NOW, ratiosPending: false },
+            ]));
+            return { ok: true, json: async () => ({ results }) } as Response;
+        });
+
+        const { result } = renderHook(() => useScreenerFundamentals());
+        act(() => { result.current.loadMany(symbols); });
+
+        await waitFor(() => expect(result.current.progress).toBeNull(), { timeout: 5000 });
+        expect(mockFetch).toHaveBeenCalledTimes(3); // 50 + 50 + 20
+        for (const call of mockFetch.mock.calls) {
+            expect(call[0]).toBe('/api/screener/refresh');
+            expect(JSON.parse(String((call[1] as RequestInit).body)).symbols.length).toBeLessThanOrEqual(50);
+        }
+        expect(result.current.map.get('6119.T')?.status).toBe('done');
+    });
+
+    it('reports how many rows were refetched vs already current when a run finishes', async () => {
+        mockFetch.mockImplementation(async (_url, init) => {
+            const body = JSON.parse(String((init as RequestInit).body)) as { symbols: string[] };
+            const results = Object.fromEntries(body.symbols.map(sym => [
+                sym, { ...DONE_ENTRY.data, symbol: sym, fetchedAt: NOW, ratiosFetchedAt: NOW, ratiosPending: false },
+            ]));
+            return { ok: true, json: async () => ({ results, refreshed: 3, cached: 7 }) } as Response;
+        });
+        const { result } = renderHook(() => useScreenerFundamentals());
+        expect(result.current.lastRun).toBeNull();
+        act(() => { result.current.loadMany(Array.from({ length: 20 }, (_, i) => `${8000 + i}.T`)); });
+        await waitFor(() => expect(result.current.lastRun).toEqual({ refreshed: 3, cached: 7 }), { timeout: 4000 });
+    });
+
+    it('applies streamed rows as they arrive, before the response finishes', async () => {
+        // jsdom has no streams/encoders; Node's are equivalent to the browser's.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { TextEncoder, TextDecoder } = require('util');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { ReadableStream } = require('stream/web');
+        Object.assign(globalThis, { TextEncoder, TextDecoder, ReadableStream });
+        const enc = new TextEncoder();
+        let push!: (s: string) => void;
+        let close!: () => void;
+        const body = new ReadableStream<Uint8Array>({
+            start(c) { push = (x: string) => c.enqueue(enc.encode(x)); close = () => c.close(); },
+        });
+        mockFetch.mockResolvedValueOnce({ ok: true, body } as unknown as Response);
+        const row = (sym: string) => JSON.stringify({ symbol: sym, data: { ...DONE_ENTRY.data, symbol: sym, fetchedAt: NOW, ratiosFetchedAt: NOW, ratiosPending: false } }) + '\n';
+
+        const { result } = renderHook(() => useScreenerFundamentals());
+        act(() => { result.current.loadMany(['S1.T', 'S2.T']); });
+
+        push(row('S1.T'));
+        await waitFor(() => expect(result.current.map.get('S1.T')?.status).toBe('done'));
+        expect(result.current.map.get('S2.T')?.status).toBe('loading'); // not yet — stream still open
+        expect(result.current.progress).toEqual({ done: 1, total: 2 });
+
+        push(row('S2.T') + JSON.stringify({ done: true, refreshed: 2, cached: 0 }) + '\n');
+        close();
+        await waitFor(() => expect(result.current.lastRun).toEqual({ refreshed: 2, cached: 0 }));
+    });
+
+    it('marks symbols the server returned nothing for as errors', async () => {
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ results: {} }) } as Response);
+        const { result } = renderHook(() => useScreenerFundamentals());
+        act(() => { result.current.loadMany(['GONE.T']); });
+        await waitFor(() => expect(result.current.map.get('GONE.T')?.status).toBe('error'));
     });
 
     it('sets error state when fetch fails', async () => {
@@ -282,14 +351,15 @@ describe('loadMany', () => {
 describe('cancelLoad', () => {
     it('stops a bulk load and reverts unfetched symbols to their previous entry', async () => {
         localStorage.setItem(LS_KEY, JSON.stringify([['KEEP.T', DONE_ENTRY]]));
-        // Never resolves — the first 3 fetches stay in flight.
+        // Never resolves — the first two chunk requests stay in flight.
         mockFetch.mockImplementation(() => new Promise(() => {}));
 
         const { result } = renderHook(() => useScreenerFundamentals());
-        const symbols = ['A.T', 'B.T', 'C.T', 'KEEP.T', 'NEW.T'];
+        // 100 symbols fill the two in-flight chunks of 50; the last chunk is never started.
+        const symbols = [...Array.from({ length: 100 }, (_, i) => `${7000 + i}.T`), 'KEEP.T', 'NEW.T'];
 
         act(() => { result.current.loadMany(symbols); });
-        expect(result.current.progress).toEqual({ done: 0, total: 5 });
+        expect(result.current.progress).toEqual({ done: 0, total: 102 });
         expect(result.current.map.get('KEEP.T')?.status).toBe('loading');
 
         act(() => { result.current.cancelLoad(); });
@@ -297,7 +367,7 @@ describe('cancelLoad', () => {
         expect(result.current.progress).toBeNull();
         expect(result.current.map.get('KEEP.T')).toMatchObject({ status: 'done' });
         expect(result.current.map.has('NEW.T')).toBe(false);
-        // Only the first worker batch was ever requested.
-        expect(mockFetch).toHaveBeenCalledTimes(3);
+        // Only the first two chunks were ever requested.
+        expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 });

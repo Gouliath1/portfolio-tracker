@@ -15,6 +15,13 @@ import type { RawPosition } from '@portfolio/types';
 
 jest.mock('@portfolio/core/yahooFinanceApi', () => ({
     fetchStockPrice: jest.fn(),
+  fetchStockPricesBatch: jest.fn(async (symbols: string[], force?: boolean) => {
+    // Delegate to the per-symbol mock so tests keep scripting prices with fetchStockPrice.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const api = require('@portfolio/core/yahooFinanceApi');
+    const entries = await Promise.all([...new Set(symbols)].map(async s => [s, await api.fetchStockPrice(s, force)] as const));
+    return Object.fromEntries(entries);
+  }),
     updateAllPositions: jest.fn(),
     fetchCurrentFxRate: jest.fn(),
     fetchHistoricalFxRates: jest.fn(),

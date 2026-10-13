@@ -263,6 +263,44 @@ export async function fetchStockPrice(symbol: string, forceRefresh: boolean = fa
     }
 }
 
+const PRICE_BATCH_SIZE = 100; // matches the server's per-request cap
+
+/**
+ * Prices for many symbols in as few requests as possible (one per 100).
+ *
+ * A portfolio load used to issue one `/api/prices` call per open ticker; the
+ * batch form turns that into a handful, and the server answers from a cache
+ * shared by all users. Symbols the server can't price come back as null.
+ */
+export async function fetchStockPricesBatch(
+    symbols: string[],
+    forceRefresh: boolean = false,
+): Promise<{[key: string]: number | null}> {
+    const unique = [...new Set(symbols)];
+    const out: {[key: string]: number | null} = {};
+
+    if (typeof window === 'undefined') {
+        // Server-side: no self-fetch; hit Yahoo directly per symbol.
+        await Promise.all(unique.map(async s => { out[s] = await fetchStockPrice(s, forceRefresh); }));
+        return out;
+    }
+
+    unique.forEach(s => { out[s] = null; });
+    for (let i = 0; i < unique.length; i += PRICE_BATCH_SIZE) {
+        const chunk = unique.slice(i, i + PRICE_BATCH_SIZE);
+        try {
+            const url = `/api/prices?symbols=${chunk.map(encodeURIComponent).join(',')}${forceRefresh ? '&fresh=1' : ''}`;
+            const response = await fetch(url);
+            if (!response.ok) continue;
+            const data = await response.json() as { prices?: Record<string, { price: number | null } | null> };
+            for (const s of chunk) out[s] = data.prices?.[s]?.price ?? null;
+        } catch (err) {
+            console.error('Error calling /api/prices (batch):', err);
+        }
+    }
+    return out;
+}
+
 // Asset-class taxonomy derived from Yahoo's `meta.instrumentType`. Yahoo only
 // distinguishes by instrument structure (it can't tell a bond ETF from an
 // equity ETF), so this is as granular as the chart endpoint allows.
@@ -319,13 +357,7 @@ export async function fetchInstrumentType(symbol: string): Promise<string | null
 
 // Function to update all positions with current prices only (quick refresh)
 export async function updateAllPositions(symbols: string[]): Promise<{[key: string]: number | null}> {
-    const results: {[key: string]: number | null} = {};
-
-    for (const symbol of symbols) {
-        results[symbol] = await fetchStockPrice(symbol, true);
-    }
-
-    return results;
+    return fetchStockPricesBatch(symbols, true);
 }
 
 // Function to refresh historical data for all positions

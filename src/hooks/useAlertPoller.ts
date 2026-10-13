@@ -10,15 +10,27 @@ type Translator = (key: TranslationKey, params?: TranslationParams) => string;
 
 const POLL_INTERVAL = 60 * 60 * 1000;
 
-async function fetchPrice(symbol: string): Promise<{ price: number | null; currency: string | null }> {
-    try {
-        const res = await fetch(`/api/screener/quote?symbol=${encodeURIComponent(symbol)}&tier=price&fresh=1`);
-        if (!res.ok) return { price: null, currency: null };
-        const d = (await res.json()) as StockFundamentals;
-        return { price: d.price ?? null, currency: d.currency ?? null };
-    } catch {
-        return { price: null, currency: null };
+/** Alerts want a reasonably current price, but never fresher than the server's floor. */
+const ALERT_MAX_AGE_MINUTES = 30;
+const ALERT_CHUNK = 50;
+
+/** One request per 50 alert symbols; the server answers from the shared cache when it can. */
+async function fetchPrices(symbols: string[]): Promise<Record<string, { price: number | null; currency: string | null }>> {
+    const out: Record<string, { price: number | null; currency: string | null }> = {};
+    for (let i = 0; i < symbols.length; i += ALERT_CHUNK) {
+        const chunk = symbols.slice(i, i + ALERT_CHUNK);
+        try {
+            const res = await fetch('/api/screener/refresh', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ symbols: chunk, tier: 'price', maxAgeMinutes: ALERT_MAX_AGE_MINUTES }),
+            });
+            if (!res.ok) continue;
+            const { results } = (await res.json()) as { results: Record<string, StockFundamentals> };
+            for (const [s, d] of Object.entries(results)) out[s] = { price: d.price ?? null, currency: d.currency ?? null };
+        } catch { /* try again next poll */ }
     }
+    return out;
 }
 
 function fmtAlertPrice(v: number, currency: string | null, locale: string) {
@@ -76,9 +88,30 @@ export function useAlertPoller(alerts: Record<string, PriceAlert>) {
             const symbols = Object.keys(current);
             if (symbols.length === 0) return;
 
-            await Promise.all(symbols.map(async symbol => {
+            // Hidden tabs don't poll, and with several tabs open only one does:
+            // N tabs must not mean N times the traffic.
+            if (document.visibilityState !== 'visible') return;
+            const run = async () => {
+                const prices = await fetchPrices(symbols);
+                evaluate(current, symbols, prices);
+            };
+            if (typeof navigator !== 'undefined' && navigator.locks) {
+                await navigator.locks.request('pt-alert-poll', { ifAvailable: true }, async lock => {
+                    if (lock) await run();
+                });
+            } else {
+                await run();
+            }
+        };
+
+        const evaluate = (
+            current: Record<string, PriceAlert>,
+            symbols: string[],
+            prices: Record<string, { price: number | null; currency: string | null }>,
+        ) => {
+            symbols.forEach(symbol => {
                 const alert = current[symbol];
-                const { price, currency } = await fetchPrice(symbol);
+                const { price, currency } = prices[symbol] ?? { price: null, currency: null };
                 if (price == null) return;
 
                 if (alert.targetAbove != null && price >= alert.targetAbove) {
@@ -95,7 +128,7 @@ export function useAlertPoller(alerts: Record<string, PriceAlert>) {
                         sendNotification(symbol, 'below', price, alert.targetBelow, currency, i18nRef.current.t, i18nRef.current.locale);
                     }
                 }
-            }));
+            });
         };
 
         const onVisible = () => { if (document.visibilityState === 'visible') poll(); };

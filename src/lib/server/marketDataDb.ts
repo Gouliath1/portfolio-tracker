@@ -165,6 +165,19 @@ async function ensureInit(): Promise<boolean> {
             // Migrate existing DBs: add columns introduced after the initial schema.
             await addColumnIfMissing(c, 'security_fundamentals', 'ratios_fetched_at', 'TEXT');
             await addColumnIfMissing(c, 'security_fundamentals', 'sector', 'TEXT');
+            // How far back we've already asked upstream for a series. A ticker that
+            // IPO'd 10 years ago can never have rows "covering" a 30-year request,
+            // so without this record every `range=max` request looked uncovered and
+            // refetched (and rewrote the whole series) forever.
+            await c.execute(`
+                CREATE TABLE IF NOT EXISTS history_coverage (
+                    kind TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    covered_from TEXT NOT NULL,
+                    refreshed_at TEXT NOT NULL,
+                    PRIMARY KEY (kind, key)
+                )
+            `);
             // Persisted Yahoo cookie+crumb (single row) so the rare successful
             // acquisition survives restarts and is reused for hours.
             await c.execute(`
@@ -309,7 +322,8 @@ export async function setCachedHistoricalPrices(ticker: string, prices: Record<D
             entries.map(([date, price]) => ({
                 sql: `INSERT INTO security_prices (ticker, price_date, close_price)
                       VALUES (?, ?, ?)
-                      ON CONFLICT (ticker, price_date) DO UPDATE SET close_price = excluded.close_price`,
+                      ON CONFLICT (ticker, price_date) DO UPDATE SET close_price = excluded.close_price
+                      WHERE close_price IS NOT excluded.close_price`,
                 args: [ticker, date, price],
             })),
             'write',
@@ -494,6 +508,113 @@ export async function setCachedRatios(ticker: string, info: RatioInfo, sector?: 
     }
 }
 
+// ── History coverage ─────────────────────────────────────────────────────────
+
+const _memCoverage = new Map<string, string>();
+
+/** Earliest date we've already requested upstream for this series, or null. */
+export async function getHistoryCoverage(kind: 'prices' | 'fx', key: string): Promise<string | null> {
+    const id = `${kind}:${key}`;
+    const mem = _memCoverage.get(id);
+    if (mem) return mem;
+    if (!(await ensureInit())) return null;
+    const c = getClient();
+    if (!c) return null;
+    try {
+        const rows = await c.execute({
+            sql: 'SELECT covered_from FROM history_coverage WHERE kind = ? AND key = ?',
+            args: [kind, key],
+        });
+        const from = rows.rows[0]?.covered_from as string | undefined;
+        if (from) _memCoverage.set(id, from);
+        return from ?? null;
+    } catch (err) {
+        console.warn(`[marketDataDb] Read coverage failed for ${id}:`, err);
+        return null;
+    }
+}
+
+/** Record that upstream was asked for this series back to `from` (keeps the earliest). */
+export async function setHistoryCoverage(kind: 'prices' | 'fx', key: string, from: string): Promise<void> {
+    const id = `${kind}:${key}`;
+    const prev = _memCoverage.get(id);
+    if (prev && prev <= from) return; // already recorded — no write
+    _memCoverage.set(id, prev && prev < from ? prev : from);
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        await c.execute({
+            sql: `INSERT INTO history_coverage (kind, key, covered_from, refreshed_at)
+                  VALUES (?, ?, ?, ?)
+                  ON CONFLICT (kind, key) DO UPDATE SET
+                    covered_from = MIN(history_coverage.covered_from, excluded.covered_from),
+                    refreshed_at = excluded.refreshed_at`,
+            args: [kind, key, from, new Date().toISOString()],
+        });
+    } catch (err) {
+        console.warn(`[marketDataDb] Write coverage failed for ${id}:`, err);
+    }
+}
+
+// ── Batched fundamentals writes ──────────────────────────────────────────────
+
+export interface FundamentalsWrite {
+    ticker: string;
+    price?: PriceInfo;
+    ratios?: RatioInfo & { sector?: string | null };
+}
+
+/**
+ * Persist many screener rows in one round-trip. A bulk refresh used to issue
+ * two `execute` calls per symbol; at ~1800 symbols that's thousands of
+ * separate writes. Here a chunk is one `batch`, and unchanged values are not
+ * rewritten.
+ */
+export async function setCachedFundamentalsBatch(items: FundamentalsWrite[]): Promise<void> {
+    if (items.length === 0) return;
+    const now = new Date().toISOString();
+
+    const stmts: { sql: string; args: (string | number | null)[] }[] = [];
+    for (const it of items) {
+        if (it.price) {
+            mergeMem(it.ticker, it.price, { price: now });
+            stmts.push({
+                sql: `INSERT INTO security_fundamentals (ticker, name, price, currency, fetched_at)
+                      VALUES (?, ?, ?, ?, ?)
+                      ON CONFLICT (ticker) DO UPDATE SET
+                        name = excluded.name, price = excluded.price,
+                        currency = excluded.currency, fetched_at = excluded.fetched_at`,
+                args: [it.ticker, it.price.name, it.price.price, it.price.currency, now],
+            });
+        }
+        if (it.ratios) {
+            const { sector, ...r } = it.ratios;
+            mergeMem(it.ticker, { ...r, sector: sector ?? undefined }, { ratios: now });
+            stmts.push({
+                sql: `INSERT INTO security_fundamentals (ticker, fetched_at, trailing_pe, forward_pe, dividend_yield, price_to_book, market_cap, sector, ratios_fetched_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      ON CONFLICT (ticker) DO UPDATE SET
+                        trailing_pe = excluded.trailing_pe, forward_pe = excluded.forward_pe,
+                        dividend_yield = excluded.dividend_yield, price_to_book = excluded.price_to_book,
+                        market_cap = excluded.market_cap,
+                        sector = COALESCE(excluded.sector, security_fundamentals.sector),
+                        ratios_fetched_at = excluded.ratios_fetched_at`,
+                args: [it.ticker, now, r.trailingPE, r.forwardPE, r.dividendYield, r.priceToBook, r.marketCap, sector ?? null, now],
+            });
+        }
+    }
+    if (stmts.length === 0) return;
+    if (!(await ensureInit())) return;
+    const c = getClient();
+    if (!c) return;
+    try {
+        await c.batch(stmts, 'write');
+    } catch (err) {
+        console.warn(`[marketDataDb] Batch fundamentals write failed (${items.length} rows):`, err);
+    }
+}
+
 // ── Persisted Yahoo auth (cookie + crumb) ────────────────────────────────────
 
 export async function getStoredYahooAuth(): Promise<{ cookie: string; crumb: string } | null> {
@@ -553,7 +674,8 @@ export async function setCachedHistoricalFxRates(pair: string, rates: Record<Dat
             entries.map(([date, rate]) => ({
                 sql: `INSERT INTO market_fx_rates (pair, rate_date, rate)
                       VALUES (?, ?, ?)
-                      ON CONFLICT (pair, rate_date) DO UPDATE SET rate = excluded.rate`,
+                      ON CONFLICT (pair, rate_date) DO UPDATE SET rate = excluded.rate
+                      WHERE rate IS NOT excluded.rate`,
                 args: [pair, date, rate],
             })),
             'write',
@@ -621,7 +743,9 @@ export async function setCachedDividendEvents(ticker: string, events: Record<Dat
                   VALUES (?, ?, ?, ?)
                   ON CONFLICT (ticker, ex_date) DO UPDATE SET
                     amount_per_share = excluded.amount_per_share,
-                    currency = excluded.currency`,
+                    currency = excluded.currency
+                  WHERE amount_per_share IS NOT excluded.amount_per_share
+                     OR currency IS NOT excluded.currency`,
             args: [ticker, date, ev.amount, ev.currency],
         }));
         stmts.push({

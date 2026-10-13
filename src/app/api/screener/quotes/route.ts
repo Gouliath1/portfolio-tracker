@@ -6,13 +6,16 @@
  */
 import { NextResponse } from 'next/server';
 import { getCachedFundamentalsBatch } from '../../../../lib/server/marketDataDb';
+import { parseSymbols, badRequest, cdnCache } from '../../../../lib/server/requestGuards';
 
-const CACHE_HEADERS = { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' };
+const CACHE_HEADERS = cdnCache(60, 300);
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const raw = searchParams.get('symbols') ?? '';
-    const symbols = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 300);
+    const parsed = parseSymbols(raw, 300);
+    if (parsed.rejected) return badRequest('symbols: up to 300 valid symbols');
+    const symbols = parsed.symbols;
 
     if (symbols.length === 0) {
         return NextResponse.json({}, { headers: CACHE_HEADERS });

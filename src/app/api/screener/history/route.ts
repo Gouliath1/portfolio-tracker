@@ -12,6 +12,7 @@
 
 import { NextResponse } from 'next/server';
 import { fetchHistoricalPrices, fetchHistoricalOHLC } from '@portfolio/core';
+import { isValidSymbol, badRequest, cdnCache, expensiveRoutesDisabled, disabledResponse } from '../../../../lib/server/requestGuards';
 
 const RANGE_MONTHS: Record<string, number> = { '6mo': 6, '1y': 12, '2y': 24, '5y': 60, 'max': 360 };
 
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
     if (!symbol) {
         return NextResponse.json({ error: 'symbol is required' }, { status: 400 });
     }
+    if (!isValidSymbol(symbol)) return badRequest('Invalid symbol');
+    if (expensiveRoutesDisabled()) return disabledResponse();
     const months = RANGE_MONTHS[range];
     if (!months) {
         return NextResponse.json({ error: 'invalid range' }, { status: 400 });
@@ -48,7 +51,7 @@ export async function GET(request: Request) {
             .sort((a, b) => a.date.localeCompare(b.date));
         return NextResponse.json(
             { symbol, prices, candles: candles ?? [] },
-            { headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400' } },
+            { headers: cdnCache(3600, 86400) },
         );
     } catch (error) {
         return NextResponse.json(

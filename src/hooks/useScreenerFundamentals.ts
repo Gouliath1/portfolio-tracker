@@ -21,11 +21,16 @@ export interface FundamentalsApi {
      *  Does NOT set loading state so the existing price/ratio data stays visible. */
     backfillSector: (symbols: string[]) => void;
     progress: LoadProgress | null;
+    /** Outcome of the last completed bulk run: rows refetched vs already current (shared cache). */
+    lastRun: { refreshed: number; cached: number } | null;
 }
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-const BULK_CONCURRENCY = 3;
-const BULK_GAP_MS = 120;
+// Rows stream back one by one, so chunks can be large: a full refresh is ~36
+// requests instead of one per symbol. The server caps a request at 50.
+const REFRESH_CHUNK = 50;
+const REFRESH_CONCURRENCY = 2;
+const BULK_GAP_MS = 250;
 interface FetchOpts { fresh?: boolean; }
 
 // ── localStorage persistence ──────────────────────────────────────────────
@@ -133,6 +138,82 @@ export function useScreenerFundamentals(): FundamentalsApi {
         }
     }, [setEntry]);
 
+    // Running totals for the current bulk run, published when it finishes.
+    const runTally = useRef({ refreshed: 0, cached: 0 });
+    const [lastRun, setLastRun] = useState<{ refreshed: number; cached: number } | null>(null);
+
+    /** Refresh one chunk through the batch endpoint and write every row into the store. */
+    const refreshChunk = useCallback(async (chunk: string[], onRow: () => void, shouldStop: () => boolean) => {
+        type Row = StockFundamentals & {
+            ratiosPending?: boolean; ratiosError?: string;
+            fetchedAt?: string; ratiosFetchedAt?: string | null;
+        };
+        const seen = new Set<string>();
+        const apply = (symbol: string, data: Row) => {
+            seen.add(symbol);
+            setEntry(symbol, {
+                status: 'done', data,
+                ratiosPending: data.ratiosPending,
+                ratiosError: data.ratiosError,
+                fetchedAt: data.fetchedAt,
+                ratiosFetchedAt: data.ratiosFetchedAt,
+            });
+            onRow();
+        };
+        const failRest = (reason: string) => chunk.filter(s => !seen.has(s)).forEach(s => {
+            requested.current.delete(s);
+            setEntry(s, { status: 'error', reason });
+            onRow();
+        });
+        try {
+            const res = await fetch('/api/screener/refresh', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ symbols: chunk, stream: true }),
+            });
+            if (!res.ok) return failRest(`HTTP ${res.status}`);
+
+            const reader = res.body?.getReader?.();
+            if (reader) {
+                // NDJSON: one row per line as soon as the server has it, so the table
+                // fills in steadily instead of waiting for the whole chunk.
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const handle = (line: string) => {
+                    if (!line.trim()) return;
+                    const msg = JSON.parse(line) as { symbol?: string; data?: Row; done?: boolean; refreshed?: number; cached?: number };
+                    if (msg.done) {
+                        runTally.current.refreshed += msg.refreshed ?? 0;
+                        runTally.current.cached += msg.cached ?? 0;
+                    } else if (msg.symbol && msg.data) {
+                        apply(msg.symbol, msg.data);
+                    }
+                };
+                for (;;) {
+                    if (shouldStop()) { void reader.cancel(); return; }
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? '';
+                    lines.forEach(handle);
+                }
+                handle(buffer);
+            } else {
+                // No streaming body (older clients/mocks): the endpoint also answers with plain JSON.
+                const { results, refreshed = 0, cached = 0 } = await res.json() as {
+                    refreshed?: number; cached?: number; results: Record<string, Row>;
+                };
+                runTally.current.refreshed += refreshed;
+                runTally.current.cached += cached;
+                for (const symbol of chunk) if (results[symbol]) apply(symbol, results[symbol]);
+            }
+            failRest('no data');
+        } catch (e) {
+            failRest(e instanceof Error ? e.message : 'network error');
+        }
+    }, [setEntry]);
+
     // Bumped by every loadMany/cancelLoad so a superseded run's workers stop picking up symbols.
     const runId = useRef(0);
     const pendingRestore = useRef<Map<string, FundEntry | undefined>>(new Map());
@@ -171,25 +252,39 @@ export function useScreenerFundamentals(): FundamentalsApi {
             return next;
         });
 
+        runTally.current = { refreshed: 0, cached: 0 };
         const total = symbols.length;
         let done = 0;
         setProgress({ done, total });
 
+        // One request per chunk instead of one per symbol. The server answers from
+        // the shared cache for anything already refreshed today (by anyone), so
+        // "refresh all" only costs upstream calls for what is genuinely stale.
+        const chunks: string[][] = [];
+        for (let i = 0; i < symbols.length; i += REFRESH_CHUNK) chunks.push(symbols.slice(i, i + REFRESH_CHUNK));
+
         let idx = 0;
         const worker = async () => {
-            while (idx < symbols.length && runId.current === myRun) {
-                const sym = symbols[idx++];
-                restore.delete(sym);
-                await fetchOne(sym);
+            while (idx < chunks.length && runId.current === myRun) {
+                const chunk = chunks[idx++];
+                chunk.forEach(s => restore.delete(s));
+                await refreshChunk(chunk, () => {
+                    // Per row, so the counter moves steadily while a chunk streams in.
+                    if (runId.current !== myRun) return;
+                    done += 1;
+                    setProgress({ done, total });
+                }, () => runId.current !== myRun);
                 if (runId.current !== myRun) return;
-                done += 1;
-                setProgress({ done, total });
                 await delay(BULK_GAP_MS);
             }
         };
-        void Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, total) }, worker))
-            .finally(() => { if (runId.current === myRun) setProgress(null); });
-    }, [fetchOne, restorePending]);
+        void Promise.all(Array.from({ length: Math.min(REFRESH_CONCURRENCY, chunks.length) }, worker))
+            .finally(() => {
+                if (runId.current !== myRun) return;
+                setProgress(null);
+                setLastRun({ ...runTally.current });
+            });
+    }, [refreshChunk, restorePending]);
 
     const cancelLoad = useCallback(() => {
         runId.current += 1;
@@ -252,5 +347,5 @@ export function useScreenerFundamentals(): FundamentalsApi {
         });
     }, [fetchOne]);
 
-    return { map, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress };
+    return { map, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress, lastRun };
 }
