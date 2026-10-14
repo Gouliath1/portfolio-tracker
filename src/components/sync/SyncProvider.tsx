@@ -18,9 +18,11 @@ import {
     type ReactNode,
 } from 'react';
 import { useTranslation } from '../../i18n';
+import { useOptionalAccount } from '../account/AccountProvider';
 import {
     generateSyncToken, readDeviceState, writeDeviceState, clearDeviceState,
     buildJoinLink, readJoinTokenFromHash, planSync, pullSync, pushSync, revokeSync,
+    queueKeyRevoke, takeQueuedKeyRevoke,
     type ServerSnapshot,
 } from '../../utils/syncClient';
 import { collectSyncBlob, applySyncBlob, isLocalStateEmpty, stashBackup } from '../../utils/syncState';
@@ -28,7 +30,8 @@ import { collectSyncBlob, applySyncBlob, isLocalStateEmpty, stashBackup } from '
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error' | 'conflict';
 
 interface Conflict {
-    token: string;
+    /** The anonymous key, or null when syncing as the signed-in account. */
+    token: string | null;
     server: ServerSnapshot;
 }
 
@@ -37,8 +40,12 @@ export interface SyncContextValue {
     enabled: boolean;
     error: string | null;
     lastSyncedAt: Date | null;
-    /** Shareable join link for this device's session, when enabled. */
+    /** Shareable join link for this device's session, when enabled with a key (none for account sync). */
     link: string | null;
+    /** How this device syncs: with a shareable key, or as the signed-in account. */
+    mode: 'key' | 'account' | null;
+    /** Move this device's anonymous key sync onto the signed-in account. */
+    switchToAccount: () => Promise<void>;
     conflict: Conflict | null;
     /** A `#sync=` link was opened; the user hasn't yet decided to join. */
     pendingJoin: string | null;
@@ -85,6 +92,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const [pendingJoin, setPendingJoin] = useState<string | null>(null);
     const [remoteUpdate, setRemoteUpdate] = useState(false);
     const [panelOpen, setPanelOpen] = useState(false);
+    const [mode, setMode] = useState<'key' | 'account' | null>(null);
+    const account = useOptionalAccount();
 
     const busy = useRef(false);
     const conflictRef = useRef<Conflict | null>(null);
@@ -118,7 +127,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }, []);
 
     /** Adopt the server's blob locally, record it, and reload. */
-    const adoptCloud = useCallback((token: string, server: ServerSnapshot) => {
+    const adoptCloud = useCallback((token: string | null, server: ServerSnapshot) => {
         const freshDevice = isLocalStateEmpty();
         if (!freshDevice) stashBackup();
         if (!applySyncBlob(server.blob, { freshDevice })) {
@@ -143,7 +152,19 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         setStatus('syncing');
         try {
             const pulled = await pullSync(device.token);
-            if (!pulled.ok) return fail(pulled.error);
+            if (!pulled.ok) {
+                if (pulled.unauthorized && device.token === null) {
+                    // Signed out or the session expired: stop syncing as the account.
+                    // Local data is untouched; signing in again resumes.
+                    clearDeviceState();
+                    setMode(null);
+                    setLastSyncedAt(null);
+                    setStatus('off');
+                    setError(t('sync.signedOutNotice'));
+                    return;
+                }
+                return fail(pulled.error);
+            }
 
             const localBlob = collectSyncBlob();
             const server = pulled.found ? { version: pulled.version, blob: pulled.blob } : null;
@@ -164,6 +185,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
                     // Local data is untouched; this device just stops syncing.
                     clearDeviceState();
                     setLink(null);
+                    setMode(null);
                     setLastSyncedAt(null);
                     setStatus('off');
                     setError(t('sync.endedNotice'));
@@ -219,12 +241,34 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const device = readDeviceState();
         if (device) {
-            setLink(buildJoinLink(device.token));
+            setLink(device.token ? buildJoinLink(device.token) : null);
+            setMode(device.token ? 'key' : 'account');
             setStatus('idle');
             void runPass(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // After moving to an account, retire the old anonymous key — unless this
+    // device is still using it (the move didn't complete).
+    useEffect(() => {
+        const queued = takeQueuedKeyRevoke();
+        if (queued && readDeviceState()?.token !== queued) void revokeSync(queued);
+    }, []);
+
+    // The account session ended (signed out, or it expired): a device that was
+    // syncing as that account stops, keeping its local data.
+    useEffect(() => {
+        if (!account?.loaded || account.user) return;
+        const device = readDeviceState();
+        if (device && device.token === null) {
+            clearDeviceState();
+            setMode(null);
+            setLastSyncedAt(null);
+            setStatus('off');
+            setError(t('sync.signedOutNotice'));
+        }
+    }, [account?.loaded, account?.user, t]);
 
     // Local edits don't raise events (localStorage only notifies *other*
     // tabs), so compare against the last-synced blob on a short timer.
@@ -249,8 +293,47 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         };
     }, [runPass]);
 
+    /**
+     * Connect this device to a session: an anonymous key, or (token = null) the
+     * signed-in account. A missing session is an error for a key someone typed
+     * in, but for an account it just means "nothing uploaded yet": create it.
+     */
+    const connect = useCallback(async (token: string | null, createIfMissing: boolean) => {
+        setPendingJoin(null);
+        setStatus('syncing');
+        const pulled = await pullSync(token);
+        if (!pulled.ok) return fail(pulled.error);
+
+        const localBlob = collectSyncBlob();
+        const finish = (version: number) => {
+            writeDeviceState({ token, version, lastBlob: localBlob });
+            setLink(token ? buildJoinLink(token) : null);
+            setMode(token ? 'key' : 'account');
+            markSynced();
+        };
+
+        if (!pulled.found) {
+            if (!createIfMissing) return fail(t('sync.errNotFound'));
+            const res = await pushSync(token, localBlob, 0);
+            if (!res.ok) return fail(res.error);
+            return finish(res.version);
+        }
+
+        const server = { version: pulled.version, blob: pulled.blob };
+        if (localBlob === server.blob) return finish(server.version);
+        if (isLocalStateEmpty()) {
+            adoptCloud(token, server);
+            return;
+        }
+        // This device already has data that differs from the session's.
+        setConflictState({ token, server });
+    }, [adoptCloud, fail, markSynced, setConflictState, t]);
+
     const enable = useCallback(async () => {
         if (readDeviceState()) return;
+        // Signed in: sync as the account — nothing to generate, nothing to lose.
+        if (account?.user) return connect(null, true);
+
         setStatus('syncing');
         const token = generateSyncToken();
         const blob = collectSyncBlob();
@@ -258,32 +341,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         if (!res.ok) return fail(res.error);
         writeDeviceState({ token, version: res.version, lastBlob: blob });
         setLink(buildJoinLink(token));
+        setMode('key');
         markSynced();
-    }, [fail, markSynced]);
+    }, [account?.user, connect, fail, markSynced]);
 
-    const join = useCallback(async (token: string) => {
-        setPendingJoin(null);
-        setStatus('syncing');
-        const pulled = await pullSync(token);
-        if (!pulled.ok) return fail(pulled.error);
-        if (!pulled.found) return fail(t('sync.errNotFound'));
+    const join = useCallback((token: string) => connect(token, false), [connect]);
 
-        const server = { version: pulled.version, blob: pulled.blob };
-        const localBlob = collectSyncBlob();
-
-        if (isLocalStateEmpty() || localBlob === server.blob) {
-            if (localBlob === server.blob) {
-                writeDeviceState({ token, version: server.version, lastBlob: localBlob });
-                setLink(buildJoinLink(token));
-                markSynced();
-            } else {
-                adoptCloud(token, server);
-            }
-            return;
-        }
-        // This device already has data that differs from the session's.
-        setConflictState({ token, server });
-    }, [adoptCloud, fail, markSynced, setConflictState, t]);
+    const switchToAccount = useCallback(async () => {
+        if (!account?.user) return;
+        const device = readDeviceState();
+        if (device?.token) queueKeyRevoke(device.token);
+        await connect(null, true);
+    }, [account?.user, connect]);
 
     const resolveConflict = useCallback(async (keep: 'local' | 'cloud') => {
         const c = conflictRef.current;
@@ -298,7 +367,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         const res = await pushSync(c.token, localBlob, c.server.version);
         if (res.ok) {
             writeDeviceState({ token: c.token, version: res.version, lastBlob: localBlob });
-            setLink(buildJoinLink(c.token));
+            setLink(c.token ? buildJoinLink(c.token) : null);
+            setMode(c.token ? 'key' : 'account');
             setConflictState(null);
             markSynced();
         } else if (res.conflict) {
@@ -320,6 +390,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         }
         clearDeviceState();
         setLink(null);
+        setMode(null);
         setConflictState(null);
         setError(null);
         setLastSyncedAt(null);
@@ -329,12 +400,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const applyRemoteUpdate = useCallback(() => runPass(true), [runPass]);
 
     const value = useMemo<SyncContextValue>(() => ({
-        status, enabled: status !== 'off', error, lastSyncedAt, link, conflict, pendingJoin,
+        status, enabled: status !== 'off', error, lastSyncedAt, link, mode, switchToAccount, conflict, pendingJoin,
         remoteUpdate, applyRemoteUpdate,
         enable, join, disable, syncNow: applyRemoteUpdate, resolveConflict,
         dismissPendingJoin: () => setPendingJoin(null),
         panelOpen, openPanel: () => setPanelOpen(true), closePanel: () => setPanelOpen(false),
-    }), [panelOpen, status, error, lastSyncedAt, link, conflict, pendingJoin, remoteUpdate, applyRemoteUpdate, enable, join, disable, resolveConflict]);
+    }), [panelOpen, status, error, lastSyncedAt, link, mode, switchToAccount, conflict, pendingJoin, remoteUpdate, applyRemoteUpdate, enable, join, disable, resolveConflict]);
 
     return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }

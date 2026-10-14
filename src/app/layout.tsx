@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Analytics } from "@vercel/analytics/next";
 import { LanguageProvider } from "../i18n";
+import { AccountProvider } from "../components/account/AccountProvider";
 import { SyncProvider } from "../components/sync/SyncProvider";
 import { SyncDialogs } from "../components/sync/SyncDialogs";
 import "./globals.css";
@@ -45,10 +46,12 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <LanguageProvider>
-            <SyncProvider>
-              {children}
-              <SyncDialogs />
-            </SyncProvider>
+            <AccountProvider>
+              <SyncProvider>
+                {children}
+                <SyncDialogs />
+              </SyncProvider>
+            </AccountProvider>
           </LanguageProvider>
         </ThemeProvider>
         <Analytics />

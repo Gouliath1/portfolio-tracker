@@ -10,7 +10,8 @@ const DEVICE_KEY = 'pt_sync'; // per-device, deliberately not in the synced allo
 const FRAGMENT_PARAM = 'sync';
 
 export interface DeviceSyncState {
-    token: string;
+    /** The anonymous sync key, or null when this device syncs as the signed-in account. */
+    token: string | null;
     /** Server version this device last matched. */
     version: number;
     /** Exact blob at that version, to tell "local changed" from "unchanged". */
@@ -40,7 +41,8 @@ export function readDeviceState(): DeviceSyncState | null {
         const raw = localStorage.getItem(DEVICE_KEY);
         if (!raw) return null;
         const s = JSON.parse(raw);
-        if (typeof s?.token === 'string' && typeof s.version === 'number' && typeof s.lastBlob === 'string') {
+        if ((typeof s?.token === 'string' || s?.token === null)
+            && typeof s.version === 'number' && typeof s.lastBlob === 'string') {
             return s as DeviceSyncState;
         }
     } catch { /* fall through */ }
@@ -53,6 +55,17 @@ export function writeDeviceState(state: DeviceSyncState): void {
 
 export function clearDeviceState(): void {
     localStorage.removeItem(DEVICE_KEY);
+}
+
+// When a device moves from an anonymous key to an account, the old key should
+// stop working. The switch can end in a page reload (adopting the cloud copy),
+// so the revoke is queued here and performed on the next start.
+const REVOKE_KEY = 'pt_sync_revoke';
+export const queueKeyRevoke = (token: string) => localStorage.setItem(REVOKE_KEY, token);
+export function takeQueuedKeyRevoke(): string | null {
+    const t = localStorage.getItem(REVOKE_KEY);
+    if (t) localStorage.removeItem(REVOKE_KEY);
+    return t;
 }
 
 // ── Share link ──────────────────────────────────────────────────────────────
@@ -91,25 +104,26 @@ export function planSync(args: {
 export type PullResult =
     | { ok: true; found: false }
     | { ok: true; found: true; blob: string; version: number }
-    | { ok: false; error: string };
+    | { ok: false; error: string; unauthorized?: boolean };
 
 export type PushResponse =
     | { ok: true; version: number }
-    | { ok: false; conflict: ServerSnapshot | null; error: string };
+    | { ok: false; conflict: ServerSnapshot | null; error: string; unauthorized?: boolean };
 
-async function call(method: string, body: unknown): Promise<Response> {
+/** A key identifies an anonymous session; no key means "the signed-in account" (the cookie decides). */
+async function call(method: string, token: string | null, body: Record<string, unknown> = {}): Promise<Response> {
     return fetch('/api/sync', {
         method,
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(token === null ? body : { token, ...body }),
     });
 }
 
-export async function pullSync(token: string): Promise<PullResult> {
+export async function pullSync(token: string | null): Promise<PullResult> {
     try {
-        const res = await call('PUT', { token });
+        const res = await call('PUT', token);
         const data = await res.json();
-        if (!res.ok || !data.ok) return { ok: false, error: data.error ?? `HTTP ${res.status}` };
+        if (!res.ok || !data.ok) return { ok: false, error: data.error ?? `HTTP ${res.status}`, unauthorized: res.status === 401 };
         return data.found
             ? { ok: true, found: true, blob: data.blob, version: data.version }
             : { ok: true, found: false };
@@ -118,14 +132,15 @@ export async function pullSync(token: string): Promise<PullResult> {
     }
 }
 
-export async function pushSync(token: string, blob: string, baseVersion: number): Promise<PushResponse> {
+export async function pushSync(token: string | null, blob: string, baseVersion: number): Promise<PushResponse> {
     try {
-        const res = await call('POST', { token, blob, baseVersion });
+        const res = await call('POST', token, { blob, baseVersion });
         const data = await res.json();
         if (res.ok && data.ok) return { ok: true, version: data.version };
         return {
             ok: false,
             error: data.error ?? `HTTP ${res.status}`,
+            unauthorized: res.status === 401,
             conflict: res.status === 409 && data.conflict
                 ? { blob: data.conflict.blob, version: data.conflict.version }
                 : null,
@@ -135,9 +150,9 @@ export async function pushSync(token: string, blob: string, baseVersion: number)
     }
 }
 
-export async function revokeSync(token: string): Promise<boolean> {
+export async function revokeSync(token: string | null): Promise<boolean> {
     try {
-        const res = await call('DELETE', { token });
+        const res = await call('DELETE', token);
         return res.ok;
     } catch {
         return false;

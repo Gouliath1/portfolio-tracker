@@ -6,16 +6,19 @@
  * a query string, for the same log/history/referrer reasons as /api/share.
  * The server stores an opaque, versioned blob and never inspects it.
  *
- *   POST   { token, blob, baseVersion }  push (baseVersion 0 = create); 409 on a stale base
- *   PUT    { token }                     pull the current blob
- *   DELETE { token }                     revoke
+ *   POST   { token?, blob, baseVersion }  push (baseVersion 0 = create); 409 on a stale base
+ *   PUT    { token? }                     pull the current blob
+ *   DELETE { token? }                     revoke
+ *
+ * `token` is the anonymous sync key. Omit it while signed in to sync as the account.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidToken } from '../../../lib/server/shareStore';
 import {
-    getSync, pushSync, deleteSync, syncUnavailableReason, SYNC_TTL_DAYS,
+    getSync, pushSync, deleteSync, syncUnavailableReason, SYNC_TTL_DAYS, type SyncPrincipal,
 } from '../../../lib/server/syncStore';
+import { getRequestUser, isSameOrigin } from '../../../lib/server/authSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,6 +48,28 @@ function rateLimited(request: NextRequest, now = Date.now()): boolean {
     return entry.count > MAX_REQUESTS_PER_WINDOW;
 }
 
+/**
+ * Who this request syncs as: the anonymous key in the body, or — when there is
+ * none — the signed-in account. A request that supplies a key never touches
+ * the account, so key-based sync is unchanged. Cookie-authenticated writes
+ * must be same-origin (CSRF); key-based ones carry their own secret instead.
+ */
+async function resolvePrincipal(
+    request: NextRequest,
+    body: Record<string, unknown> | null,
+): Promise<{ principal: SyncPrincipal } | { error: NextResponse }> {
+    const token = body?.token;
+    if (token !== undefined) {
+        return isValidToken(token)
+            ? { principal: token }
+            : { error: json({ ok: false, error: 'Invalid token' }, 400) };
+    }
+    if (!isSameOrigin(request)) return { error: json({ ok: false, error: 'Forbidden' }, 403) };
+    const user = await getRequestUser(request);
+    if (!user) return { error: json({ ok: false, error: 'Sign in or provide a sync key' }, 401) };
+    return { principal: { accountId: user.id } };
+}
+
 async function readBody(request: NextRequest): Promise<Record<string, unknown> | null> {
     try {
         const raw = await request.text();
@@ -70,16 +95,15 @@ export async function POST(request: NextRequest) {
     const body = await readBody(request);
     if (!body) return json({ ok: false, error: 'Invalid request body' }, 400);
 
-    const { token, blob, baseVersion } = body as {
-        token?: unknown; blob?: unknown; baseVersion?: unknown;
-    };
-    if (!isValidToken(token)) return json({ ok: false, error: 'Invalid token' }, 400);
+    const { blob, baseVersion } = body as { blob?: unknown; baseVersion?: unknown };
+    const who = await resolvePrincipal(request, body);
+    if ('error' in who) return who.error;
     if (typeof blob !== 'string') return json({ ok: false, error: 'Expected { blob: string }' }, 400);
     if (typeof baseVersion !== 'number' || !Number.isInteger(baseVersion) || baseVersion < 0) {
         return json({ ok: false, error: 'Expected { baseVersion: non-negative integer }' }, 400);
     }
 
-    const result = await pushSync(token, blob, baseVersion);
+    const result = await pushSync(who.principal, blob, baseVersion);
     if (!result) return unavailable();
 
     if (!result.ok && result.throttled) {
@@ -111,10 +135,10 @@ export async function PUT(request: NextRequest) {
     if (rateLimited(request)) return json({ ok: false, error: 'Too many requests' }, 429);
 
     const body = await readBody(request);
-    const token = body?.token;
-    if (!isValidToken(token)) return json({ ok: false, error: 'Invalid token' }, 400);
+    const who = await resolvePrincipal(request, body ?? {});
+    if ('error' in who) return who.error;
 
-    const record = await getSync(token);
+    const record = await getSync(who.principal);
     if (!record) {
         // Distinguish "no such session" from "store down" without leaking more.
         if (syncUnavailableReason()) return unavailable();
@@ -134,10 +158,10 @@ export async function DELETE(request: NextRequest) {
     if (rateLimited(request)) return json({ ok: false, error: 'Too many requests' }, 429);
 
     const body = await readBody(request);
-    const token = body?.token;
-    if (!isValidToken(token)) return json({ ok: false, error: 'Invalid token' }, 400);
+    const who = await resolvePrincipal(request, body ?? {});
+    if ('error' in who) return who.error;
 
     // Deleting an absent session reports success: "must not be reachable" holds either way.
-    await deleteSync(token);
+    await deleteSync(who.principal);
     return json({ ok: true });
 }

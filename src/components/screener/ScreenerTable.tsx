@@ -1,6 +1,6 @@
 'use client';
 
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import * as XLSX from 'xlsx';
 import {
     useReactTable,
@@ -31,6 +31,16 @@ const PAGE_SIZE = 50;
 type View = 'all' | 'loaded' | 'unloaded' | 'stale' | 'pinned' | 'alerts' | 'notes';
 
 const STALE_COLOR = 'oklch(68% 0.14 60)';
+
+// The fundamentals store is seeded from localStorage before the first client
+// render, but the server has no localStorage: its HTML was rendered with an
+// empty map. Anything derived from the map (tab counts, the freshness chip, row
+// cells) must therefore render from an empty map until hydration is done, or
+// React reports a mismatch. `useSyncExternalStore` is React's own way to ask
+// "am I hydrated yet": false on the server and during hydration, true after.
+const EMPTY_MAP: Map<string, FundEntry> = new Map();
+const subscribeNever = () => () => {};
+const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
 const RATIOS_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 
 /** A loaded row is stale when its price is from an earlier market day or its ratios are over 7 days old. */
@@ -118,8 +128,14 @@ export function ScreenerTable({
     const refreshRef = useRef<(symbol: string) => void>(() => {});
     const nameCacheRef = useRef<Map<string, string>>(new Map());
 
-    const { map: fundMap, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress, lastRun } = useScreenerFundamentals();
+    const { map: storeMap, refresh, loadMany, cancelLoad, loadCached, backfillSector, progress, lastRun } = useScreenerFundamentals();
+    const hydrated = useHydrated();
+    // What is drawn comes from `fundMap` (empty until hydrated); what the load logic decides
+    // on comes from `storeMapRef` (always the real data), so hydration can't trigger refetches.
+    const fundMap = hydrated ? storeMap : EMPTY_MAP;
     mapRef.current = fundMap;
+    const storeMapRef = useRef(storeMap);
+    storeMapRef.current = storeMap;
     refreshRef.current = refresh;
 
     // Effective page size: flat (no pagination) when not on All view, or when showAll is toggled.
@@ -517,7 +533,7 @@ export function ScreenerTable({
         const toFetch: string[] = [];
         const toBackfill: string[] = [];
         for (const s of autoLoadSymbols) {
-            const e = mapRef.current.get(s);
+            const e = storeMapRef.current.get(s);
             if (!e || (e.status === 'done' && e.ratiosPending)) {
                 toFetch.push(s);
             } else if (e.status === 'done' && !e.ratiosPending && e.data.sector == null) {

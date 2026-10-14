@@ -11,12 +11,8 @@
  * The compare-and-set lives in the SQL, so two racing pushes can't both win.
  */
 
-import { createClient, Client } from '@libsql/client';
-import { dirname } from 'path';
-import { mkdirSync } from 'fs';
 import { hashToken } from './shareStore';
-
-const DEFAULT_LOCAL_PATH = './data/sync.db';
+import { withSchema, appDbUnavailableReason, resetAppDbForTests } from './appDb';
 
 /** Refreshed on every push, so an in-use portfolio never lapses. */
 export const SYNC_TTL_DAYS = 90;
@@ -40,81 +36,35 @@ export type PushResult =
     | { ok: false; throttled: true; retryAfterMs: number }
     | { ok: false; throttled?: false; conflict: SyncRecord | null };
 
-let _client: Client | null = null;
-let _initPromise: Promise<void> | null = null;
-let _unavailable = false;
-let _unavailableReason: string | null = null;
+export const syncUnavailableReason = appDbUnavailableReason;
 
-export function syncUnavailableReason(): string | null {
-    return _unavailableReason;
-}
+/**
+ * Who a sync row belongs to: an anonymous sync key (the browser-held secret;
+ * only its hash is stored) or a signed-in account (addressed by account id, so
+ * no key to lose). The two key spaces can't collide: token hashes are 64 hex
+ * characters, account keys start with `acct:`.
+ */
+export type SyncPrincipal = string | { accountId: string };
 
-function markUnavailable(reason: string): null {
-    _unavailable = true;
-    _unavailableReason = reason;
-    console.warn(`[syncStore] ${reason}`);
-    return null;
-}
+const keyFor = (p: SyncPrincipal): string =>
+    typeof p === 'string' ? hashToken(p) : `acct:${p.accountId}`;
 
-function getClient(): Client | null {
-    if (_unavailable) return null;
-    if (_client) return _client;
-
-    const url = process.env.TURSO_DATABASE_URL;
-    const token = process.env.TURSO_AUTH_TOKEN;
-
-    try {
-        if (url && token) {
-            _client = createClient({ url, authToken: token });
-        } else if (process.env.VERCEL) {
-            return markUnavailable(
-                'TURSO_DATABASE_URL / TURSO_AUTH_TOKEN are not set in this environment, ' +
-                'and a serverless filesystem cannot hold a local database.',
-            );
-        } else {
-            const path = process.env.SYNC_DB_PATH ?? DEFAULT_LOCAL_PATH;
-            try { mkdirSync(dirname(path), { recursive: true }); } catch { /* exists */ }
-            _client = createClient({ url: `file:${path}` });
-        }
-        return _client;
-    } catch (error) {
-        return markUnavailable(
-            `Could not open the database: ${error instanceof Error ? error.message : String(error)}`,
+async function ensureInit() {
+    return withSchema('sync', async client => {
+        await client.execute(`
+            CREATE TABLE IF NOT EXISTS sync_sessions (
+                token_hash TEXT PRIMARY KEY,
+                blob       TEXT NOT NULL,
+                version    INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+        `);
+        await client.execute(
+            `CREATE INDEX IF NOT EXISTS idx_sync_expires ON sync_sessions(expires_at)`,
         );
-    }
-}
-
-async function ensureInit(): Promise<Client | null> {
-    const client = getClient();
-    if (!client) return null;
-
-    if (!_initPromise) {
-        _initPromise = (async () => {
-            await client.execute(`
-                CREATE TABLE IF NOT EXISTS sync_sessions (
-                    token_hash TEXT PRIMARY KEY,
-                    blob       TEXT NOT NULL,
-                    version    INTEGER NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    expires_at TEXT NOT NULL
-                )
-            `);
-            await client.execute(
-                `CREATE INDEX IF NOT EXISTS idx_sync_expires ON sync_sessions(expires_at)`,
-            );
-        })();
-    }
-
-    try {
-        await _initPromise;
-    } catch (error) {
-        _initPromise = null;
-        return markUnavailable(
-            `Database rejected the schema setup: ${error instanceof Error ? error.message : String(error)}`,
-        );
-    }
-    return client;
+    });
 }
 
 function expiryFrom(now: Date): string {
@@ -122,20 +72,20 @@ function expiryFrom(now: Date): string {
 }
 
 /** Fetch the current blob. An expired row counts as absent and is deleted on the way past. */
-export async function getSync(token: string, now = new Date()): Promise<SyncRecord | null> {
+export async function getSync(principal: SyncPrincipal, now = new Date()): Promise<SyncRecord | null> {
     const client = await ensureInit();
     if (!client) return null;
 
     const result = await client.execute({
         sql: `SELECT blob, version, updated_at, expires_at FROM sync_sessions WHERE token_hash = ?`,
-        args: [hashToken(token)],
+        args: [keyFor(principal)],
     });
     const row = result.rows[0];
     if (!row) return null;
 
     const expiresAt = String(row.expires_at);
     if (new Date(expiresAt).getTime() <= now.getTime()) {
-        await deleteSync(token);
+        await deleteSync(principal);
         return null;
     }
     return {
@@ -151,7 +101,7 @@ export async function getSync(token: string, now = new Date()): Promise<SyncReco
  * Returns `null` when storage is unavailable.
  */
 export async function pushSync(
-    token: string,
+    principal: SyncPrincipal,
     blob: string,
     baseVersion: number,
     now = new Date(),
@@ -159,7 +109,7 @@ export async function pushSync(
     const client = await ensureInit();
     if (!client) return null;
 
-    const hash = hashToken(token);
+    const hash = keyFor(principal);
     const iso = now.toISOString();
     const expiresAt = expiryFrom(now);
     const nextVersion = baseVersion + 1;
@@ -185,7 +135,7 @@ export async function pushSync(
         return { ok: true, version: nextVersion, updatedAt: iso, expiresAt };
     }
 
-    const current = await getSync(token, now);
+    const current = await getSync(principal, now);
     if (baseVersion > 0 && current && current.version === baseVersion) {
         // Right version, rejected anyway: too soon after the last write.
         const retryAfterMs = Math.max(
@@ -197,13 +147,13 @@ export async function pushSync(
 }
 
 /** Revoke a sync session. Holding the key is the only authorisation required. */
-export async function deleteSync(token: string): Promise<boolean> {
+export async function deleteSync(principal: SyncPrincipal): Promise<boolean> {
     const client = await ensureInit();
     if (!client) return false;
 
     const result = await client.execute({
         sql: `DELETE FROM sync_sessions WHERE token_hash = ?`,
-        args: [hashToken(token)],
+        args: [keyFor(principal)],
     });
     return result.rowsAffected > 0;
 }
@@ -221,9 +171,4 @@ export async function purgeExpiredSync(now = new Date()): Promise<number> {
 }
 
 /** Test seam — drops the memoised client so a new DB path takes effect. */
-export function resetSyncStoreForTests(): void {
-    _client = null;
-    _initPromise = null;
-    _unavailable = false;
-    _unavailableReason = null;
-}
+export const resetSyncStoreForTests = resetAppDbForTests;
