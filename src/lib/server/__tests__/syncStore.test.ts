@@ -14,14 +14,14 @@ describe('syncStore', () => {
 
     beforeEach(() => {
         dir = mkdtempSync(join(tmpdir(), 'sync-'));
-        process.env.SYNC_DB_PATH = join(dir, 'sync.db');
+        process.env.APP_DB_PATH = join(dir, 'sync.db');
         delete process.env.TURSO_DATABASE_URL;
         delete process.env.TURSO_AUTH_TOKEN;
         resetSyncStoreForTests();
     });
 
     afterEach(() => {
-        delete process.env.SYNC_DB_PATH;
+        delete process.env.APP_DB_PATH;
         resetSyncStoreForTests();
         rmSync(dir, { recursive: true, force: true });
     });
@@ -98,13 +98,13 @@ describe('syncStore write throttle', () => {
     let dir: string;
     beforeEach(() => {
         dir = mkdtempSync(join(tmpdir(), 'sync-'));
-        process.env.SYNC_DB_PATH = join(dir, 'sync.db');
+        process.env.APP_DB_PATH = join(dir, 'sync.db');
         delete process.env.TURSO_DATABASE_URL;
         delete process.env.TURSO_AUTH_TOKEN;
         resetSyncStoreForTests();
     });
     afterEach(() => {
-        delete process.env.SYNC_DB_PATH;
+        delete process.env.APP_DB_PATH;
         resetSyncStoreForTests();
         rmSync(dir, { recursive: true, force: true });
     });

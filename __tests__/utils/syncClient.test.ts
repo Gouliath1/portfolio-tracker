@@ -40,3 +40,43 @@ describe('token + link', () => {
         expect(readJoinTokenFromHash('#sync=short')).toBeNull();
     });
 });
+
+describe('account mode (no key)', () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    beforeEach(() => {
+        calls.length = 0;
+        global.fetch = jest.fn(async (url: string, init: RequestInit) => {
+            calls.push({ url, init });
+            return { ok: true, status: 200, json: async () => ({ ok: true, found: false, version: 1 }) } as Response;
+        }) as unknown as typeof fetch;
+    });
+
+    it('omits the token from the body when syncing as the account', async () => {
+        const { pullSync, pushSync, revokeSync } = await import('../../src/utils/syncClient');
+        await pullSync(null);
+        await pushSync(null, 'blob', 0);
+        await revokeSync(null);
+        for (const c of calls) expect(JSON.parse(String(c.init.body))).not.toHaveProperty('token');
+        expect(JSON.parse(String(calls[1].init.body))).toEqual({ blob: 'blob', baseVersion: 0 });
+    });
+
+    it('still sends the key when one is given', async () => {
+        const { pullSync } = await import('../../src/utils/syncClient');
+        await pullSync('k'.repeat(43));
+        expect(JSON.parse(String(calls[0].init.body))).toEqual({ token: 'k'.repeat(43) });
+    });
+
+    it('persists and restores an account-mode device state (null token)', async () => {
+        const { writeDeviceState, readDeviceState, clearDeviceState } = await import('../../src/utils/syncClient');
+        writeDeviceState({ token: null, version: 3, lastBlob: 'x' });
+        expect(readDeviceState()).toEqual({ token: null, version: 3, lastBlob: 'x' });
+        clearDeviceState();
+    });
+
+    it('queues an old key to revoke once, then forgets it', async () => {
+        const { queueKeyRevoke, takeQueuedKeyRevoke } = await import('../../src/utils/syncClient');
+        queueKeyRevoke('old-key');
+        expect(takeQueuedKeyRevoke()).toBe('old-key');
+        expect(takeQueuedKeyRevoke()).toBeNull();
+    });
+});
