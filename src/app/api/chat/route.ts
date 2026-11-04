@@ -3,7 +3,8 @@
  *
  * Stateless — the browser sends the portfolio brief and recent turns with each
  * request, and nothing is stored here. See `lib/server/chat` for the cost
- * levers and why the brief is inlined rather than fetched through tools.
+ * levers. The model may call the tools in `lib/server/chatTools` for up to
+ * `MAX_TOOL_ROUNDS` rounds; only the text it writes is streamed to the browser.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { clientIp, NO_STORE } from '../../../lib/server/requestGuards';
 import { getRequestUser } from '../../../lib/server/authSession';
 import { claimQuestion, refundQuestion, remainingToday } from '../../../lib/server/chatUsageStore';
+import { CHAT_TOOLS, MAX_TOOL_ROUNDS, runChatTool } from '../../../lib/server/chatTools';
 import {
     CHAT_MODEL, MAX_OUTPUT_TOKENS, admitIp, buildSystem, chatEnabled, parseChatRequest,
 } from '../../../lib/server/chat';
@@ -60,34 +62,65 @@ export async function POST(request: NextRequest) {
             : json({ error: 'Chat is temporarily unavailable' }, 503);
     }
 
-    const { brief, messages, language } = parsed.request;
+    const { brief, messages: history, language, snapshot } = parsed.request;
     const client = new Anthropic();
-
-    // Thinking off and low effort: reading a table needs no deliberation, and
-    // reasoning tokens bill as output.
-    const stream = client.messages.stream({
-        model: CHAT_MODEL,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        thinking: { type: 'disabled' },
-        output_config: { effort: 'low' },
-        system: buildSystem(brief, language),
-        messages,
-    });
+    const system = buildSystem(brief, language);
+    const abort = new AbortController();
 
     const encoder = new TextEncoder();
     const body_ = new ReadableStream<Uint8Array>({
         async start(controller) {
             let started = false;
+            const messages: Anthropic.MessageParam[] = [...history];
             try {
-                for await (const event of stream) {
-                    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                        started = true;
-                        controller.enqueue(encoder.encode(event.delta.text));
+                for (let round = 0; ; round++) {
+                    // Thinking off and low effort: reading a table needs no deliberation,
+                    // and reasoning tokens bill as output. The last round withholds the
+                    // tools so the answer always ends in text.
+                    const lastRound = round >= MAX_TOOL_ROUNDS;
+                    const stream = client.messages.stream({
+                        model: CHAT_MODEL,
+                        max_tokens: MAX_OUTPUT_TOKENS,
+                        thinking: { type: 'disabled' },
+                        output_config: { effort: 'low' },
+                        system,
+                        tools: CHAT_TOOLS,
+                        ...(lastRound ? { tool_choice: { type: 'none' as const } } : {}),
+                        messages,
+                    }, { signal: abort.signal });
+
+                    let wroteThisRound = false;
+                    for await (const event of stream) {
+                        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                            // Text from an earlier round and this one would run together.
+                            if (!wroteThisRound && started) controller.enqueue(encoder.encode('\n\n'));
+                            wroteThisRound = true;
+                            started = true;
+                            controller.enqueue(encoder.encode(event.delta.text));
+                        }
                     }
+                    const final = await stream.finalMessage();
+                    // Cache hit/miss is the number to watch when tuning cost.
+                    console.info('[chat] usage', round, JSON.stringify(final.usage));
+
+                    if (final.stop_reason !== 'tool_use' || lastRound) break;
+
+                    const calls = final.content.filter(
+                        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+                    );
+                    const results = await Promise.all(calls.map(async call => {
+                        const out = await runChatTool(call.name, call.input, { snapshot: snapshot ?? null });
+                        console.info('[chat] tool', call.name, out.isError ? 'error' : 'ok');
+                        return {
+                            type: 'tool_result' as const,
+                            tool_use_id: call.id,
+                            content: out.text,
+                            ...(out.isError ? { is_error: true } : {}),
+                        };
+                    }));
+                    messages.push({ role: 'assistant', content: final.content });
+                    messages.push({ role: 'user', content: results });
                 }
-                const final = await stream.finalMessage();
-                // Cache hit/miss is the number to watch when tuning cost.
-                console.info('[chat] usage', JSON.stringify(final.usage));
                 controller.close();
             } catch (error) {
                 console.error('[chat] failed', error instanceof Error ? error.message : error);
@@ -96,7 +129,7 @@ export async function POST(request: NextRequest) {
             }
         },
         cancel() {
-            stream.abort();
+            abort.abort();
         },
     });
 

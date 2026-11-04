@@ -25,12 +25,12 @@ type Availability = 'checking' | 'ready' | 'signin' | 'disabled';
 const SHOW_LEFT_AT = 5;
 
 interface ChatWidgetProps {
-    /** Built on demand, so the portfolio is only serialised when a question is asked. */
-    getBrief: () => string;
+    /** Brief plus structured snapshot, built on demand so the portfolio is only serialised when a question is asked. */
+    getContext: () => { markdown: string; snapshot: unknown };
     hasPositions: boolean;
 }
 
-export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
+export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
     const { t, language } = useTranslation();
     const [open, setOpen] = useState(false);
     const [availability, setAvailability] = useState<Availability>('checking');
@@ -108,10 +108,11 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
         const controller = new AbortController();
         abortRef.current = controller;
         try {
+            const { markdown, snapshot } = getContext();
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ brief: getBrief(), messages, language }),
+                body: JSON.stringify({ brief: markdown, snapshot, messages, language }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) {
@@ -159,7 +160,7 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
             abortRef.current = null;
             setBusy(false);
         }
-    }, [busy, getBrief, hasPositions, language, t, turns]);
+    }, [busy, getContext, hasPositions, language, t, turns]);
 
     const reset = () => {
         abortRef.current?.abort();
