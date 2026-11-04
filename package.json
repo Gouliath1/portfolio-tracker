@@ -48,5 +48,6 @@
     "playwright-chromium": "^1.60.0",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "packageManager": "pnpm@10.18.3"
 }
