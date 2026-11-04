@@ -3,17 +3,21 @@ import { runChatTool } from '../chatTools';
 import { parseChatRequest } from '../chat';
 import type { PortfolioSnapshot } from '../../../utils/portfolioSnapshot';
 
-jest.mock('../marketDataDb', () => ({
-    getCachedHistoricalPrices: jest.fn(async (t: string) => t === 'AAPL'
-        ? { '2026-09-01': 100, '2026-09-15': 120, '2026-10-01': 90, '2026-10-20': 110 } : {}),
-    getCachedFundamentalsBatch: jest.fn(async () => new Map([['AAPL', {
-        data: { name: 'Apple', price: 110, currency: 'USD', sector: 'Tech', trailingPE: 30.123, forwardPE: 27, priceToBook: 40, dividendYield: 0.5, marketCap: 1e12 },
-        fetchedAt: '2026-10-20', ratiosFetchedAt: '2026-10-19T00:00:00Z',
-    }]])),
-    getCachedDividendEvents: jest.fn(async () => ({
-        '2026-08-01': { amount: 0.25, currency: 'USD' }, '2025-01-01': { amount: 0.2, currency: 'USD' },
-    })),
+jest.mock('../../../app/api/historical-prices/route', () => ({
+    GET: jest.fn(async (r: Request) => new Response(JSON.stringify({
+        symbol: new URL(r.url).searchParams.get('symbol'), source: 'cache',
+        prices: { '2026-10-01': 100, '2026-10-10': 120, '2026-10-15': 90, '2026-10-20': 110 },
+    }), { status: 200 })),
 }));
+jest.mock('../../../app/api/dividends/route', () => ({
+    GET: jest.fn(async () => new Response(JSON.stringify({
+        dividends: { '2026-08-01': { amount: 0.25, currency: 'USD' }, '2025-01-01': { amount: 0.2, currency: 'USD' } },
+    }))),
+}));
+jest.mock('../../../app/api/fx-rates/route', () => ({ GET: jest.fn(async () => new Response('{"error":"Invalid pair or date"}', { status: 400 })) }));
+jest.mock('../../../app/api/prices/route', () => ({ GET: jest.fn(async () => new Response('{}')) }));
+jest.mock('../../../app/api/ticker-info/route', () => ({ GET: jest.fn(async () => new Response('{}')) }));
+jest.mock('../../../app/api/screener/quotes/route', () => ({ GET: jest.fn(async () => new Response('{}')) }));
 
 const h = (ticker: string, over: Partial<PortfolioSnapshot['holdings'][number]> = {}) => ({
     ticker, name: ticker, account: 'Main', assetClass: 'Equity', stockCcy: 'USD', quantity: 1, avgCost: 1,
@@ -26,7 +30,7 @@ const snapshot = {
     holdings: [h('AAPL', { value: 300 }), h('VTI', { value: 500, account: 'NISA', assetClass: 'Fund' }), h('SONY', { value: 100, stockCcy: 'JPY', pnlPct: -5 })],
     recentClosed: [{ ticker: 'TSLA', name: 'Tesla', account: 'Main', soldOn: '2026-01-01', realizedPnl: 5, realizedPnlPct: 2 }],
 } as unknown as PortfolioSnapshot;
-const ctx = { snapshot, now: new Date('2026-10-25') };
+const ctx = { snapshot };
 const call = async (name: string, input: unknown, c = ctx) => {
     const r = await runChatTool(name, input, c);
     return { ...r, data: r.isError ? null : JSON.parse(r.text) };
@@ -59,28 +63,37 @@ describe('portfolio tools', () => {
     });
 });
 
-describe('market-data tools', () => {
-    it('summarises price history', async () => {
-        const r = await call('get_price_history', { ticker: 'AAPL', range: '3m' });
-        expect(r.data.changePct).toBe(10);
-        expect(r.data.high.price).toBe(120);
-        expect(r.data.maxDrawdownPct).toBe(-25);
-        expect(r.data.points).toHaveLength(12);
+describe('market_data', () => {
+    const hp = (symbol: string) => ({ path: '/api/historical-prices', query: { symbol, range: '30d' } });
+
+    it('summarises a price series from the existing route', async () => {
+        const r = await call('market_data', { requests: [hp('AAPL')] });
+        expect(r.data[0].data).toMatchObject({ symbol: 'AAPL', prices: { n: 4, first: 100, last: 110, changePct: 10 } });
+        expect(r.data[0].data.prices.max).toEqual({ date: '2026-10-10', value: 120 });
     });
 
-    it('reports missing history and rejects bad input', async () => {
-        expect((await call('get_price_history', { ticker: 'NOPE' })).data.available).toBe(false);
-        expect((await call('get_price_history', { ticker: 'bad symbol!' })).isError).toBe(true);
-        expect((await call('get_price_history', { ticker: 'AAPL', range: '9y' })).isError).toBe(true);
+    it('batches several lookups and keeps latest dividends', async () => {
+        const r = await call('market_data', { requests: [hp('AAPL'), hp('VTI'), { path: '/api/dividends', query: { symbol: 'AAPL' } }] });
+        expect(r.data.map((x: { data: { symbol?: string } }) => x.data.symbol)).toEqual(['AAPL', 'VTI', undefined]);
+        expect(r.data[2].data.dividends.latest[0]).toMatchObject({ date: '2026-08-01', amount: 0.25 });
     });
 
-    it('returns fundamentals and dividends', async () => {
-        expect((await call('get_fundamentals', { tickers: ['AAPL'] })).data[0].trailingPE).toBe(30.12);
-        expect((await call('get_dividends', { ticker: 'AAPL' })).data.trailing12mPerShare).toBe(0.25);
+    it('reports route errors per request and refuses unlisted paths', async () => {
+        const r = await call('market_data', { requests: [{ path: '/api/fx-rates', query: { pair: 'x' } }, { path: '/api/auth/me' }] });
+        expect(r.data[0].error).toMatch(/Invalid pair/);
+        expect(r.data[1].error).toMatch(/path must be one of/);
     });
 
-    it('rejects unknown tools', async () => {
+    it('does not forward fresh or cachedOnly', async () => {
+        const { GET } = jest.requireMock('../../../app/api/historical-prices/route');
+        await call('market_data', { requests: [{ path: '/api/historical-prices', query: { symbol: 'AAPL', fresh: '1' } }] });
+        const url = new URL((GET.mock.calls.at(-1)[0] as Request).url);
+        expect(url.searchParams.has('fresh')).toBe(false);
+    });
+
+    it('rejects unknown tools and empty requests', async () => {
         expect((await call('drop_tables', {})).isError).toBe(true);
+        expect((await call('market_data', {})).isError).toBe(true);
     });
 });
 
@@ -89,6 +102,9 @@ describe('parseChatRequest snapshot', () => {
     it('keeps a valid snapshot and drops a malformed one', () => {
         const ok = parseChatRequest({ ...base, snapshot });
         expect(ok.ok && ok.request.snapshot).toBeTruthy();
+        const withNull = JSON.parse(JSON.stringify({ ...snapshot, holdings: [h('AAPL', { value: NaN })] }));
+        const lenient = parseChatRequest({ ...base, snapshot: withNull });
+        expect(lenient.ok && lenient.request.snapshot?.holdings[0].value).toBe(0);
         const dropped = parseChatRequest({ ...base, snapshot: { holdings: 'x' } });
         expect(dropped.ok && dropped.request.snapshot).toBeUndefined();
     });

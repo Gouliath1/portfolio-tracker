@@ -1,35 +1,49 @@
 /**
  * Tools the portfolio chat can call.
  *
- * Two kinds, both executed on the server:
- *
  *  - **Portfolio tools** work on the structured snapshot the browser sends with
- *    each request (positions only exist client-side), so they can filter, rank
- *    and look up holdings without the model scanning a table.
- *  - **Market-data tools** read the server's own caches (price history,
- *    fundamentals, dividends). They never trigger an upstream fetch, so a chat
- *    question can't fan out into Yahoo requests; what the app has not cached
- *    is reported as unavailable.
+ *    each request, because positions only exist client-side and no API can
+ *    serve them.
+ *  - **`market_data`** is one generic, read-only window onto the app's existing
+ *    market-data routes (prices, history, dividends, FX, fundamentals). It
+ *    calls the route handlers in-process, so their validation, caching and
+ *    rate guards apply exactly as they do for the UI. The model composes
+ *    queries; nothing here is specific to one kind of question.
  *
  * Every result is compact JSON, capped in size, because tool output is input
  * tokens on the next round.
  */
 
+import { NextRequest } from 'next/server';
 import type { PortfolioSnapshot, SnapshotHolding } from '../../utils/portfolioSnapshot';
-import {
-    getCachedDividendEvents,
-    getCachedFundamentalsBatch,
-    getCachedHistoricalPrices,
-} from './marketDataDb';
-import { isValidSymbol } from './requestGuards';
+import { GET as historicalPrices } from '../../app/api/historical-prices/route';
+import { GET as dividends } from '../../app/api/dividends/route';
+import { GET as fxRates } from '../../app/api/fx-rates/route';
+import { GET as prices } from '../../app/api/prices/route';
+import { GET as tickerInfo } from '../../app/api/ticker-info/route';
+import { GET as screenerQuotes } from '../../app/api/screener/quotes/route';
 
 /** Upper bound on one tool result, in characters. */
 export const MAX_TOOL_RESULT_CHARS = 6_000;
+/** The market_data tool batches many lookups, so it gets a larger budget. */
+export const MAX_MARKET_RESULT_CHARS = 20_000;
+/** Lookups per market_data call. */
+export const MAX_MARKET_REQUESTS = 30;
 /** Model↔tool round trips allowed per question. */
 export const MAX_TOOL_ROUNDS = 4;
 
-const RANGE_DAYS = { '1m': 31, '3m': 92, '6m': 183, '1y': 366, '3y': 1096, '5y': 1827 } as const;
-type RangeKey = keyof typeof RANGE_DAYS;
+/**
+ * Read-only routes the model may call. `fresh=1` is never forwarded, so chat
+ * can't force upstream refreshes beyond what a normal page view would do.
+ */
+const MARKET_ROUTES: Record<string, { handler: (r: NextRequest) => Promise<Response>; params: string }> = {
+    '/api/historical-prices': { handler: historicalPrices, params: 'symbol, range (e.g. 30d, 90d, 1y, 5y, max) → daily closes' },
+    '/api/dividends': { handler: dividends, params: 'symbol, range (e.g. 1y, 5y) → ex-date dividends per share' },
+    '/api/prices': { handler: prices, params: 'symbols (comma list) → latest price per symbol' },
+    '/api/fx-rates': { handler: fxRates, params: 'pair (e.g. USDJPY), date (YYYY-MM-DD, optional)' },
+    '/api/ticker-info': { handler: tickerInfo, params: 'symbol → company name' },
+    '/api/screener/quotes': { handler: screenerQuotes, params: 'symbols (comma list) → cached P/E, P/B, yield, market cap, sector' },
+};
 
 export const CHAT_TOOLS = [
     {
@@ -67,42 +81,37 @@ export const CHAT_TOOLS = [
         },
     },
     {
-        name: 'get_price_history',
+        name: 'market_data',
         description:
-            'Price history summary for one ticker over a range: start/end price, change, high and low with dates, ' +
-            'worst drawdown, and about 12 evenly spaced points (good for a chart). Prices are in the security\'s own currency. Any ticker, held or not.',
+            'Read-only market data from the app\'s own API, for any ticker (held or not). Pass up to ' +
+            `${MAX_MARKET_REQUESTS} requests per call and batch independent lookups together, e.g. one historical-prices ` +
+            'request per holding to compare recent moves. Daily series come back summarised (first, last, change %, ' +
+            'min, max, ~12 sample points) rather than in full. Prices are in each security\'s own currency; data may be stale or missing.\n' +
+            'Paths:\n' + Object.entries(MARKET_ROUTES).map(([k, v]) => `- ${k}: ${v.params}`).join('\n'),
         input_schema: {
             type: 'object' as const,
             properties: {
-                ticker: { type: 'string' },
-                range: { type: 'string', enum: ['1m', '3m', '6m', '1y', '3y', '5y'], description: 'Default 1y' },
+                requests: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: MAX_MARKET_REQUESTS,
+                    items: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', enum: Object.keys(MARKET_ROUTES) },
+                            query: { type: 'object', additionalProperties: { type: 'string' }, description: 'Query parameters, e.g. {"symbol":"AAPL","range":"30d"}' },
+                        },
+                        required: ['path'],
+                    },
+                },
             },
-            required: ['ticker'],
-        },
-    },
-    {
-        name: 'get_fundamentals',
-        description: 'Valuation snapshot per ticker: P/E (trailing, forward), dividend yield, price/book, market cap, sector. Any ticker, held or not.',
-        input_schema: {
-            type: 'object' as const,
-            properties: { tickers: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 10 } },
-            required: ['tickers'],
-        },
-    },
-    {
-        name: 'get_dividends',
-        description: 'Dividend payments per share for one ticker (ex-dates, amounts), with trailing-12-month total.',
-        input_schema: {
-            type: 'object' as const,
-            properties: { ticker: { type: 'string' } },
-            required: ['ticker'],
+            required: ['requests'],
         },
     },
 ];
 
 export interface ToolContext {
     snapshot: PortfolioSnapshot | null;
-    now?: Date;
 }
 
 const num = (n: number | null | undefined, digits = 2): number | null =>
@@ -177,77 +186,73 @@ function closedPositions(input: Record<string, unknown>, snap: PortfolioSnapshot
     };
 }
 
-// ── Market-data tools ───────────────────────────────────────────────────────
+// ── Market data ─────────────────────────────────────────────────────────────
 
-function checkSymbol(s: string | null): string {
-    if (!s || !isValidSymbol(s)) throw new Error('Invalid ticker symbol');
-    return s;
-}
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-async function priceHistory(input: Record<string, unknown>, now: Date) {
-    const ticker = checkSymbol(str(input.ticker));
-    const range = (str(input.range) ?? '1y') as RangeKey;
-    if (!(range in RANGE_DAYS)) throw new Error(`range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+const isDateMap = (v: unknown): v is Record<string, unknown> => {
+    if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+    const keys = Object.keys(v);
+    return keys.length > 0 && keys.every(k => DATE_KEY.test(k));
+};
 
-    const all = await getCachedHistoricalPrices(ticker);
-    const from = new Date(now.getTime() - RANGE_DAYS[range] * 86_400_000).toISOString().slice(0, 10);
-    const series = Object.entries(all).filter(([d]) => d >= from).sort(([a], [b]) => a.localeCompare(b));
-    if (series.length < 2) return { ticker, range, available: false, note: 'No cached price history for this ticker and range.' };
+/**
+ * Shrink what a route returns without knowing which route it was. A map keyed
+ * by date is a time series: numeric ones become a summary with a few sample
+ * points, object-valued ones (dividends) keep only the latest entries.
+ */
+export function compactSeries(value: unknown): unknown {
+    if (Array.isArray(value)) return value.slice(0, 50).map(compactSeries);
+    if (typeof value !== 'object' || value === null) return value;
 
-    let hi = series[0], lo = series[0], peak = series[0][1], worst = 0, worstFrom = '', worstTo = '';
-    for (const p of series) {
-        if (p[1] > hi[1]) hi = p;
-        if (p[1] < lo[1]) lo = p;
-        if (p[1] > peak) peak = p[1];
-        const dd = (p[1] - peak) / peak;
-        if (dd < worst) { worst = dd; worstTo = p[0]; worstFrom = series.find(s => s[1] === peak)?.[0] ?? ''; }
+    if (isDateMap(value)) {
+        const rows = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+        if (rows.every(([, v]) => typeof v === 'number' && Number.isFinite(v))) {
+            const nums = rows as [string, number][];
+            if (nums.length < 2) return { n: nums.length, points: nums };
+            const first = nums[0], last = nums[nums.length - 1];
+            const hi = nums.reduce((m, r) => (r[1] > m[1] ? r : m));
+            const lo = nums.reduce((m, r) => (r[1] < m[1] ? r : m));
+            const step = (nums.length - 1) / Math.min(11, nums.length - 1);
+            const sample = Array.from({ length: Math.min(12, nums.length) }, (_, k) => nums[Math.round(k * step)])
+                .map(([d, p]) => [d, num(p, 4)]);
+            return {
+                n: nums.length, from: first[0], to: last[0], first: num(first[1], 4), last: num(last[1], 4),
+                changePct: first[1] === 0 ? null : num(((last[1] - first[1]) / first[1]) * 100),
+                min: { date: lo[0], value: num(lo[1], 4) }, max: { date: hi[0], value: num(hi[1], 4) }, sample,
+            };
+        }
+        return { n: rows.length, latest: rows.slice(-12).reverse().map(([d, v]) => ({ date: d, ...(typeof v === 'object' ? v : { value: v }) })) };
     }
-    const first = series[0], last = series[series.length - 1];
-    const step = (series.length - 1) / 11;
-    const points = Array.from({ length: 12 }, (_, i) => series[Math.round(i * step)]).map(([date, price]) => ({ date, price: num(price, 4) }));
-
-    return {
-        ticker, range, available: true,
-        start: { date: first[0], price: num(first[1], 4) },
-        end: { date: last[0], price: num(last[1], 4) },
-        changePct: num(((last[1] - first[1]) / first[1]) * 100),
-        high: { date: hi[0], price: num(hi[1], 4) },
-        low: { date: lo[0], price: num(lo[1], 4) },
-        maxDrawdownPct: num(worst * 100),
-        drawdownPeakDate: worstFrom || undefined,
-        drawdownTroughDate: worstTo || undefined,
-        points,
-    };
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, compactSeries(v)]));
 }
 
-async function fundamentals(input: Record<string, unknown>) {
-    const tickers = tickerList(input.tickers).map(t => checkSymbol(t));
-    if (tickers.length === 0) throw new Error('"tickers" must be a non-empty array');
-    const found = await getCachedFundamentalsBatch(tickers);
-    return tickers.map(t => {
-        const f = found.get(t);
-        if (!f) return { ticker: t, available: false };
-        const d = f.data;
-        return {
-            ticker: t, name: d.name, price: num(d.price, 4), currency: d.currency, sector: d.sector,
-            trailingPE: num(d.trailingPE), forwardPE: num(d.forwardPE), priceToBook: num(d.priceToBook),
-            dividendYieldPct: num(d.dividendYield),
-            marketCap: d.marketCap, ratiosAsOf: f.ratiosFetchedAt?.slice(0, 10) ?? null,
-        };
-    });
+async function marketRequest(raw: unknown): Promise<unknown> {
+    const req = (typeof raw === 'object' && raw !== null ? raw : {}) as { path?: unknown; query?: unknown };
+    const route = typeof req.path === 'string' ? MARKET_ROUTES[req.path] : undefined;
+    if (!route) return { error: `path must be one of ${Object.keys(MARKET_ROUTES).join(', ')}` };
+
+    const url = new URL(`http://internal${req.path}`);
+    const query = (typeof req.query === 'object' && req.query !== null ? req.query : {}) as Record<string, unknown>;
+    for (const [k, v] of Object.entries(query)) {
+        if (k === 'fresh' || k === 'cachedOnly') continue;
+        if (typeof v === 'string' || typeof v === 'number') url.searchParams.set(k, String(v));
+    }
+    try {
+        const res = await route.handler(new NextRequest(url));
+        const body = await res.json().catch(() => null);
+        return res.ok
+            ? { path: req.path, query: Object.fromEntries(url.searchParams), data: compactSeries(body) }
+            : { path: req.path, query: Object.fromEntries(url.searchParams), error: (body as { error?: string } | null)?.error ?? `HTTP ${res.status}` };
+    } catch (error) {
+        return { path: req.path, error: error instanceof Error ? error.message : 'request failed' };
+    }
 }
 
-async function dividends(input: Record<string, unknown>, now: Date) {
-    const ticker = checkSymbol(str(input.ticker));
-    const events = Object.entries(await getCachedDividendEvents(ticker)).sort(([a], [b]) => b.localeCompare(a));
-    if (events.length === 0) return { ticker, available: false, note: 'No cached dividend history.' };
-    const yearAgo = new Date(now.getTime() - 366 * 86_400_000).toISOString().slice(0, 10);
-    const ttm = events.filter(([d]) => d >= yearAgo).reduce((s, [, e]) => s + e.amount, 0);
-    return {
-        ticker, available: true, currency: events[0][1].currency,
-        trailing12mPerShare: num(ttm, 4),
-        recent: events.slice(0, 12).map(([exDate, e]) => ({ exDate, amount: num(e.amount, 4) })),
-    };
+async function marketData(input: Record<string, unknown>) {
+    const list = Array.isArray(input.requests) ? input.requests : [];
+    if (list.length === 0) throw new Error('"requests" must be a non-empty array');
+    return Promise.all(list.slice(0, MAX_MARKET_REQUESTS).map(marketRequest));
 }
 
 // ── Dispatch ────────────────────────────────────────────────────────────────
@@ -263,7 +268,6 @@ export async function runChatTool(
     ctx: ToolContext,
 ): Promise<{ text: string; isError: boolean }> {
     const args = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
-    const now = ctx.now ?? new Date();
     try {
         let result: unknown;
         switch (name) {
@@ -276,14 +280,13 @@ export async function runChatTool(
                     : closedPositions(args, ctx.snapshot);
                 break;
             }
-            case 'get_price_history': result = await priceHistory(args, now); break;
-            case 'get_fundamentals': result = await fundamentals(args); break;
-            case 'get_dividends': result = await dividends(args, now); break;
+            case 'market_data': result = await marketData(args); break;
             default: throw new Error(`Unknown tool: ${name}`);
         }
         let text = JSON.stringify(result);
-        if (text.length > MAX_TOOL_RESULT_CHARS) {
-            text = `${text.slice(0, MAX_TOOL_RESULT_CHARS)}… [truncated; narrow the query]`;
+        const cap = name === 'market_data' ? MAX_MARKET_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
+        if (text.length > cap) {
+            text = `${text.slice(0, cap)}… [truncated; narrow the query]`;
         }
         return { text, isError: false };
     } catch (error) {
