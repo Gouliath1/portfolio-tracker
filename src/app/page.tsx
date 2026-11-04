@@ -33,6 +33,7 @@ import {
 } from 'react-icons/md';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { OwnerBadge } from '../components/account/OwnerBadge';
+import { ChatWidget } from '../components/chat/ChatWidget';
 import { useTranslation } from '../i18n';
 import type { TranslationKey, TranslationParams } from '../i18n';
 
@@ -677,6 +678,11 @@ export default function Home() {
                     </main>
                 </div>
             </div>
+
+            <ChatWidget
+                getBrief={() => makeBrief().markdown}
+                hasPositions={summary.positions.length > 0}
+            />
 
             <MobileBottomNav
                 activePage="home"

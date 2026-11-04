@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCacheStatus } from '@portfolio/server/marketDataDb';
 import { getShareStoreStatus } from '@portfolio/server/shareStore';
+import { chatEnabled } from '@portfolio/server/chat';
 
 /**
  * Which server-side pieces are actually live right now — what the About
@@ -22,7 +23,7 @@ export interface ArchitectureStatus {
     /** Where opt-in AI snapshots are stored, and whether it can take one. */
     shares: { available: boolean; kind: 'turso' | 'sqlite' | 'unavailable'; location: string | null; reason: string | null };
     /** Providers the server can reach with its current configuration. */
-    providers: { yahoo: boolean; jquants: boolean };
+    providers: { yahoo: boolean; jquants: boolean; anthropic: boolean };
 }
 
 export async function GET() {
@@ -38,6 +39,8 @@ export async function GET() {
             // Yahoo needs no key — it is the baseline and is always reachable.
             yahoo: true,
             jquants: !!process.env.JQUANTS_API_KEY,
+            // Chat: a key is set and the kill switch is off.
+            anthropic: chatEnabled(),
         },
     };
 
