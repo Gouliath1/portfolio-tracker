@@ -1,10 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MdAutoAwesome, MdClose, MdArrowUpward, MdStop, MdRestartAlt } from 'react-icons/md';
+import {
+    MdAutoAwesome, MdClose, MdArrowUpward, MdStop, MdRestartAlt, MdOpenInFull, MdCloseFullscreen,
+} from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import { useOptionalAccount } from '../account/AccountProvider';
 import { useOptionalSync } from '../sync/SyncProvider';
+import { RichText } from './RichText';
 
 /** Mirrors the server's cap so the box can't accept what the API will refuse. */
 const MAX_QUESTION_CHARS = 800;
@@ -34,6 +37,8 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
     const [turns, setTurns] = useState<Turn[]>([]);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
+    /** Desktop only: a roomier panel for tables and charts. */
+    const [wide, setWide] = useState(false);
     const [remaining, setRemaining] = useState<number | null>(null);
     const account = useOptionalAccount();
     const sync = useOptionalSync();
@@ -196,7 +201,9 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
                 <section
                     role="dialog"
                     aria-label={t('chat.title')}
-                    className="fixed z-50 flex flex-col inset-x-0 top-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:top-auto md:right-6 md:bottom-6 md:w-[380px] md:h-[min(560px,calc(100dvh-3rem))] md:rounded-xl overflow-hidden"
+                    className={`fixed z-50 flex flex-col inset-x-0 top-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:top-auto md:right-6 md:bottom-6 md:rounded-xl overflow-hidden ${wide
+                        ? 'md:w-[min(780px,calc(100vw-3rem))] md:h-[calc(100dvh-3rem)]'
+                        : 'md:w-[480px] md:h-[min(700px,calc(100dvh-3rem))]'}`}
                     style={{
                         background: 'var(--surface-popover)',
                         border: '1px solid var(--border-strong)',
@@ -215,6 +222,11 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
                                     <MdRestartAlt size={18} />
                                 </button>
                             )}
+                            <button onClick={() => setWide(w => !w)} aria-pressed={wide}
+                                aria-label={t(wide ? 'chat.collapse' : 'chat.expand')} title={t(wide ? 'chat.collapse' : 'chat.expand')}
+                                className="hidden md:flex p-2 rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+                                {wide ? <MdCloseFullscreen size={16} /> : <MdOpenInFull size={16} />}
+                            </button>
                             <button onClick={close} aria-label={t('chat.close')}
                                 className="p-2 rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
                                 <MdClose size={18} />
@@ -254,20 +266,32 @@ export function ChatWidget({ getBrief, hasPositions }: ChatWidgetProps) {
                             </div>
                         )}
 
-                        {turns.map((turn, i) => (
-                            <div key={i} className={turn.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                                <p className="whitespace-pre-wrap break-words max-w-[88%] px-3 py-2 rounded-lg leading-relaxed"
-                                    style={turn.role === 'user'
-                                        ? { background: 'var(--accent-dim)', color: 'var(--text-primary)' }
-                                        : {
-                                            background: 'var(--bg-base)',
-                                            border: '1px solid var(--border)',
-                                            color: turn.error ? 'var(--pnl-red)' : 'var(--text-primary)',
-                                        }}>
-                                    {turn.content || (busy && i === turns.length - 1 ? '…' : '')}
-                                </p>
-                            </div>
-                        ))}
+                        {turns.map((turn, i) => {
+                            const last = i === turns.length - 1;
+                            const streaming = busy && last;
+                            if (turn.role === 'user') {
+                                return (
+                                    <div key={i} className="flex justify-end">
+                                        <p className="whitespace-pre-wrap break-words max-w-[85%] px-3 py-2 rounded-lg leading-relaxed"
+                                            style={{ background: 'var(--accent-dim)', color: 'var(--text-primary)' }}>
+                                            {turn.content}
+                                        </p>
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div key={i} className="min-w-0 px-3 py-2.5 rounded-lg"
+                                    style={{
+                                        background: 'var(--bg-base)',
+                                        border: '1px solid var(--border)',
+                                        color: turn.error ? 'var(--pnl-red)' : 'var(--text-primary)',
+                                    }}>
+                                    {turn.error || !turn.content
+                                        ? <p className="leading-relaxed">{turn.content || (streaming ? '…' : '')}</p>
+                                        : <RichText text={turn.content} streaming={streaming} />}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     <footer className="flex-shrink-0 px-3 pt-2 pb-3" style={{ borderTop: '1px solid var(--border)' }}>
