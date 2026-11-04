@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { resetAppDbForTests } from '../appDb';
 import {
-    normalizeEmail, checkLoginRequestAllowed, createLoginToken, consumeLoginToken,
+    normalizeEmail, normalizeDisplayName, updateUserName, checkLoginRequestAllowed, createLoginToken, consumeLoginToken,
     createSession, getSessionUser, deleteSession, deleteAccount,
     LOGIN_TOKEN_TTL_MS, SESSION_TTL_MS, MAX_LOGIN_EMAILS_PER_ADDRESS_PER_HOUR,
 } from '../authStore';
@@ -142,5 +142,32 @@ describe('deleteAccount', () => {
         await deleteAccount(a.id);
         expect((await getSync({ accountId: b.id }, at(5)))?.blob).toBe('b-blob');
         expect((await getSync('k'.repeat(43), at(5)))?.blob).toBe('anon-blob');
+    });
+});
+
+
+describe('display name', () => {
+    it('normalises what people type', () => {
+        expect(normalizeDisplayName('  Julien   Guille ')).toBe('Julien Guille');
+        expect(normalizeDisplayName('a\u0000b\nc')).toBe('abc');
+        expect(normalizeDisplayName('x'.repeat(100))).toHaveLength(60);
+        expect(normalizeDisplayName('   ')).toBeNull();
+        expect(normalizeDisplayName(42)).toBeNull();
+    });
+
+    it('starts empty, can be set, is returned by the session, and can be cleared', async () => {
+        const user = (await consumeLoginToken((await createLoginToken('n@x.com', T0))!, at(1)))!;
+        expect(user.name).toBeNull();
+        const session = (await createSession(user.id, at(2)))!;
+
+        expect(await updateUserName(user.id, 'Julien')).toBe(true);
+        expect((await getSessionUser(session, at(3)))?.name).toBe('Julien');
+
+        // A later sign-in returns the saved name too.
+        const again = await consumeLoginToken((await createLoginToken('n@x.com', at(10)))!, at(11));
+        expect(again?.name).toBe('Julien');
+
+        await updateUserName(user.id, null);
+        expect((await getSessionUser(session, at(12)))?.name).toBeNull();
     });
 });

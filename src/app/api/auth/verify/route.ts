@@ -27,5 +27,5 @@ export async function POST(request: Request) {
     const session = await createSession(user.id);
     if (!session) return json({ ok: false, error: 'Sign-in is unavailable' }, 503);
 
-    return json({ ok: true, user: { email: user.email } }, 200, { 'Set-Cookie': sessionCookie(session) });
+    return json({ ok: true, user: { email: user.email, name: user.name } }, 200, { 'Set-Cookie': sessionCookie(session) });
 }

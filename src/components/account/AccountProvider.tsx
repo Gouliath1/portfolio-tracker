@@ -11,7 +11,25 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-export interface AccountUser { email: string }
+export interface AccountUser { email: string; name: string | null }
+
+/**
+ * What to call the signed-in person: their chosen name, else a readable form
+ * of the email's local part ("julien.guille@x.com" → "Julien Guille").
+ */
+export function displayName(user: AccountUser): string {
+    if (user.name) return user.name;
+    const local = user.email.split('@')[0] ?? user.email;
+    return local
+        .split(/[._\-+]+/)
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ') || user.email;
+}
+
+export function initialOf(user: AccountUser): string {
+    return displayName(user).charAt(0).toUpperCase() || '?';
+}
 
 export type RequestLinkResult =
     | { ok: true; devLink?: string }
@@ -22,6 +40,7 @@ export interface AccountContextValue {
     /** False until the first `/api/auth/me` answer, so the UI doesn't flash "signed out". */
     loaded: boolean;
     requestLink: (email: string) => Promise<RequestLinkResult>;
+    setName: (name: string) => Promise<boolean>;
     signOut: () => Promise<void>;
     deleteAccount: () => Promise<boolean>;
 }
@@ -70,6 +89,19 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    const setName = useCallback(async (name: string): Promise<boolean> => {
+        try {
+            const res = await fetch('/api/auth/me', {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ name }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.ok) { setUser(data.user as AccountUser); return true; }
+        } catch { /* fall through */ }
+        return false;
+    }, []);
+
     const signOut = useCallback(async () => {
         try { await fetch('/api/auth/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); }
         finally { setUser(null); }
@@ -84,8 +116,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const value = useMemo<AccountContextValue>(
-        () => ({ user, loaded, requestLink, signOut, deleteAccount }),
-        [user, loaded, requestLink, signOut, deleteAccount],
+        () => ({ user, loaded, requestLink, setName, signOut, deleteAccount }),
+        [user, loaded, requestLink, setName, signOut, deleteAccount],
     );
     return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }

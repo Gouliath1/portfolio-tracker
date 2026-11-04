@@ -8,6 +8,7 @@ import {
 import { useTranslation } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import { SyncMenuButton } from '../sync/SyncMenuButton';
+import { OwnerBadge } from '../account/OwnerBadge';
 import { WipBadge } from '../shared/WipBadge';
 
 export type SidebarViewId = 'overview' | 'assets' | 'data';
@@ -94,6 +95,7 @@ export function AppSidebar({
                             style={{ color: 'var(--text-primary)' }}>
                             {activeSetName}
                         </div>
+                        <OwnerBadge showName className="text-xs mt-0.5" />
                     </div>
                 </button>
             )}

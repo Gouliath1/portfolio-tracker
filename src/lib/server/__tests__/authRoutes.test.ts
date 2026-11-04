@@ -7,7 +7,7 @@ import { resetAppDbForTests } from '../appDb';
 import { resetGuardsForTests } from '../requestGuards';
 import { POST as requestLink } from '../../../app/api/auth/request/route';
 import { POST as verify } from '../../../app/api/auth/verify/route';
-import { GET as me } from '../../../app/api/auth/me/route';
+import { GET as me, PATCH as patchMe } from '../../../app/api/auth/me/route';
 import { POST as logout } from '../../../app/api/auth/logout/route';
 import { DELETE as deleteAccountRoute } from '../../../app/api/auth/account/route';
 import * as sync from '../../../app/api/sync/route';
@@ -107,7 +107,7 @@ describe('sign in / session', () => {
         expect(cookie).toContain('SameSite=Lax');
 
         const who = await (await me(req('/api/auth/me', 'GET', undefined, { cookie: cookie.split(';')[0] }))).json();
-        expect(who).toEqual({ user: { email: 'me@x.com' } });
+        expect(who).toEqual({ user: { email: 'me@x.com', name: null } });
     });
 
     it('a link works once', async () => {
@@ -185,5 +185,30 @@ describe('sync as an account', () => {
         expect(await (await sync.PUT(req('/api/sync', 'PUT', { token: key }))).json()).toMatchObject({ blob: 'anon' });
         expect(await (await sync.PUT(req('/api/sync', 'PUT', {}, { cookie }))).json()).toMatchObject({ found: false });
         expect((await sync.PUT(req('/api/sync', 'PUT', { token: 'short' }))).status).toBe(400);
+    });
+});
+
+
+describe('PATCH /api/auth/me (display name)', () => {
+    it('sets the name, which /me then reports', async () => {
+        const cookie = await signIn('name@x.com');
+        const res = await patchMe(req('/api/auth/me', 'PATCH', { name: '  Julien   G ' }, { cookie }));
+        expect(await res.json()).toEqual({ ok: true, user: { email: 'name@x.com', name: 'Julien G' } });
+        expect(await (await me(req('/api/auth/me', 'GET', undefined, { cookie }))).json())
+            .toEqual({ user: { email: 'name@x.com', name: 'Julien G' } });
+    });
+
+    it('clears the name with an empty string', async () => {
+        const cookie = await signIn('clear@x.com');
+        await patchMe(req('/api/auth/me', 'PATCH', { name: 'Someone' }, { cookie }));
+        const res = await patchMe(req('/api/auth/me', 'PATCH', { name: '' }, { cookie }));
+        expect((await res.json()).user.name).toBeNull();
+    });
+
+    it('requires a session, same-origin, and a string', async () => {
+        expect((await patchMe(req('/api/auth/me', 'PATCH', { name: 'x' }))).status).toBe(401);
+        const cookie = await signIn('guard@x.com');
+        expect((await patchMe(req('/api/auth/me', 'PATCH', { name: 'x' }, { cookie, origin: 'https://evil.example' }))).status).toBe(403);
+        expect((await patchMe(req('/api/auth/me', 'PATCH', { name: 123 }, { cookie }))).status).toBe(400);
     });
 });

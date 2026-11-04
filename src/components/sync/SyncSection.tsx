@@ -20,7 +20,8 @@ import { copyToClipboard } from '../../utils/clipboard';
 import { readJoinTokenFromHash } from '../../utils/syncClient';
 import { hasBackup, restoreBackup, summarizeBlob, collectSyncBlob } from '../../utils/syncState';
 import { useOptionalSync, type SyncContextValue } from './SyncProvider';
-import { useOptionalAccount, type AccountContextValue } from '../account/AccountProvider';
+import { useOptionalAccount, displayName, type AccountContextValue } from '../account/AccountProvider';
+import { suggestEmailFix } from '../../utils/emailTypo';
 
 function extractToken(input: string): string | null {
     const trimmed = input.trim();
@@ -74,14 +75,32 @@ const SyncPanelBody = ({ sync, account }: { sync: SyncContextValue; account: Acc
     const [copied, setCopied] = useState(false);
     const [backupAvailable, setBackupAvailable] = useState(() => typeof window !== 'undefined' && hasBackup());
 
-    const sendLink = async () => {
-        if (!account || !email.trim() || accountBusy) return;
+    const [suggestion, setSuggestion] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState(false);
+    const [nameDraft, setNameDraft] = useState('');
+
+    /** `asTyped` skips the typo check — the person has already said the address is right. */
+    const sendLink = async (address = email, asTyped = false) => {
+        const target = address.trim();
+        if (!account || !target || accountBusy) return;
+        const fix = asTyped ? null : suggestEmailFix(target);
+        if (fix) { setSuggestion(fix); return; }
+        setSuggestion(null);
         setAccountBusy(true);
         setAccountError(null);
-        const res = await account.requestLink(email.trim());
+        const res = await account.requestLink(target);
         setAccountBusy(false);
-        if (res.ok) { setSentTo(email.trim()); setDevLink(res.devLink ?? null); }
+        if (res.ok) { setSentTo(target); setDevLink(res.devLink ?? null); }
         else setAccountError(res.error);
+    };
+
+    const saveName = async () => {
+        if (!account) return;
+        setAccountBusy(true);
+        const ok = await account.setName(nameDraft);
+        setAccountBusy(false);
+        if (ok) setEditingName(false);
+        else setAccountError(t('account.nameSaveFailed'));
     };
 
     const removeAccount = async () => {
@@ -257,7 +276,7 @@ const SyncPanelBody = ({ sync, account }: { sync: SyncContextValue; account: Acc
                 ) : (
                     <div className="space-y-2">
                         <div className="flex gap-2">
-                            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                            <input type="email" value={email} onChange={e => { setEmail(e.target.value); setSuggestion(null); }}
                                 onKeyDown={e => { if (e.key === 'Enter') void sendLink(); }}
                                 placeholder={t('account.emailPlaceholder')} autoComplete="email"
                                 aria-label={t('account.emailPlaceholder')} className={inputClass} style={inputStyle} />
@@ -265,7 +284,19 @@ const SyncPanelBody = ({ sync, account }: { sync: SyncContextValue; account: Acc
                                 {accountBusy ? t('account.sending') : t('account.sendLink')}
                             </PrimaryButton>
                         </div>
-                        <Muted>{t('account.explainer')}</Muted>
+                        {suggestion ? (
+                            <div className="space-y-1.5" role="alert">
+                                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                                    {t('account.didYouMean', { email: suggestion })}
+                                </p>
+                                <div className="flex gap-4">
+                                    <TextButton onClick={() => { setEmail(suggestion); void sendLink(suggestion, true); }}>{t('account.useSuggestion')}</TextButton>
+                                    <TextButton onClick={() => void sendLink(email, true)}>{t('account.sendAsTyped')}</TextButton>
+                                </div>
+                            </div>
+                        ) : (
+                            <Muted>{t('account.explainer')}</Muted>
+                        )}
                     </div>
                 )}
                 {keyPath}
@@ -288,10 +319,25 @@ const SyncPanelBody = ({ sync, account }: { sync: SyncContextValue; account: Acc
             {!enabled && <Muted>{t('sync.explainer')}</Muted>}
 
             {user && (
-                <p className="text-xs flex flex-wrap items-center gap-x-2" style={{ color: 'var(--text-secondary)' }}>
-                    <span>{t('account.signedInAs')} <strong style={{ color: 'var(--text-primary)' }} className="break-all">{user.email}</strong></span>
-                    <TextButton onClick={() => void account?.signOut()}>{t('account.signOut')}</TextButton>
-                </p>
+                editingName ? (
+                    <div className="flex gap-2 items-center">
+                        <input value={nameDraft} onChange={e => setNameDraft(e.target.value)} maxLength={60}
+                            onKeyDown={e => { if (e.key === 'Enter') void saveName(); if (e.key === 'Escape') setEditingName(false); }}
+                            placeholder={t('account.namePlaceholder')} aria-label={t('account.namePlaceholder')} autoFocus
+                            className={inputClass} style={inputStyle} />
+                        <TextButton onClick={() => void saveName()} disabled={accountBusy}>{t('account.saveName')}</TextButton>
+                        <TextButton onClick={() => setEditingName(false)}>{t('sync.cancel')}</TextButton>
+                    </div>
+                ) : (
+                    <div className="space-y-0.5">
+                        <p className="text-sm font-medium break-words" style={{ color: 'var(--text-primary)' }}>{displayName(user)}</p>
+                        <p className="text-xs flex flex-wrap items-center gap-x-3" style={{ color: 'var(--text-secondary)' }}>
+                            <span className="break-all">{user.email}</span>
+                            <TextButton onClick={() => { setNameDraft(user.name ?? ''); setEditingName(true); }}>{t('account.editName')}</TextButton>
+                            <TextButton onClick={() => void account?.signOut()}>{t('account.signOut')}</TextButton>
+                        </p>
+                    </div>
+                )
             )}
 
             {body}
