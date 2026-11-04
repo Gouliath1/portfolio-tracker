@@ -32,6 +32,7 @@ import {
     MdVisibility, MdVisibilityOff, MdAccountBalanceWallet, MdAutoAwesome,
 } from 'react-icons/md';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
+import { OwnerBadge } from '../components/account/OwnerBadge';
 import { useTranslation } from '../i18n';
 import type { TranslationKey, TranslationParams } from '../i18n';
 
@@ -427,6 +428,7 @@ export default function Home() {
                                         style={{ color: 'var(--text-primary)' }}>
                                         {activeSetName || t('sidebar.activePortfolio')}
                                     </span>
+                                    <OwnerBadge className="flex-shrink-0" />
                                 </div>
                                 <div className="flex items-center gap-2 ml-auto flex-shrink-0">
                                     <span className="md:hidden px-2 py-0.5 rounded text-xs font-mono font-semibold"

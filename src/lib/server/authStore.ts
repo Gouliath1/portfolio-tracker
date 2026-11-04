@@ -26,9 +26,16 @@ const SESSION_TOUCH_MS = 24 * 3_600_000;
 export const MAX_LOGIN_EMAILS_PER_ADDRESS_PER_HOUR = 3;
 export const DEFAULT_DAILY_EMAIL_CAP = 90;
 
-export interface AuthUser { id: string; email: string }
+export interface AuthUser { id: string; email: string; name: string | null }
 
 const newSecret = () => randomBytes(32).toString('base64url');
+
+/** A display name as people type it: trimmed, whitespace collapsed, no control characters, 60 chars max. Empty means "no name". */
+export function normalizeDisplayName(input: unknown): string | null {
+    if (typeof input !== 'string') return null;
+    const name = input.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    return name === '' ? null : name;
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -59,6 +66,9 @@ async function db() {
                 used_at    TEXT
             )
         `);
+        // Added after the first release: an optional display name.
+        try { await c.execute(`ALTER TABLE auth_users ADD COLUMN name TEXT`); }
+        catch (e) { if (!/duplicate column/i.test(e instanceof Error ? e.message : String(e))) throw e; }
         await c.execute(`CREATE INDEX IF NOT EXISTS idx_login_email ON auth_login_tokens(email, created_at)`);
         await c.execute(`CREATE INDEX IF NOT EXISTS idx_login_created ON auth_login_tokens(created_at)`);
         await c.execute(`
@@ -140,9 +150,9 @@ export async function consumeLoginToken(token: unknown, now = new Date()): Promi
               ON CONFLICT(email) DO UPDATE SET last_login_at = excluded.last_login_at`,
         args: [randomUUID(), email, iso, iso],
     });
-    const user = await c.execute({ sql: `SELECT id, email FROM auth_users WHERE email = ?`, args: [email] });
+    const user = await c.execute({ sql: `SELECT id, email, name FROM auth_users WHERE email = ?`, args: [email] });
     const row = user.rows[0];
-    return row ? { id: String(row.id), email: String(row.email) } : null;
+    return row ? { id: String(row.id), email: String(row.email), name: row.name == null ? null : String(row.name) } : null;
 }
 
 export async function createSession(userId: string, now = new Date()): Promise<string | null> {
@@ -165,7 +175,7 @@ export async function getSessionUser(sessionId: unknown, now = new Date()): Prom
 
     const hash = hashToken(sessionId);
     const res = await c.execute({
-        sql: `SELECT s.last_seen_at, s.expires_at, u.id, u.email
+        sql: `SELECT s.last_seen_at, s.expires_at, u.id, u.email, u.name
               FROM auth_sessions s JOIN auth_users u ON u.id = s.user_id
               WHERE s.session_hash = ?`,
         args: [hash],
@@ -182,7 +192,15 @@ export async function getSessionUser(sessionId: unknown, now = new Date()): Prom
             args: [now.toISOString(), new Date(now.getTime() + SESSION_TTL_MS).toISOString(), hash],
         });
     }
-    return { id: String(row.id), email: String(row.email) };
+    return { id: String(row.id), email: String(row.email), name: row.name == null ? null : String(row.name) };
+}
+
+/** Set (or clear, with null) the account's display name. */
+export async function updateUserName(userId: string, name: string | null): Promise<boolean> {
+    const c = await db();
+    if (!c) return false;
+    const res = await c.execute({ sql: `UPDATE auth_users SET name = ? WHERE id = ?`, args: [name, userId] });
+    return res.rowsAffected > 0;
 }
 
 export async function deleteSession(sessionId: unknown): Promise<void> {
