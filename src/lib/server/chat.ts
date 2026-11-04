@@ -64,15 +64,40 @@ export type ParsedChat =
     | { ok: true; request: ChatRequest }
     | { ok: false; status: number; error: string };
 
-/** A snapshot is optional context: a malformed one is dropped, not an error. */
+const HOLDING_NUMBERS = [
+    'quantity', 'avgCost', 'value', 'cost', 'weightPct', 'pnlPct', 'totalReturnPct', 'dividends',
+] as const;
+
+/**
+ * A snapshot is optional context: a malformed one is dropped, not an error.
+ * A non-finite number (a holding whose price or FX rate failed) arrives as
+ * `null` after JSON, so those are zeroed per holding instead of discarding
+ * everything the tools could still answer from.
+ */
 function readSnapshot(raw: unknown): PortfolioSnapshot | undefined {
     if (typeof raw !== 'object' || raw === null) return undefined;
     const s = raw as Partial<PortfolioSnapshot>;
     if (!Array.isArray(s.holdings) || !Array.isArray(s.recentClosed)
-        || typeof s.baseCurrency !== 'string' || typeof s.closedCount !== 'number') return undefined;
-    if (!s.holdings.every(h => h && typeof h.ticker === 'string' && typeof h.value === 'number')) return undefined;
+        || typeof s.baseCurrency !== 'string') return undefined;
     if (JSON.stringify(raw).length > MAX_SNAPSHOT_CHARS) return undefined;
-    return raw as PortfolioSnapshot;
+
+    const holdings = s.holdings
+        .filter(h => h && typeof h.ticker === 'string' && h.ticker !== '')
+        .map(h => {
+            const clean = { ...h } as unknown as Record<string, unknown>;
+            for (const k of HOLDING_NUMBERS) {
+                if (typeof clean[k] !== 'number' || !Number.isFinite(clean[k])) clean[k] = 0;
+            }
+            for (const k of ['name', 'account', 'assetClass', 'stockCcy', 'heldSince'] as const) {
+                if (typeof clean[k] !== 'string') clean[k] = '';
+            }
+            return clean as unknown as PortfolioSnapshot['holdings'][number];
+        });
+    return {
+        ...(s as PortfolioSnapshot),
+        holdings,
+        closedCount: typeof s.closedCount === 'number' ? s.closedCount : s.recentClosed.length,
+    };
 }
 
 const bad = (error: string, status = 400): ParsedChat => ({ ok: false, status, error });
@@ -123,7 +148,7 @@ export function parseChatRequest(body: unknown): ParsedChat {
 
 const INSTRUCTIONS = [
     'You answer questions about one person\'s investment portfolio, using the brief below and your tools.',
-    'The brief is a summary. Answer from it when it suffices. Call a tool when you need detail it lacks: filtering or ranking holdings, one holding in depth, sales, price history or drawdowns, valuation ratios, dividend history. Batch independent calls in one turn, and do not narrate before calling a tool.',
+    'The brief is a summary. Answer from it when it suffices. Call a tool when you need detail it lacks: filtering or ranking holdings, one holding in depth, sales, recent price moves, valuation ratios, dividend history (market_data, one request per ticker, batched). Batch independent calls in one turn, and do not narrate before calling a tool.',
     'Tool data is either the user\'s own portfolio or cached market data that may be stale or missing. If a tool reports no data, say so.',
     'Be brief: a direct answer first, then at most a few short supporting points. Quote the numbers you rely on.',
     'If neither the brief nor the tools contain what is needed, say so instead of guessing. Never invent prices, news or figures.',
