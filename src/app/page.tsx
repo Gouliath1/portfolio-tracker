@@ -680,7 +680,7 @@ export default function Home() {
             </div>
 
             <ChatWidget
-                getBrief={() => makeBrief().markdown}
+                getContext={makeBrief}
                 hasPositions={summary.positions.length > 0}
             />
 

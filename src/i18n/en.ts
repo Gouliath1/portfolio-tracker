@@ -610,7 +610,7 @@ export const en = {
     'chat.stop': 'Stop',
     'chat.suggestion1': 'Show my allocation by asset class',
     'chat.suggestion2': 'What drove my P&L the most?',
-    'chat.intro': 'Answers use only your current holdings and returns.',
+    'chat.intro': 'Answers use your holdings and returns, plus cached prices, valuations and dividends.',
     'chat.privacy': 'Your portfolio summary is sent to Claude to answer. Nothing is stored.',
     'chat.disabled': 'Chat isn’t set up on this server yet.',
     'chat.noPositions': 'Add some positions first, then ask away.',
