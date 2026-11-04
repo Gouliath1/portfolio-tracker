@@ -599,7 +599,7 @@ export const fr: Translations = {
     'chat.stop': 'Arrêter',
     'chat.suggestion1': 'Montre ma répartition par classe d’actifs',
     'chat.suggestion2': 'Qu’est-ce qui a le plus pesé sur ma performance ?',
-    'chat.intro': 'Les réponses se basent uniquement sur vos positions et rendements actuels.',
+    'chat.intro': 'Les réponses s’appuient sur vos positions et rendements, ainsi que les cours, valorisations et dividendes en cache.',
     'chat.privacy': 'Le résumé de votre portefeuille est envoyé à Claude pour répondre. Rien n’est conservé.',
     'chat.disabled': 'Le chat n’est pas encore configuré sur ce serveur.',
     'chat.noPositions': 'Ajoutez d’abord des positions, puis posez vos questions.',
