@@ -67,6 +67,21 @@ export const CHAT_TOOLS = [
         },
     },
     {
+        name: 'get_period_performance',
+        description:
+            'Price change over a period for EVERY open holding, ranked. Use for "what lost / gained the most this month / ' +
+            'quarter / year" or "how did my positions do recently". The brief only has since-purchase returns. ' +
+            'Change is the security\'s own price move in its listing currency, not the position\'s P&L.',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                range: { type: 'string', enum: ['1m', '3m', '6m', '1y'], description: 'Default 1m' },
+                order: { type: 'string', enum: ['worst_first', 'best_first'], description: 'Default worst_first' },
+                limit: { type: 'integer', minimum: 1, maximum: 30, description: 'Default 10' },
+            },
+        },
+    },
+    {
         name: 'get_price_history',
         description:
             'Price history summary for one ticker over a range: start/end price, change, high and low with dates, ' +
@@ -220,6 +235,42 @@ async function priceHistory(input: Record<string, unknown>, now: Date) {
     };
 }
 
+async function periodPerformance(input: Record<string, unknown>, snap: PortfolioSnapshot, now: Date) {
+    const range = (str(input.range) ?? '1m') as RangeKey;
+    if (!(range in RANGE_DAYS)) throw new Error(`range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+    const limit = Math.min(30, Math.max(1, Number(input.limit) || 10));
+    const from = new Date(now.getTime() - RANGE_DAYS[range] * 86_400_000).toISOString().slice(0, 10);
+
+    // One row per ticker; the same security in two accounts moves identically.
+    const byTicker = new Map<string, { value: number; weightPct: number; name: string; accounts: string[] }>();
+    for (const h of snap.holdings) {
+        const e = byTicker.get(h.ticker) ?? { value: 0, weightPct: 0, name: h.name, accounts: [] };
+        e.value += h.value; e.weightPct += h.weightPct; e.accounts.push(h.account);
+        byTicker.set(h.ticker, e);
+    }
+    const rows = await Promise.all([...byTicker.entries()].slice(0, 100).map(async ([ticker, e]) => {
+        if (!isValidSymbol(ticker)) return null;
+        const series = Object.entries(await getCachedHistoricalPrices(ticker))
+            .filter(([d]) => d >= from).sort(([a], [b]) => a.localeCompare(b));
+        if (series.length < 2) return { ticker, ...e, available: false as const };
+        const [d0, p0] = series[0], [d1, p1] = series[series.length - 1];
+        return { ticker, ...e, available: true as const, from: d0, to: d1, changePct: num(((p1 - p0) / p0) * 100) };
+    }));
+    const ok = rows.filter((r): r is NonNullable<typeof r> & { available: true } => !!r && r.available);
+    ok.sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0));
+    if (input.order === 'best_first') ok.reverse();
+    const missing = rows.filter(r => r && !r.available).map(r => r!.ticker);
+    return {
+        range, note: 'Percent price change in each security\'s own currency; weightPct is share of the portfolio.',
+        ranked: ok.slice(0, limit).map(r => ({
+            ticker: r.ticker, name: r.name, changePct: r.changePct, from: r.from, to: r.to,
+            weightPct: num(r.weightPct), value: num(r.value),
+        })),
+        coverage: `${ok.length} of ${byTicker.size} holdings have cached history`,
+        noHistory: missing.slice(0, 20),
+    };
+}
+
 async function fundamentals(input: Record<string, unknown>) {
     const tickers = tickerList(input.tickers).map(t => checkSymbol(t));
     if (tickers.length === 0) throw new Error('"tickers" must be a non-empty array');
@@ -269,11 +320,13 @@ export async function runChatTool(
         switch (name) {
             case 'query_holdings':
             case 'get_holding':
-            case 'get_closed_positions': {
+            case 'get_closed_positions':
+            case 'get_period_performance': {
                 if (!ctx.snapshot) throw new Error('Structured portfolio data is not available; use the brief');
                 result = name === 'query_holdings' ? queryHoldings(args, ctx.snapshot)
                     : name === 'get_holding' ? getHolding(args, ctx.snapshot)
-                    : closedPositions(args, ctx.snapshot);
+                    : name === 'get_closed_positions' ? closedPositions(args, ctx.snapshot)
+                    : await periodPerformance(args, ctx.snapshot, now);
                 break;
             }
             case 'get_price_history': result = await priceHistory(args, now); break;

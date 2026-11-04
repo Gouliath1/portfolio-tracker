@@ -59,6 +59,14 @@ describe('portfolio tools', () => {
     });
 });
 
+describe('period performance', () => {
+    it('ranks held tickers by price change, worst first', async () => {
+        const r = await call('get_period_performance', { range: '3m' });
+        expect(r.data.ranked[0]).toMatchObject({ ticker: 'AAPL', changePct: 10 });
+        expect(r.data.noHistory).toEqual(expect.arrayContaining(['VTI', 'SONY']));
+    });
+});
+
 describe('market-data tools', () => {
     it('summarises price history', async () => {
         const r = await call('get_price_history', { ticker: 'AAPL', range: '3m' });
@@ -89,6 +97,9 @@ describe('parseChatRequest snapshot', () => {
     it('keeps a valid snapshot and drops a malformed one', () => {
         const ok = parseChatRequest({ ...base, snapshot });
         expect(ok.ok && ok.request.snapshot).toBeTruthy();
+        const withNull = JSON.parse(JSON.stringify({ ...snapshot, holdings: [h('AAPL', { value: NaN })] }));
+        const lenient = parseChatRequest({ ...base, snapshot: withNull });
+        expect(lenient.ok && lenient.request.snapshot?.holdings[0].value).toBe(0);
         const dropped = parseChatRequest({ ...base, snapshot: { holdings: 'x' } });
         expect(dropped.ok && dropped.request.snapshot).toBeUndefined();
     });
