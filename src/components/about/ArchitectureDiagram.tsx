@@ -24,7 +24,7 @@
 import { useEffect, useState } from 'react';
 import {
     MdArrowDownward, MdArrowForward, MdLaptopMac, MdDns, MdStorage, MdCloudQueue,
-    MdShowChart, MdInsights, MdListAlt, MdSmartToy,
+    MdShowChart, MdInsights, MdListAlt, MdSmartToy, MdAutoAwesome,
 } from 'react-icons/md';
 import type { IconType } from 'react-icons';
 import { useTranslation } from '../../i18n';
@@ -49,7 +49,7 @@ interface ServerStatus {
     region: string | null;
     cache: { kind: Storage; location: string | null; rows: number | null; reason: string | null };
     shares: { available: boolean; kind: Storage; location: string | null; reason: string | null };
-    providers: { yahoo: boolean; jquants: boolean };
+    providers: { yahoo: boolean; jquants: boolean; anthropic: boolean };
 }
 
 /**
@@ -375,6 +375,7 @@ export function ArchitectureDiagram() {
                                 lines: [
                                     { text: t('about.lineAppCacheFirst') },
                                     { text: t('about.lineAppNoHoldings') },
+                                    { text: t('about.lineAppChat') },
                                 ],
                             }} />
                         </Group>
@@ -432,6 +433,17 @@ export function ArchitectureDiagram() {
                                 tag: 'JPX',
                                 state: providerState(server?.providers.jquants),
                                 lines: [{ text: t(server?.providers.jquants ? 'about.lineKeySet' : 'about.detailNoKey') }],
+                            }} />
+                            <Node className={PROVIDER} node={{
+                                icon: MdAutoAwesome,
+                                titleKey: 'about.boxClaude',
+                                subtitleKey: 'about.subClaude',
+                                tag: 'ANTHROPIC',
+                                state: providerState(server?.providers.anthropic),
+                                lines: [
+                                    { text: t(server?.providers.anthropic ? 'about.lineKeySet' : 'about.detailNoKey') },
+                                    { text: t('about.lineClaudeSent') },
+                                ],
                             }} />
                             <Node className={PROVIDER} node={{
                                 icon: MdListAlt,
