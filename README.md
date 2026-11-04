@@ -50,7 +50,7 @@ A personal investment dashboard built with Next.js for tracking stock positions 
 
 2. **Install dependencies:**
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **(Optional) Create an environment file** for the screener's data providers and the production market-data cache:
