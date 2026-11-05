@@ -63,8 +63,20 @@ describe('portfolio tools', () => {
     });
 });
 
+describe('market_data range', () => {
+    it('trims a long cached series to the requested window', async () => {
+        const day = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString().slice(0, 10);
+        const { GET } = jest.requireMock('../../../app/api/historical-prices/route');
+        GET.mockImplementationOnce(async () => new Response(JSON.stringify({
+            symbol: 'AAPL', prices: { [day(400)]: 50, [day(100)]: 60, [day(20)]: 100, [day(1)]: 90 },
+        })));
+        const r = await call('market_data', { requests: [{ path: '/api/historical-prices', query: { symbol: 'AAPL', range: '30d' } }] });
+        expect(r.data[0].data.prices).toMatchObject({ n: 2, first: 100, last: 90, changePct: -10 });
+    });
+});
+
 describe('market_data', () => {
-    const hp = (symbol: string) => ({ path: '/api/historical-prices', query: { symbol, range: '30d' } });
+    const hp = (symbol: string) => ({ path: '/api/historical-prices', query: { symbol, range: '1y' } });
 
     it('summarises a price series from the existing route', async () => {
         const r = await call('market_data', { requests: [hp('AAPL')] });

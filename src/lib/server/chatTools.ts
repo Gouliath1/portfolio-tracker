@@ -37,7 +37,7 @@ export const MAX_TOOL_ROUNDS = 4;
  * can't force upstream refreshes beyond what a normal page view would do.
  */
 const MARKET_ROUTES: Record<string, { handler: (r: NextRequest) => Promise<Response>; params: string }> = {
-    '/api/historical-prices': { handler: historicalPrices, params: 'symbol, range (e.g. 30d, 90d, 1y, 5y, max) → daily closes' },
+    '/api/historical-prices': { handler: historicalPrices, params: 'symbol, range (e.g. 30d, 90d, 1y, 5y, max) → daily closes, trimmed to that window' },
     '/api/dividends': { handler: dividends, params: 'symbol, range (e.g. 1y, 5y) → ex-date dividends per share' },
     '/api/prices': { handler: prices, params: 'symbols (comma list) → latest price per symbol' },
     '/api/fx-rates': { handler: fxRates, params: 'pair (e.g. USDJPY), date (YYYY-MM-DD, optional)' },
@@ -201,12 +201,17 @@ const isDateMap = (v: unknown): v is Record<string, unknown> => {
  * by date is a time series: numeric ones become a summary with a few sample
  * points, object-valued ones (dividends) keep only the latest entries.
  */
-export function compactSeries(value: unknown): unknown {
-    if (Array.isArray(value)) return value.slice(0, 50).map(compactSeries);
+export function compactSeries(value: unknown, since?: string): unknown {
+    if (Array.isArray(value)) return value.slice(0, 50).map(v => compactSeries(v, since));
     if (typeof value !== 'object' || value === null) return value;
 
     if (isDateMap(value)) {
-        const rows = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+        // The routes hand back everything they have cached whatever `range` was
+        // asked for (it only decides whether to refetch), so the window is applied here.
+        const rows = Object.entries(value)
+            .filter(([d]) => !since || d >= since)
+            .sort(([a], [b]) => a.localeCompare(b));
+        if (rows.length === 0) return { n: 0, note: since ? `no data since ${since}` : 'no data' };
         if (rows.every(([, v]) => typeof v === 'number' && Number.isFinite(v))) {
             const nums = rows as [string, number][];
             if (nums.length < 2) return { n: nums.length, points: nums };
@@ -224,7 +229,17 @@ export function compactSeries(value: unknown): unknown {
         }
         return { n: rows.length, latest: rows.slice(-12).reverse().map(([d, v]) => ({ date: d, ...(typeof v === 'object' ? v : { value: v }) })) };
     }
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, compactSeries(v)]));
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, compactSeries(v, since)]));
+}
+
+/** First date inside a `range` like 30d, 90d, 1y; null for max or anything else. */
+export function rangeStart(range: unknown, now = new Date()): string | null {
+    const m = typeof range === 'string' ? /^(\d{1,3})([dy])$/.exec(range) : null;
+    if (!m) return null;
+    const d = new Date(now);
+    if (m[2] === 'y') d.setFullYear(d.getFullYear() - Number(m[1]));
+    else d.setDate(d.getDate() - Number(m[1]));
+    return d.toISOString().slice(0, 10);
 }
 
 async function marketRequest(raw: unknown): Promise<unknown> {
@@ -242,7 +257,7 @@ async function marketRequest(raw: unknown): Promise<unknown> {
         const res = await route.handler(new NextRequest(url));
         const body = await res.json().catch(() => null);
         return res.ok
-            ? { path: req.path, query: Object.fromEntries(url.searchParams), data: compactSeries(body) }
+            ? { path: req.path, query: Object.fromEntries(url.searchParams), data: compactSeries(body, rangeStart(url.searchParams.get('range'))  ?? undefined) }
             : { path: req.path, query: Object.fromEntries(url.searchParams), error: (body as { error?: string } | null)?.error ?? `HTTP ${res.status}` };
     } catch (error) {
         return { path: req.path, error: error instanceof Error ? error.message : 'request failed' };
