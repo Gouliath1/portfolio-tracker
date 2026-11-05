@@ -18,7 +18,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { fetchHistoricalPrices } from '@portfolio/core';
+import { fetchHistoricalPrices, rangeStartISO } from '@portfolio/core';
 import {
     getCachedHistoricalPrices,
     setCachedHistoricalPrices,
@@ -39,19 +39,6 @@ import {
 type PriceMap = Record<string, number>;
 
 const _inFlight = new Map<string, Promise<PriceMap>>();
-
-function rangeToStartDate(range: string): string {
-    const now = new Date();
-    const match = /^(\d+)([dy])$/.exec(range);
-    if (match) {
-        const n = parseInt(match[1], 10);
-        if (match[2] === 'y') now.setFullYear(now.getFullYear() - n);
-        else if (match[2] === 'd') now.setDate(now.getDate() - n);
-    } else if (range === 'max') {
-        now.setFullYear(now.getFullYear() - 30);
-    }
-    return now.toISOString().split('T')[0];
-}
 
 
 async function fetchAndCache(symbol: string, startDate: string): Promise<PriceMap> {
@@ -78,7 +65,7 @@ export async function GET(request: Request) {
 
     const cached = await getCachedHistoricalPrices(symbol);
     const cachedDates = Object.keys(cached);
-    const requestedStart = rangeToStartDate(range);
+    const requestedStart = rangeStartISO(range);
     const lastBusinessDay = lastExpectedBusinessDay();
 
     let minCached: string | null = null;

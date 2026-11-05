@@ -1,6 +1,6 @@
 import { Position } from '@portfolio/types';
-import { HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, formatDateLabel, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { HistoricalSnapshot, stepMs, type DateWindow } from '@portfolio/core';
+import { formatDateLabel, getTransactionsNearDate } from './chartUtils';
 import { translate, DEFAULT_LANGUAGE, localeTag } from '../../../i18n';
 import type { TranslationKey, TranslationParams } from '../../../i18n';
 
@@ -59,7 +59,7 @@ export const createChartData = (
     dateIntervals: Date[],
     historicalData: HistoricalSnapshot[],
     positions: Position[],
-    timeline: TimelineFilter,
+    dateWindow: DateWindow,
     showValues: boolean,
     currency: string = 'JPY',
     t: Translator = defaultTranslator,
@@ -70,7 +70,7 @@ export const createChartData = (
     const pnlData: number[] = [];
     const transactionDates: boolean[] = [];
 
-    const currentInterval = getIntervalForTimeline(timeline);
+    const currentInterval = stepMs(dateWindow);
 
     dateIntervals.forEach((date, index) => {
         const snapshot = historicalData[index];
@@ -97,7 +97,7 @@ export const createChartData = (
     });
 
     return {
-        labels: dateIntervals.map(date => formatDateLabel(date, timeline, locale)),
+        labels: dateIntervals.map(date => formatDateLabel(date, dateWindow, locale)),
         datasets: [
             {
                 // Portfolio Value — primary, strongest visual weight

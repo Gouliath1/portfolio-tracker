@@ -1,13 +1,14 @@
 import { Position } from '@portfolio/types';
+import { presetWindow, spanDays, windowBetween, type DateWindow, type WindowPreset } from '@portfolio/core';
 import type { TranslationKey } from '../../../i18n';
 
-export type TimelineFilter = '1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '2Y' | '5Y' | 'All';
+export type TimelineFilter = WindowPreset | 'All' | 'Custom';
 
 /**
  * The `key` is the internal timeline identity (never translated — it drives the
  * date maths and cache keys); `labelKey` is what the button shows.
  */
-export const TIMELINE_BUTTONS: { key: TimelineFilter; labelKey: TranslationKey }[] = [
+export const TIMELINE_BUTTONS: { key: Exclude<TimelineFilter, 'Custom'>; labelKey: TranslationKey }[] = [
     { key: '1D', labelKey: 'timeline.1d' },
     { key: '5D', labelKey: 'timeline.5d' },
     { key: '1M', labelKey: 'timeline.1m' },
@@ -19,107 +20,40 @@ export const TIMELINE_BUTTONS: { key: TimelineFilter; labelKey: TranslationKey }
     { key: 'All', labelKey: 'timeline.all' }
 ];
 
-export const generateDateIntervals = (timeline: TimelineFilter, positions: Position[]): Date[] => {
-    const now = new Date();
-    const dates: Date[] = [];
-    let startDate: Date;
-    let interval: number; // in milliseconds
+/** A selected period: a preset button, "All", or a user-picked date range. */
+export interface TimelineSelection {
+    timeline: TimelineFilter;
+    /** ISO dates; only meaningful when `timeline` is 'Custom'. */
+    custom?: { from: string; to: string };
+}
 
-    switch (timeline) {
-        case '1D':
-            startDate = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
-            interval = 60 * 60 * 1000; // 1 hour intervals
-            break;
-        case '5D':
-            startDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-            interval = 24 * 60 * 60 * 1000; // 1 day intervals
-            break;
-        case '1M':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-            interval = 24 * 60 * 60 * 1000; // 1 day intervals
-            break;
-        case '6M':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-            interval = 7 * 24 * 60 * 60 * 1000; // 1 week intervals
-            break;
-        case 'YTD':
-            startDate = new Date(now.getFullYear(), 0, 1);
-            interval = 7 * 24 * 60 * 60 * 1000; // 1 week intervals
-            break;
-        case '1Y':
-            startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-            interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
-            break;
-        case '2Y':
-            startDate = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
-            interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
-            break;
-        case '5Y':
-            startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-            interval = 90 * 24 * 60 * 60 * 1000; // 3 month intervals
-            break;
-        case 'All':
-        default:
-            // For 'All', use transaction dates as reference points but with regular intervals
-            const sortedPositions = [...positions].sort((a, b) => 
-                new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
-            );
-            if (sortedPositions.length === 0) return [];
-            
-            startDate = new Date(sortedPositions[0].transactionDate);
-            interval = 30 * 24 * 60 * 60 * 1000; // 1 month intervals
-            break;
+/** Stable identity of a selection, for cache keys. */
+export const selectionKey = ({ timeline, custom }: TimelineSelection): string =>
+    timeline === 'Custom' && custom ? `Custom_${custom.from}_${custom.to}` : timeline;
+
+/**
+ * The concrete dates a selection covers, or null when it has none yet ("All"
+ * with no positions, or a custom range that isn't valid).
+ */
+export const resolveWindow = (
+    { timeline, custom }: TimelineSelection,
+    positions: Position[],
+    now: Date = new Date(),
+): DateWindow | null => {
+    if (timeline === 'Custom') return custom ? windowBetween(custom.from, custom.to, now) : null;
+    if (timeline === 'All') {
+        const first = positions.map(p => new Date(p.transactionDate).getTime()).filter(Number.isFinite);
+        return first.length === 0 ? null : { from: new Date(Math.min(...first)), to: new Date(now) };
     }
-
-    // Generate dates from startDate to now with the specified interval
-    let currentDate = new Date(startDate);
-    while (currentDate <= now) {
-        dates.push(new Date(currentDate));
-        currentDate = new Date(currentDate.getTime() + interval);
-    }
-
-    // Always include the current date as the last point if it's not already included
-    if (dates.length === 0 || dates[dates.length - 1].getTime() < now.getTime() - interval / 2) {
-        dates.push(new Date(now));
-    }
-
-    return dates;
+    return presetWindow(timeline, now);
 };
 
-export const formatDateLabel = (date: Date, timeline: TimelineFilter, locale = 'en-US'): string => {
-    switch (timeline) {
-        case '1D':
-            return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-        case '5D':
-        case '1M':
-            return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
-        case '6M':
-        case 'YTD':
-        case '1Y':
-        case '2Y':
-            return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
-        case '5Y':
-        case 'All':
-        default:
-            return date.toLocaleDateString(locale, { year: 'numeric', month: 'short' });
-    }
-};
-
-export const getIntervalForTimeline = (timeline: TimelineFilter): number => {
-    switch (timeline) {
-        case '1D':
-            return 60 * 60 * 1000; // 1 hour
-        case '5D':
-        case '1M':
-            return 24 * 60 * 60 * 1000; // 1 day
-        case '6M':
-        case 'YTD':
-        case '1Y':
-        case '2Y':
-            return 7 * 24 * 60 * 60 * 1000; // 1 week
-        default:
-            return 30 * 24 * 60 * 60 * 1000; // 1 month
-    }
+/** Axis label granularity follows the span, so any window reads sensibly. */
+export const formatDateLabel = (date: Date, dateWindow: DateWindow, locale = 'en-US'): string => {
+    const days = spanDays(dateWindow);
+    if (days <= 1) return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    if (days <= 900) return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(locale, { year: 'numeric', month: 'short' });
 };
 
 export const getTransactionsNearDate = (

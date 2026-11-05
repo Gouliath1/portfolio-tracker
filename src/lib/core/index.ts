@@ -6,3 +6,4 @@ export * from './historicalPortfolioCalculations';
 export * from './yahooFinanceApi';
 export * from './brokerInformationMapping';
 export * from './taxRules';
+export * from './dateWindow';
