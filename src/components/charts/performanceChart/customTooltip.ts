@@ -1,6 +1,7 @@
 import { Position } from '@portfolio/types';
 import { HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, getIntervalForTimeline, getTransactionsNearDate } from './chartUtils';
+import { stepMs, type DateWindow } from '@portfolio/core';
+import { getTransactionsNearDate } from './chartUtils';
 import { defaultTranslator, DEFAULT_LOCALE, type Translator } from './chartData';
 
 function formatBase(value: number, symbol: string, currency: string, locale: string): string {
@@ -12,7 +13,7 @@ export const createCustomTooltip = (
     dateIntervals: Date[],
     historicalData: HistoricalSnapshot[],
     positions: Position[],
-    selectedTimeline: TimelineFilter,
+    dateWindow: DateWindow,
     showValues: boolean,
     symbol: string = '¥',
     currency: string = 'JPY',
@@ -62,7 +63,7 @@ export const createCustomTooltip = (
             let innerHTML = createTooltipHeader(date, locale);
             innerHTML += createTooltipMainContent(tooltip, snapshot, showValues, symbol, currency, t, locale);
             innerHTML += createTooltipPositionBreakdown(snapshot, showValues, symbol, currency, t, locale);
-            innerHTML += createTooltipTransactions(date, positions, selectedTimeline, showValues, symbol, currency, t, locale);
+            innerHTML += createTooltipTransactions(date, positions, dateWindow, showValues, symbol, currency, t, locale);
             
             tooltipEl.innerHTML = innerHTML;
         }
@@ -172,14 +173,14 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
 const createTooltipTransactions = (
     date: Date,
     positions: Position[],
-    selectedTimeline: TimelineFilter,
+    dateWindow: DateWindow,
     showValues: boolean,
     symbol: string,
     currency: string,
     t: Translator,
     locale: string,
 ): string => {
-    const currentInterval = getIntervalForTimeline(selectedTimeline);
+    const currentInterval = stepMs(dateWindow);
     const transactions = getTransactionsNearDate(positions, date, currentInterval);
     
     if (transactions.length === 0) {

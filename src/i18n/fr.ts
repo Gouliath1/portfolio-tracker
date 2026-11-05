@@ -401,6 +401,9 @@ export const fr: Translations = {
     'timeline.2y': '2A',
     'timeline.5y': '5A',
     'timeline.all': 'Tout',
+    'timeline.custom': 'Période',
+    'timeline.from': 'Du',
+    'timeline.to': 'Au',
 
     // ── Screener table ───────────────────────────────────────────────────
     'screener.ratiosUnavailable': 'Ratios indisponibles : {reason}',

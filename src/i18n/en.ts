@@ -412,6 +412,9 @@ export const en = {
     'timeline.2y': '2Y',
     'timeline.5y': '5Y',
     'timeline.all': 'All',
+    'timeline.custom': 'Custom',
+    'timeline.from': 'From',
+    'timeline.to': 'To',
 
     // ── Screener table ───────────────────────────────────────────────────
     'screener.ratiosUnavailable': 'Ratios unavailable: {reason}',

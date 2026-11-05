@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Position } from '@portfolio/types';
-import { calculateHistoricalPortfolioValues, createLiveSnapshot, HistoricalSnapshot } from '@portfolio/core';
-import { TimelineFilter, generateDateIntervals } from './chartUtils';
+import { calculateHistoricalPortfolioValues, createLiveSnapshot, windowDates, HistoricalSnapshot } from '@portfolio/core';
+import { TimelineSelection, resolveWindow, selectionKey } from './chartUtils';
 import { readCachedChart, writeCachedChart } from '../../../utils/pnlCache';
 import type { TranslationKey } from '../../../i18n';
 
@@ -18,7 +18,14 @@ export const HISTORICAL_DATA_ERROR_KEY: TranslationKey = 'chart.errHistoricalDat
 // from raw prices into this currency while the cost series is read straight off
 // position.costInJPY (already in the page's currency) — leaving the cost basis
 // line stuck in the previously-selected currency after a switch.
-export const useChartData = (positions: Position[], selectedTimeline: TimelineFilter, currency: string) => {
+export const useChartData = (positions: Position[], selection: TimelineSelection, currency: string) => {
+    // Resolved once per selection (not per render) so the dates the chart labels
+    // and the snapshots computed for them can't drift apart as the clock moves.
+    const key = selectionKey(selection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the selection's identity
+    const dateWindow = useMemo(() => resolveWindow(selection, positions), [key, positions]);
+    const dateIntervals = useMemo(() => (dateWindow ? windowDates(dateWindow) : []), [dateWindow]);
+
     const [historicalData, setHistoricalData] = useState<HistoricalSnapshot[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<TranslationKey | null>(null);
@@ -33,7 +40,7 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
     }, [positions]);
 
     const calculateHistoricalData = useCallback(async () => {
-        if (positions.length === 0) {
+        if (positions.length === 0 || !dateWindow) {
             setHistoricalData([]);
             return;
         }
@@ -43,13 +50,13 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         // Same tiered caching as PnL summary: same-day cache short-circuits the
         // recompute; older cache paints, then recomputes in the background.
         let cacheFromToday = false;
-        const cached = readCachedChart(positions, currency, selectedTimeline);
+        const cached = readCachedChart(positions, currency, key);
         if (cached) {
             setHistoricalData(anchorToLive(cached.snapshots));
             cacheFromToday = cached.fromToday;
-            if (isDev) console.log(`[chart-cache] HIT — fromToday=${cached.fromToday}, timeline=${selectedTimeline}, snapshots=${cached.snapshots.length}`);
+            if (isDev) console.log(`[chart-cache] HIT — fromToday=${cached.fromToday}, timeline=${key}, snapshots=${cached.snapshots.length}`);
         } else if (isDev) {
-            console.log(`[chart-cache] MISS — timeline=${selectedTimeline}`);
+            console.log(`[chart-cache] MISS — timeline=${key}`);
         }
 
         if (cacheFromToday) return; // skip recompute entirely
@@ -58,12 +65,11 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         setError(null);
 
         try {
-            const dateIntervals = generateDateIntervals(selectedTimeline, positions);
             const snapshots = await calculateHistoricalPortfolioValues(positions, dateIntervals, true, currency);
             setHistoricalData(anchorToLive(snapshots));
             // Cache the raw historical series; the live anchor is re-applied on
             // every read so a later visit overlays that day's fresh prices.
-            writeCachedChart(positions, currency, selectedTimeline, snapshots);
+            writeCachedChart(positions, currency, key, snapshots);
         } catch (err) {
             console.error('Error calculating historical data:', err);
             setError(HISTORICAL_DATA_ERROR_KEY);
@@ -71,13 +77,15 @@ export const useChartData = (positions: Position[], selectedTimeline: TimelineFi
         } finally {
             setIsLoading(false);
         }
-    }, [positions, selectedTimeline, currency, anchorToLive]);
+    }, [positions, dateWindow, dateIntervals, key, currency, anchorToLive]);
 
     useEffect(() => {
         calculateHistoricalData();
     }, [calculateHistoricalData]);
 
     return {
+        dateWindow,
+        dateIntervals,
         historicalData,
         isLoading,
         error
