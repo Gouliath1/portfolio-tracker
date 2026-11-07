@@ -42,14 +42,6 @@ const nextConfig: NextConfig = {
         NEXT_PUBLIC_APP_VERSION: appVersion,
         NEXT_PUBLIC_BUILD_NUMBER: buildNumber,
     },
-    async rewrites() {
-        return [
-            {
-                source: '/yahoo-finance/:path*',
-                destination: 'https://query1.finance.yahoo.com/:path*'
-            }
-        ];
-    }
 };
 
 export default nextConfig;

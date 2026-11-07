@@ -124,17 +124,43 @@ describe('POST /api/snapshot', () => {
     });
 });
 
+const get = (headers: Record<string, string> = {}) =>
+    new NextRequest('http://localhost:3000/api/snapshot', { headers });
+
+describe('local-only guard', () => {
+    it('refuses a cross-origin POST', async () => {
+        const { POST } = await loadRoute();
+        const request = new NextRequest('http://localhost:3000/api/snapshot', {
+            method: 'POST',
+            headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+            body: JSON.stringify(payload(1)),
+        });
+        expect((await POST(request)).status).toBe(403);
+    });
+
+    it('refuses a non-loopback host (DNS rebinding / hosted)', async () => {
+        const { POST, GET } = await loadRoute();
+        const request = new NextRequest('https://portfolio.example.com/api/snapshot', {
+            method: 'POST',
+            body: JSON.stringify(payload(1)),
+        });
+        expect((await POST(request)).status).toBe(403);
+        const read = new NextRequest('https://portfolio.example.com/api/snapshot');
+        expect((await GET(read)).status).toBe(403);
+    });
+});
+
 describe('GET /api/snapshot', () => {
     it('returns 404 before anything has been written', async () => {
         const { GET } = await loadRoute();
-        expect((await GET()).status).toBe(404);
+        expect((await GET(get())).status).toBe(404);
     });
 
     it('returns what POST wrote', async () => {
         const { POST, GET } = await loadRoute();
         await POST(post(payload(2)));
 
-        const response = await GET();
+        const response = await GET(get());
         expect(response.status).toBe(200);
         expect((await response.json()).snapshot.holdingCount).toBe(2);
     });

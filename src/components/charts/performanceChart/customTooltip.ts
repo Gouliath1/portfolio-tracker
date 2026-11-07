@@ -72,6 +72,11 @@ export const createCustomTooltip = (
     };
 };
 
+/** Names come from imports, sync blobs and market data: never trust them as HTML. */
+const esc = (v: unknown): string => String(v ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+));
+
 const cssVarStr = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 const createTooltipHeader = (date: Date, locale: string): string => {
@@ -86,7 +91,7 @@ const createTooltipMainContent = (tooltip: any, snapshot: HistoricalSnapshot | u
     const label = tooltip.dataPoints[0].dataset.label;
 
     let innerHTML = `<div style="margin-bottom: 8px; font-weight: 500;">
-        ${label}: `;
+        ${esc(label)}: `;
 
     if (showValues) {
         innerHTML += `${formatBase(mainValue, symbol, currency, locale)}
@@ -152,14 +157,14 @@ const createTooltipPositionBreakdown = (snapshot: HistoricalSnapshot | undefined
             const quantityInfo = t('chart.shares', { count: position.quantity.toLocaleString(locale) });
 
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${position.fullName}: ${valueStr} | ${quantityInfo} |
+                • ${esc(position.fullName)}: ${valueStr} | ${quantityInfo} |
                 <span style="color: ${pnlColor}; font-weight: 600;">
                     ${pnlSign}${pnlStr} (${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%)
                 </span>
             </div>`;
         } else {
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${position.fullName}: 
+                • ${esc(position.fullName)}: 
                 <span style="color: ${pnlColor}; font-weight: 600;">
                     ${pnlPercentSign}${position.pnlPercentage.toFixed(1)}%
                 </span>
@@ -196,11 +201,11 @@ const createTooltipTransactions = (
             const totalCostNum = transaction.quantity * transaction.costPerUnit * (transaction.transactionFxRate || 1);
             const totalCostStr = formatBase(totalCostNum, symbol, currency, locale);
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${transaction.fullName}: ${shares} @ ${totalCostStr}
+                • ${esc(transaction.fullName)}: ${shares} @ ${totalCostStr}
             </div>`;
         } else {
             innerHTML += `<div style="margin: 4px 0; font-size: 11px;">
-                • ${transaction.fullName}: ${shares}
+                • ${esc(transaction.fullName)}: ${shares}
             </div>`;
         }
     });

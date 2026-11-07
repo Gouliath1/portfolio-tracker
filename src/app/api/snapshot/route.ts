@@ -77,7 +77,30 @@ async function writeAtomic(target: string, contents: string): Promise<void> {
     }
 }
 
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/**
+ * The bridge is a local-machine feature, so refuse anything else:
+ *  - the Host must be loopback (also defeats DNS rebinding, where a hostile
+ *    domain resolves to 127.0.0.1), and
+ *  - a browser-supplied Origin must match it, so a web page the user happens
+ *    to have open can't write a poisoned snapshot the MCP server then feeds
+ *    to the assistant (a plain `text/plain` POST skips CORS preflight).
+ */
+function isLocalRequest(request: NextRequest): boolean {
+    const host = request.headers.get('host') ?? request.nextUrl.host;
+    let hostname: string;
+    try { hostname = new URL(`http://${host}`).hostname; } catch { return false; }
+    if (!LOCAL_HOSTNAMES.has(hostname)) return false;
+    const origin = request.headers.get('origin');
+    if (!origin) return true;
+    try { return new URL(origin).host === host; } catch { return false; }
+}
+
+const forbidden = () => NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+
 export async function POST(request: NextRequest) {
+    if (!isLocalRequest(request)) return forbidden();
     let body: unknown;
     try {
         const raw = await request.text();
@@ -126,11 +149,12 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    return NextResponse.json({ ok: true, path: target, writtenAt: payload.writtenAt });
+    return NextResponse.json({ ok: true, writtenAt: payload.writtenAt });
 }
 
 /** Read the snapshot back — used for debugging the bridge, and by nothing else. */
-export async function GET() {
+export async function GET(request: NextRequest) {
+    if (!isLocalRequest(request)) return forbidden();
     try {
         const raw = await readFile(snapshotPath(), 'utf8');
         return new NextResponse(raw, {

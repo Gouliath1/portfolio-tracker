@@ -92,3 +92,8 @@ data/shares.db-*
 data/app.db
 data/app.db-*
 data/app.db-*
+
+# Local sync store (holds synced portfolio blobs)
+data/sync.db
+data/sync.db-*
+.harness/
