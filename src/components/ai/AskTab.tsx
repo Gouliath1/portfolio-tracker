@@ -1,13 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-    MdAutoAwesome, MdClose, MdArrowUpward, MdStop, MdRestartAlt, MdOpenInFull, MdCloseFullscreen,
-} from 'react-icons/md';
+import { MdArrowUpward, MdStop, MdRestartAlt } from 'react-icons/md';
 import { useTranslation } from '../../i18n';
 import { useOptionalAccount } from '../account/AccountProvider';
 import { useOptionalSync } from '../sync/SyncProvider';
-import { RichText } from './RichText';
+import { RichText } from '../chat/RichText';
+import type { PortfolioBrief } from './usePortfolioBrief';
 
 /** Mirrors the server's cap so the box can't accept what the API will refuse. */
 const MAX_QUESTION_CHARS = 800;
@@ -24,21 +23,22 @@ type Availability = 'checking' | 'ready' | 'signin' | 'disabled';
 /** The counter only appears once the allowance is nearly gone. */
 const SHOW_LEFT_AT = 5;
 
-interface ChatWidgetProps {
-    /** Brief plus structured snapshot, built on demand so the portfolio is only serialised when a question is asked. */
-    getContext: () => { markdown: string; snapshot: unknown };
+interface AskTabProps {
+    /** Brief plus structured snapshot, built on demand; null until the portfolio has loaded. */
+    getBrief: () => PortfolioBrief | null;
     hasPositions: boolean;
+    /** Whether this tab is the one on screen (it stays mounted so the conversation survives). */
+    active: boolean;
+    /** Closes the whole panel, e.g. before opening the sign-in dialog. */
+    onClose: () => void;
 }
 
-export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
+export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps) {
     const { t, language } = useTranslation();
-    const [open, setOpen] = useState(false);
     const [availability, setAvailability] = useState<Availability>('checking');
     const [turns, setTurns] = useState<Turn[]>([]);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
-    /** Desktop only: a roomier panel for tables and charts. */
-    const [wide, setWide] = useState(false);
     const [remaining, setRemaining] = useState<number | null>(null);
     const account = useOptionalAccount();
     const sync = useOptionalSync();
@@ -47,14 +47,13 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
     const abortRef = useRef<AbortController | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const launcherRef = useRef<HTMLButtonElement>(null);
 
     // Signing in or out changes what the server will allow, so ask again.
     useEffect(() => { setAvailability('checking'); }, [signedInAs]);
 
     // Ask the server whether chat is configured, who is signed in and what is left.
     useEffect(() => {
-        if (!open || availability !== 'checking') return;
+        if (!active || availability !== 'checking') return;
         let cancelled = false;
         fetch('/api/chat')
             .then(r => r.json())
@@ -65,37 +64,26 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
             })
             .catch(() => { if (!cancelled) setAvailability('disabled'); });
         return () => { cancelled = true; };
-    }, [open, availability]);
+    }, [active, availability]);
 
     useEffect(() => () => abortRef.current?.abort(), []);
 
     useEffect(() => {
-        if (open && availability === 'ready') inputRef.current?.focus();
-    }, [open, availability]);
+        if (active && availability === 'ready') inputRef.current?.focus();
+    }, [active, availability]);
 
     useEffect(() => {
         const el = listRef.current;
         if (el) el.scrollTop = el.scrollHeight;
-    }, [turns, open]);
-
-    const close = useCallback(() => {
-        setOpen(false);
-        launcherRef.current?.focus();
-    }, []);
-
-    useEffect(() => {
-        if (!open) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
-    }, [open, close]);
+    }, [turns, active]);
 
     const patchLast = (patch: (turn: Turn) => Turn) =>
         setTurns(prev => prev.length === 0 ? prev : [...prev.slice(0, -1), patch(prev[prev.length - 1])]);
 
     const ask = useCallback(async (raw: string) => {
         const question = raw.trim();
-        if (!question || busy || !hasPositions) return;
+        const brief = getBrief();
+        if (!question || busy || !hasPositions || !brief) return;
 
         // Failed notices are UI-only; replaying them would put our error text in Claude's mouth.
         const history = turns.filter(m => !m.error && m.content).map(({ role, content }) => ({ role, content }));
@@ -108,11 +96,10 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
         const controller = new AbortController();
         abortRef.current = controller;
         try {
-            const { markdown, snapshot } = getContext();
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ brief: markdown, snapshot, messages, language }),
+                body: JSON.stringify({ brief: brief.markdown, snapshot: brief.snapshot, messages, language }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) {
@@ -160,7 +147,7 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
             abortRef.current = null;
             setBusy(false);
         }
-    }, [busy, getContext, hasPositions, language, t, turns]);
+    }, [busy, getBrief, hasPositions, language, t, turns]);
 
     const reset = () => {
         abortRef.current?.abort();
@@ -179,61 +166,7 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
     const suggestions = [t('chat.suggestion1'), t('chat.suggestion2')];
 
     return (
-        <>
-            {!open && (
-                <button
-                    ref={launcherRef}
-                    onClick={() => setOpen(true)}
-                    aria-label={t('chat.open')}
-                    className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:right-6 md:bottom-6 z-40 flex items-center gap-2 h-11 px-3.5 rounded-full text-sm font-medium transition-colors hover:opacity-90"
-                    style={{
-                        background: 'var(--surface-popover)',
-                        color: 'var(--accent)',
-                        border: '1px solid var(--border-strong)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
-                    }}
-                >
-                    <MdAutoAwesome size={18} aria-hidden="true" />
-                    <span className="hidden sm:inline">{t('chat.launch')}</span>
-                </button>
-            )}
-
-            {open && (
-                <section
-                    role="dialog"
-                    aria-label={t('chat.title')}
-                    className={`fixed z-50 flex flex-col inset-x-0 top-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:top-auto md:right-6 md:bottom-6 md:rounded-xl overflow-hidden ${wide
-                        ? 'md:w-[min(780px,calc(100vw-3rem))] md:h-[calc(100dvh-3rem)]'
-                        : 'md:w-[480px] md:h-[min(700px,calc(100dvh-3rem))]'}`}
-                    style={{
-                        background: 'var(--surface-popover)',
-                        border: '1px solid var(--border-strong)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                    }}
-                >
-                    <header className="flex items-center justify-between gap-2 pl-4 pr-2 h-12 flex-shrink-0"
-                        style={{ borderBottom: '1px solid var(--border)' }}>
-                        <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                            {t('chat.title')}
-                        </h2>
-                        <div className="flex items-center">
-                            {turns.length > 0 && (
-                                <button onClick={reset} aria-label={t('chat.clear')} title={t('chat.clear')}
-                                    className="p-2 rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
-                                    <MdRestartAlt size={18} />
-                                </button>
-                            )}
-                            <button onClick={() => setWide(w => !w)} aria-pressed={wide}
-                                aria-label={t(wide ? 'chat.collapse' : 'chat.expand')} title={t(wide ? 'chat.collapse' : 'chat.expand')}
-                                className="hidden md:flex p-2 rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
-                                {wide ? <MdCloseFullscreen size={16} /> : <MdOpenInFull size={16} />}
-                            </button>
-                            <button onClick={close} aria-label={t('chat.close')}
-                                className="p-2 rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
-                                <MdClose size={18} />
-                            </button>
-                        </div>
-                    </header>
+        <div className="flex flex-col flex-1 min-h-0">
 
                     <div ref={listRef} role="log" aria-live="polite"
                         className="flex-1 overflow-y-auto px-4 py-4 space-y-3 text-sm">
@@ -247,7 +180,7 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
                                 </p>
                                 {availability === 'signin' && sync && (
                                     <button
-                                        onClick={() => { close(); sync.openPanel(); }}
+                                        onClick={() => { onClose(); sync.openPanel(); }}
                                         className="px-3 py-2 rounded-lg text-sm font-medium"
                                         style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
                                         {t('chat.signInButton')}
@@ -329,15 +262,22 @@ export function ChatWidget({ getContext, hasPositions }: ChatWidgetProps) {
                                 </button>
                             )}
                         </div>
-                        <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {t('chat.privacy')}
-                            {availability === 'ready' && remaining !== null && remaining <= SHOW_LEFT_AT && (
-                                <> {t('chat.left', { count: String(remaining) })}</>
+                        <p className="mt-2 text-xs flex items-center justify-between gap-2" style={{ color: 'var(--text-muted)' }}>
+                            <span>
+                                {t('chat.privacy')}
+                                {availability === 'ready' && remaining !== null && remaining <= SHOW_LEFT_AT && (
+                                    <> {t('chat.left', { count: String(remaining) })}</>
+                                )}
+                            </span>
+                            {turns.length > 0 && (
+                                <button onClick={reset} aria-label={t('chat.clear')} title={t('chat.clear')}
+                                    className="flex-shrink-0 flex items-center gap-1 hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
+                                    <MdRestartAlt size={14} />
+                                    {t('chat.clear')}
+                                </button>
                             )}
                         </p>
                     </footer>
-                </section>
-            )}
-        </>
+        </div>
     );
 }
