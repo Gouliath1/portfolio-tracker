@@ -17,7 +17,7 @@ import { Position } from '@portfolio/types';
 
 import { Filler } from 'chart.js';
 
-import { TimelineFilter, generateDateIntervals } from './performanceChart/chartUtils';
+import type { TimelineSelection } from './performanceChart/chartUtils';
 import { valueBadgePlugin } from './performanceChart/valueBadgePlugin';
 import { createChartData } from './performanceChart/chartData';
 import { createChartOptions } from './performanceChart/chartOptions';
@@ -33,6 +33,9 @@ ChartJS.register(
     Title, Tooltip, Legend, Filler, valueBadgePlugin
 );
 
+/** Stand-in while no period resolves; the chart renders its empty state then. */
+const EMPTY_WINDOW = { from: new Date(0), to: new Date(0) };
+
 interface PerformanceChartProps {
     positions: Position[];
     showValues: boolean;
@@ -41,7 +44,7 @@ interface PerformanceChartProps {
 }
 
 export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symbol = '¥' }: PerformanceChartProps) => {
-    const [selectedTimeline, setSelectedTimeline] = useState<TimelineFilter>('All');
+    const [selection, setSelection] = useState<TimelineSelection>({ timeline: 'All' });
     const { t, locale } = useTranslation();
     useTheme();
 
@@ -53,9 +56,8 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
         };
     }, []);
 
-    const { historicalData, isLoading, error } = useChartData(positions, selectedTimeline, currency);
-    const dateIntervals = generateDateIntervals(selectedTimeline, positions);
-    const chartData = createChartData(dateIntervals, historicalData, positions, selectedTimeline, showValues, currency, t, locale);
+    const { dateWindow, dateIntervals, historicalData, isLoading, error } = useChartData(positions, selection, currency);
+    const chartData = createChartData(dateIntervals, historicalData, positions, dateWindow ?? EMPTY_WINDOW, showValues, currency, t, locale);
 
     // Frame the y-axis to the actual data range, padded by 10% top and bottom.
     const yValues = chartData.datasets
@@ -70,10 +72,10 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
         yBounds = { min: dataMin - pad, max: dataMax + pad };
     }
 
-    const options = createChartOptions(showValues, selectedTimeline, symbol, currency, yBounds, locale);
+    const options = createChartOptions(showValues, symbol, currency, yBounds, locale);
     options.plugins!.tooltip = {
         enabled: false,
-        external: createCustomTooltip(dateIntervals, historicalData, positions, selectedTimeline, showValues, symbol, currency, t, locale),
+        external: createCustomTooltip(dateIntervals, historicalData, positions, dateWindow ?? EMPTY_WINDOW, showValues, symbol, currency, t, locale),
     };
     // Config consumed by the latest-value pill badge plugin.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,10 +105,7 @@ export const PerformanceChart = ({ positions, showValues, currency = 'JPY', symb
                 >
                     {t('chart.title')}
                 </h2>
-                <TimelineFilterButtons
-                    selectedTimeline={selectedTimeline}
-                    onTimelineChange={setSelectedTimeline}
-                />
+                <TimelineFilterButtons selection={selection} onSelectionChange={setSelection} />
             </div>
 
             <ChartLegend showValues={showValues} />

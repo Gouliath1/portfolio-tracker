@@ -11,6 +11,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { rangeStartISO } from '@portfolio/core';
 import { fetchHistoricalDividends } from '@portfolio/core';
 import {
     isValidSymbol,
@@ -32,19 +33,6 @@ type DividendRow = { amount: number; currency: string };
 type DividendMap = Record<string, DividendRow>;
 
 const _inFlight = new Map<string, Promise<DividendMap>>();
-
-function rangeToStartDate(range: string): string {
-    const now = new Date();
-    const match = /^(\d+)([dy])$/.exec(range);
-    if (match) {
-        const n = parseInt(match[1], 10);
-        if (match[2] === 'y') now.setFullYear(now.getFullYear() - n);
-        else if (match[2] === 'd') now.setDate(now.getDate() - n);
-    } else if (range === 'max') {
-        now.setFullYear(now.getFullYear() - 30);
-    }
-    return now.toISOString().split('T')[0];
-}
 
 // Freshness window for the dividend cache. Most issuers pay quarterly or
 // semi-annually, so refetching once a week is plenty fresh and keeps us
@@ -80,7 +68,7 @@ export async function GET(request: Request) {
 
     const cached = await getCachedDividendEvents(symbol);
     const refreshedAt = await getDividendRefreshedAt(symbol);
-    const requestedStart = rangeToStartDate(range);
+    const requestedStart = rangeStartISO(range);
 
     let minCached: string | null = null;
     for (const d of Object.keys(cached)) {

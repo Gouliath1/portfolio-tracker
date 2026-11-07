@@ -63,8 +63,52 @@ describe('portfolio tools', () => {
     });
 });
 
+describe('market_data windows', () => {
+    const NOW = new Date(2026, 10, 5, 12);
+    const longHistory = (sym = 'AAPL') => new Response(JSON.stringify({
+        symbol: sym, prices: {
+            '2026-07-01': 50, '2026-08-31': 100, '2026-09-10': 120, '2026-09-30': 90, '2026-10-14': 95, '2026-11-04': 130,
+        },
+    }));
+    const lastUrl = () => {
+        const { GET } = jest.requireMock('../../../app/api/historical-prices/route');
+        return new URL((GET.mock.calls.at(-1)[0] as Request).url);
+    };
+    const run = (req: object) => runChatTool('market_data', { requests: [req] }, { snapshot, now: NOW })
+        .then(r => JSON.parse(r.text)[0]);
+
+    const serve = () => jest.requireMock('../../../app/api/historical-prices/route').GET.mockImplementationOnce(async () => longHistory());
+
+    it('summarises a month two months back, measured from the prior close', async () => {
+        serve();
+        const r = await run({ path: '/api/historical-prices', from: '2026-09-01', to: '2026-09-30', query: { symbol: 'AAPL' } });
+        expect(r.data.prices).toMatchObject({ n: 3, from: '2026-08-31', to: '2026-09-30', first: 100, last: 90, changePct: -10 });
+        expect(lastUrl().searchParams.get('range')).toBe('74d');
+    });
+
+    it('handles a 2-week window and a trailing range', async () => {
+        serve();
+        const two = await run({ path: '/api/historical-prices', from: '2026-10-20', query: { symbol: 'AAPL' } });
+        expect(two.data.prices).toMatchObject({ from: '2026-10-14', to: '2026-11-04', changePct: expect.closeTo(36.84, 1) });
+        serve();
+        const trailing = await run({ path: '/api/historical-prices', query: { symbol: 'AAPL', range: '60d' } });
+        expect(trailing.data.prices.from).toBe('2026-08-31');
+    });
+
+    it('rejects malformed or reversed dates', async () => {
+        expect((await run({ path: '/api/historical-prices', from: '2026-9-1', query: { symbol: 'AAPL' } })).error).toMatch(/YYYY-MM-DD/);
+        expect((await run({ path: '/api/historical-prices', from: '2026-10-01', to: '2026-09-01', query: { symbol: 'AAPL' } })).error).toMatch(/from <= to/);
+    });
+
+    it('reports an empty window', async () => {
+        serve();
+        const r = await run({ path: '/api/historical-prices', from: '2026-01-01', to: '2026-01-31', query: { symbol: 'AAPL' } });
+        expect(r.data.prices.note).toMatch(/no data/);
+    });
+});
+
 describe('market_data', () => {
-    const hp = (symbol: string) => ({ path: '/api/historical-prices', query: { symbol, range: '30d' } });
+    const hp = (symbol: string) => ({ path: '/api/historical-prices', query: { symbol, range: '1y' } });
 
     it('summarises a price series from the existing route', async () => {
         const r = await call('market_data', { requests: [hp('AAPL')] });
