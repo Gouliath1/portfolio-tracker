@@ -24,8 +24,9 @@ export interface SummaryLoadError {
 //
 // Pass currencyHydrated=false while the base currency is still being read
 // from localStorage; the hook waits before loading to avoid computing with
-// the SSR fallback currency and writing the wrong cache slot.
-export function usePortfolioSummaryData(currency: string, currencyHydrated: boolean = true) {
+// the SSR fallback currency and writing the wrong cache slot. Bump `refreshKey`
+// to reload, e.g. when a long-lived panel is reopened after positions changed.
+export function usePortfolioSummaryData(currency: string, currencyHydrated: boolean = true, refreshKey: number = 0) {
     const [summary, setSummary] = useState<PortfolioSummaryType | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<SummaryLoadError | null>(null);
@@ -67,7 +68,7 @@ export function usePortfolioSummaryData(currency: string, currencyHydrated: bool
 
         run();
         return () => { cancelled = true; };
-    }, [currency, currencyHydrated]);
+    }, [currency, currencyHydrated, refreshKey]);
 
     return { summary, loading, error };
 }

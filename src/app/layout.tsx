@@ -6,6 +6,7 @@ import { LanguageProvider } from "../i18n";
 import { AccountProvider } from "../components/account/AccountProvider";
 import { SyncProvider } from "../components/sync/SyncProvider";
 import { SyncDialogs } from "../components/sync/SyncDialogs";
+import { AiAssistant } from "../components/ai/AiAssistant";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -48,7 +49,7 @@ export default function RootLayout({
           <LanguageProvider>
             <AccountProvider>
               <SyncProvider>
-                {children}
+                <AiAssistant>{children}</AiAssistant>
                 <SyncDialogs />
               </SyncProvider>
             </AccountProvider>

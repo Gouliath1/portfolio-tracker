@@ -3,24 +3,18 @@
 import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
-import { MdClose, MdLightMode, MdDarkMode, MdInfoOutline, MdReceiptLong, MdChevronRight } from 'react-icons/md';
+import { MdClose, MdLightMode, MdDarkMode, MdInfoOutline, MdReceiptLong, MdChevronRight, MdAutoAwesome } from 'react-icons/md';
 import { SUPPORTED_BASE_CURRENCIES, BaseCurrency } from '../../hooks/useBaseCurrency';
 import { useTranslation, SUPPORTED_LANGUAGES } from '../../i18n';
 import { ExchangeRatesSection } from './ExchangeRatesSection';
-import { ConnectAiSection } from './ConnectAiSection';
+import { useOptionalAiAssistant } from '../ai/AiAssistant';
 import { WipBadge } from '../shared/WipBadge';
-import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
 
 interface SettingsPanelProps {
     open: boolean;
     onClose: () => void;
     currency: BaseCurrency;
     onCurrencyChange: (currency: BaseCurrency) => void;
-    /** Active portfolio set — the AI connection is scoped to it. */
-    activeSetId?: string | null;
-    /** Built on demand so an unopened panel never serialises the portfolio. */
-    buildBrief?: () => { snapshot: PortfolioSnapshot; markdown: string };
-    hasPositions?: boolean;
     /** Tax estimates are still under development — off by default, toggled on here. */
     taxFeatureEnabled?: boolean;
     onTaxFeatureEnabledChange?: (enabled: boolean) => void;
@@ -28,13 +22,13 @@ interface SettingsPanelProps {
 
 export const SettingsPanel = ({
     open, onClose, currency, onCurrencyChange,
-    activeSetId = null, buildBrief, hasPositions = false,
     taxFeatureEnabled = false, onTaxFeatureEnabledChange,
 }: SettingsPanelProps) => {
     const { resolvedTheme, setTheme } = useTheme();
     const { t, language, setLanguage } = useTranslation();
     const panelRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    const ai = useOptionalAiAssistant();
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -189,14 +183,23 @@ export const SettingsPanel = ({
                         </div>
                     </section>
 
-                    {/* AI connection — the one opt-in that lets holdings leave the browser */}
-                    {buildBrief && (
-                        <ConnectAiSection
-                            open={open}
-                            setId={activeSetId}
-                            buildBrief={buildBrief}
-                            hasPositions={hasPositions}
-                        />
+                    {/* AI — one entry point; connecting an assistant lives in its panel */}
+                    {ai && (
+                        <section className="space-y-2">
+                            <button
+                                onClick={() => { onClose(); ai.open('own'); }}
+                                className="glass rounded-xl p-4 w-full flex items-center justify-between gap-4 text-left transition-opacity hover:opacity-90"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <MdAutoAwesome size={18} style={{ color: 'var(--accent)' }} className="flex-shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('ai.settingsRow')}</p>
+                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('ai.settingsRowHint')}</p>
+                                    </div>
+                                </div>
+                                <MdChevronRight size={20} style={{ color: 'var(--text-muted)' }} className="flex-shrink-0" />
+                            </button>
+                        </section>
                     )}
 
                     {/* Exchange rates — read-only view of the FX rates used for valuation */}

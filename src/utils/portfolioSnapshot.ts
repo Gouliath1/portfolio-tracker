@@ -283,6 +283,16 @@ export function buildSnapshot(
     };
 }
 
+/** The snapshot and its markdown rendering together, which is what every consumer wants. */
+export function buildBrief(
+    summary: PortfolioSummary,
+    baseCurrency: string,
+    options: BuildSnapshotOptions = {},
+): { snapshot: PortfolioSnapshot; markdown: string } {
+    const snapshot = buildSnapshot(summary, baseCurrency, options);
+    return { snapshot, markdown: formatSnapshotMarkdown(snapshot) };
+}
+
 // ── Render ───────────────────────────────────────────────────
 
 const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`);
