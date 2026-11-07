@@ -28,6 +28,8 @@ const mkSnapshot = (
 
 const positions: Position[] = []; // chart data builder only reads transaction dates for markers
 
+const WINDOW = { from: new Date('2020-01-01'), to: new Date('2025-01-01') };
+
 describe('createChartData — value/cost/pnl invariants', () => {
     it('emits identical-length arrays for value, cost, and pnl', () => {
         const dates = [
@@ -41,7 +43,7 @@ describe('createChartData — value/cost/pnl invariants', () => {
             mkSnapshot(dates[2], 90, 100),
         ];
 
-        const data = createChartData(dates, snapshots, positions, '5Y', true);
+        const data = createChartData(dates, snapshots, positions, WINDOW, true);
 
         expect(data.datasets).toHaveLength(3);
         const [value, cost, pnl] = data.datasets;
@@ -62,7 +64,7 @@ describe('createChartData — value/cost/pnl invariants', () => {
             mkSnapshot(dates[2], 90, 100),
         ];
 
-        const data = createChartData(dates, snapshots, positions, '5Y', true);
+        const data = createChartData(dates, snapshots, positions, WINDOW, true);
         const [value, cost, pnl] = data.datasets;
 
         for (let i = 0; i < dates.length; i++) {
@@ -82,7 +84,7 @@ describe('createChartData — value/cost/pnl invariants', () => {
             mkSnapshot(dates[1], 100, 80),
         ];
 
-        const data = createChartData(dates, snapshots, positions, 'All', true);
+        const data = createChartData(dates, snapshots, positions, WINDOW, true);
         const [value, cost, pnl] = data.datasets;
 
         expect(value.data[0]).toBe(0);
@@ -99,7 +101,7 @@ describe('createChartData — value/cost/pnl invariants', () => {
             mkSnapshot(dates[1], 100, 80),
         ];
 
-        const data = createChartData(dates, snapshots, positions, 'All', true);
+        const data = createChartData(dates, snapshots, positions, WINDOW, true);
         const [value, cost, pnl] = data.datasets;
 
         expect(value.data[0]).toBe(0);
@@ -113,8 +115,8 @@ describe('createChartData — value/cost/pnl invariants', () => {
         const dates = [new Date('2020-01-01')];
         const snapshots = [mkSnapshot(dates[0], 100, 80)];
 
-        const values = createChartData(dates, snapshots, positions, '5Y', true);
-        const percent = createChartData(dates, snapshots, positions, '5Y', false);
+        const values = createChartData(dates, snapshots, positions, WINDOW, true);
+        const percent = createChartData(dates, snapshots, positions, WINDOW, false);
 
         expect(values.datasets[2].yAxisID).toBe('y');
         expect(percent.datasets[2].yAxisID).toBe('y');

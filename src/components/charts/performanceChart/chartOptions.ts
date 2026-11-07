@@ -7,7 +7,6 @@ const cssVar = (name: string): string => {
 
 export const createChartOptions = (
     showValues: boolean,
-    selectedTimeline: string,
     currencySymbol: string = '¥',
     currency: string = 'JPY',
     yBounds?: { min: number; max: number },

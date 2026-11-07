@@ -15,6 +15,9 @@
  */
 
 import { NextRequest } from 'next/server';
+import {
+    clipByDate, rangeTokenReaching, toISODate, windowBetween, windowFromRangeToken, type DateWindow,
+} from '../core/dateWindow';
 import type { PortfolioSnapshot, SnapshotHolding } from '../../utils/portfolioSnapshot';
 import { GET as historicalPrices } from '../../app/api/historical-prices/route';
 import { GET as dividends } from '../../app/api/dividends/route';
@@ -83,10 +86,12 @@ export const CHAT_TOOLS = [
     {
         name: 'market_data',
         description:
-            'Read-only market data from the app\'s own API, for any ticker (held or not). Pass up to ' +
+            'Read-only market data from the app\'s own API, for any ticker (held or not). Give the period as `from`/`to` ' +
+            '(YYYY-MM-DD, inclusive) on each request: any past period works, e.g. a whole month, the 2 weeks before it, ' +
+            'or a quarter. Resolve phrases like "last month" from the brief\'s Generated date. Pass up to ' +
             `${MAX_MARKET_REQUESTS} requests per call and batch independent lookups together, e.g. one historical-prices ` +
             'request per holding to compare recent moves. Daily series come back summarised (first, last, change %, ' +
-            'min, max, ~12 sample points) rather than in full. Prices are in each security\'s own currency; data may be stale or missing.\n' +
+            'min, max, ~12 sample points) rather than in full; the change is measured from the close just before `from`. Prices are in each security\'s own currency; data may be stale or missing.\n' +
             'Paths:\n' + Object.entries(MARKET_ROUTES).map(([k, v]) => `- ${k}: ${v.params}`).join('\n'),
         input_schema: {
             type: 'object' as const,
@@ -99,7 +104,9 @@ export const CHAT_TOOLS = [
                         type: 'object',
                         properties: {
                             path: { type: 'string', enum: Object.keys(MARKET_ROUTES) },
-                            query: { type: 'object', additionalProperties: { type: 'string' }, description: 'Query parameters, e.g. {"symbol":"AAPL","range":"30d"}' },
+                            from: { type: 'string', description: 'Period start, YYYY-MM-DD' },
+                            to: { type: 'string', description: 'Period end, YYYY-MM-DD (default: today)' },
+                            query: { type: 'object', additionalProperties: { type: 'string' }, description: 'Route parameters, e.g. {"symbol":"AAPL"}; omit `range` when using from/to' },
                         },
                         required: ['path'],
                     },
@@ -112,6 +119,8 @@ export const CHAT_TOOLS = [
 
 export interface ToolContext {
     snapshot: PortfolioSnapshot | null;
+    /** Injectable clock, so relative periods are testable. */
+    now?: Date;
 }
 
 const num = (n: number | null | undefined, digits = 2): number | null =>
@@ -201,12 +210,17 @@ const isDateMap = (v: unknown): v is Record<string, unknown> => {
  * by date is a time series: numeric ones become a summary with a few sample
  * points, object-valued ones (dividends) keep only the latest entries.
  */
-export function compactSeries(value: unknown): unknown {
-    if (Array.isArray(value)) return value.slice(0, 50).map(compactSeries);
+export function compactSeries(value: unknown, window?: DateWindow): unknown {
+    if (Array.isArray(value)) return value.slice(0, 50).map(v => compactSeries(v, window));
     if (typeof value !== 'object' || value === null) return value;
 
     if (isDateMap(value)) {
-        const rows = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+        // The routes hand back everything they have cached whatever `range` was
+        // asked for (it only decides whether to refetch), so the window is applied
+        // here. The close before the window is kept as the baseline.
+        const entries = Object.entries(value);
+        const rows = window ? clipByDate(entries, window, true) : entries.sort(([a], [b]) => a.localeCompare(b));
+        if (rows.length === 0) return { n: 0, note: 'no data in the requested window' };
         if (rows.every(([, v]) => typeof v === 'number' && Number.isFinite(v))) {
             const nums = rows as [string, number][];
             if (nums.length < 2) return { n: nums.length, points: nums };
@@ -224,11 +238,12 @@ export function compactSeries(value: unknown): unknown {
         }
         return { n: rows.length, latest: rows.slice(-12).reverse().map(([d, v]) => ({ date: d, ...(typeof v === 'object' ? v : { value: v }) })) };
     }
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, compactSeries(v)]));
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, compactSeries(v, window)]));
 }
 
-async function marketRequest(raw: unknown): Promise<unknown> {
-    const req = (typeof raw === 'object' && raw !== null ? raw : {}) as { path?: unknown; query?: unknown };
+async function marketRequest(raw: unknown, now: Date): Promise<unknown> {
+    const req = (typeof raw === 'object' && raw !== null ? raw : {}) as
+        { path?: unknown; query?: unknown; from?: unknown; to?: unknown };
     const route = typeof req.path === 'string' ? MARKET_ROUTES[req.path] : undefined;
     if (!route) return { error: `path must be one of ${Object.keys(MARKET_ROUTES).join(', ')}` };
 
@@ -238,21 +253,37 @@ async function marketRequest(raw: unknown): Promise<unknown> {
         if (k === 'fresh' || k === 'cachedOnly') continue;
         if (typeof v === 'string' || typeof v === 'number') url.searchParams.set(k, String(v));
     }
+
+    // A window is either explicit dates (any period, past or trailing) or a
+    // trailing `range`. The route only understands "last N days", so for dates
+    // we ask it to reach back far enough and trim the answer ourselves.
+    let window: DateWindow | undefined;
+    if (req.from !== undefined || req.to !== undefined) {
+        const w = windowBetween(req.from, req.to ?? toISODate(now), now);
+        if (!w) return { path: req.path, error: 'from/to must be YYYY-MM-DD dates with from <= to' };
+        window = w;
+        // A week extra so a refetch also reaches the baseline close before `from`.
+        url.searchParams.set('range', rangeTokenReaching(new Date(w.from.getTime() - 7 * 86_400_000), now));
+    } else {
+        window = windowFromRangeToken(url.searchParams.get('range'), now) ?? undefined;
+    }
+
     try {
         const res = await route.handler(new NextRequest(url));
         const body = await res.json().catch(() => null);
+        const echo = { path: req.path, query: Object.fromEntries(url.searchParams) };
         return res.ok
-            ? { path: req.path, query: Object.fromEntries(url.searchParams), data: compactSeries(body) }
-            : { path: req.path, query: Object.fromEntries(url.searchParams), error: (body as { error?: string } | null)?.error ?? `HTTP ${res.status}` };
+            ? { ...echo, data: compactSeries(body, window) }
+            : { ...echo, error: (body as { error?: string } | null)?.error ?? `HTTP ${res.status}` };
     } catch (error) {
         return { path: req.path, error: error instanceof Error ? error.message : 'request failed' };
     }
 }
 
-async function marketData(input: Record<string, unknown>) {
+async function marketData(input: Record<string, unknown>, now: Date) {
     const list = Array.isArray(input.requests) ? input.requests : [];
     if (list.length === 0) throw new Error('"requests" must be a non-empty array');
-    return Promise.all(list.slice(0, MAX_MARKET_REQUESTS).map(marketRequest));
+    return Promise.all(list.slice(0, MAX_MARKET_REQUESTS).map(r => marketRequest(r, now)));
 }
 
 // ── Dispatch ────────────────────────────────────────────────────────────────
@@ -280,7 +311,7 @@ export async function runChatTool(
                     : closedPositions(args, ctx.snapshot);
                 break;
             }
-            case 'market_data': result = await marketData(args); break;
+            case 'market_data': result = await marketData(args, ctx.now ?? new Date()); break;
             default: throw new Error(`Unknown tool: ${name}`);
         }
         let text = JSON.stringify(result);
