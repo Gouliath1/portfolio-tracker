@@ -85,6 +85,15 @@ function scheduleLsSave(): void {
 
 // ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * The loaded fundamentals as they stand right now, readable outside React (the
+ * AI assistant lives in the root layout, not in the screener page).
+ */
+export function readLoadedFundamentals(): ReadonlyMap<string, FundEntry> {
+    ensureLsInit();
+    return new Map(_store.map);
+}
+
 /** Reset all module-level state. Only for use in tests. */
 export function __resetForTests__(): void {
     _store.map.clear();

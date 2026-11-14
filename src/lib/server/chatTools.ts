@@ -19,6 +19,7 @@ import {
     clipByDate, rangeTokenReaching, toISODate, windowBetween, windowFromRangeToken, type DateWindow,
 } from '../core/dateWindow';
 import type { PortfolioSnapshot, SnapshotHolding } from '../../utils/portfolioSnapshot';
+import type { ScreenerRow, ScreenerSnapshot } from '../../utils/screenerSnapshot';
 import { GET as historicalPrices } from '../../app/api/historical-prices/route';
 import { GET as dividends } from '../../app/api/dividends/route';
 import { GET as fxRates } from '../../app/api/fx-rates/route';
@@ -62,6 +63,28 @@ export const CHAT_TOOLS = [
                 assetClass: { type: 'string', description: 'Exact asset class name from the brief' },
                 account: { type: 'string', description: 'Exact account name from the brief' },
                 currency: { type: 'string', description: 'Listing currency, e.g. USD' },
+                limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Default 15' },
+            },
+        },
+    },
+    {
+        name: 'query_screener',
+        description:
+            'Filter and rank the stocks the user is researching in the screener (not their holdings): loaded fundamentals ' +
+            'such as P/E, yield, P/B, market cap and sector, plus pins and price alerts. Use for "cheapest by P/E", ' +
+            '"highest yield in a sector", "which pinned stocks have alerts", or looking up one stock by name or code.',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                search: { type: 'string', description: 'Case-insensitive match on name or symbol' },
+                sector: { type: 'string', description: 'Exact sector name' },
+                pinnedOnly: { type: 'boolean' },
+                hasAlert: { type: 'boolean' },
+                maxPE: { type: 'number', description: 'Trailing P/E at or below (stocks without a P/E are excluded)' },
+                minYieldPct: { type: 'number', description: 'Dividend yield percent at or above' },
+                maxPriceToBook: { type: 'number' },
+                sortBy: { type: 'string', enum: ['marketCap', 'trailingPE', 'forwardPE', 'dividendYieldPct', 'priceToBook', 'price', 'symbol'], description: 'Default marketCap' },
+                order: { type: 'string', enum: ['desc', 'asc'], description: 'Default desc (asc for P/E, P/B and symbol)' },
                 limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Default 15' },
             },
         },
@@ -119,6 +142,7 @@ export const CHAT_TOOLS = [
 
 export interface ToolContext {
     snapshot: PortfolioSnapshot | null;
+    screener?: ScreenerSnapshot | null;
     /** Injectable clock, so relative periods are testable. */
     now?: Date;
 }
@@ -192,6 +216,54 @@ function closedPositions(input: Record<string, unknown>, snap: PortfolioSnapshot
         note: snap.closedCount > snap.recentClosed.length
             ? `Only the ${snap.recentClosed.length} most recent sales are available.` : undefined,
         sales: snap.recentClosed.filter(c => !ticker || c.ticker.toLowerCase() === ticker),
+    };
+}
+
+// ── Screener ────────────────────────────────────────────────────────────────
+
+const SCREENER_SORTS = ['marketCap', 'trailingPE', 'forwardPE', 'dividendYieldPct', 'priceToBook', 'price', 'symbol'] as const;
+type ScreenerSort = typeof SCREENER_SORTS[number];
+
+function queryScreener(input: Record<string, unknown>, snap: ScreenerSnapshot) {
+    const sortBy: ScreenerSort = (SCREENER_SORTS as readonly string[]).includes(String(input.sortBy))
+        ? input.sortBy as ScreenerSort : 'marketCap';
+    const ascDefault = sortBy === 'symbol' || sortBy === 'trailingPE' || sortBy === 'forwardPE' || sortBy === 'priceToBook';
+    const asc = input.order === 'asc' || (input.order !== 'desc' && ascDefault);
+    const limit = Math.min(50, Math.max(1, Number(input.limit) || 15));
+
+    const search = str(input.search)?.toLowerCase();
+    const sector = str(input.sector)?.toLowerCase();
+    const maxPE = typeof input.maxPE === 'number' ? input.maxPE : null;
+    const minYield = typeof input.minYieldPct === 'number' ? input.minYieldPct : null;
+    const maxPB = typeof input.maxPriceToBook === 'number' ? input.maxPriceToBook : null;
+
+    const matched = snap.rows.filter(r =>
+        (!search || r.name.toLowerCase().includes(search) || r.symbol.toLowerCase().includes(search))
+        && (!sector || r.sector?.toLowerCase() === sector)
+        && (input.pinnedOnly !== true || r.pinned)
+        && (input.hasAlert !== true || r.alert !== undefined)
+        && (maxPE === null || (r.trailingPE !== null && r.trailingPE > 0 && r.trailingPE <= maxPE))
+        && (minYield === null || (r.dividendYieldPct !== null && r.dividendYieldPct >= minYield))
+        && (maxPB === null || (r.priceToBook !== null && r.priceToBook <= maxPB)));
+
+    // Missing values sort last whichever way the list is ordered.
+    const key = (r: ScreenerRow): number | string | null => r[sortBy];
+    matched.sort((a, b) => {
+        const x = key(a), y = key(b);
+        if (x === null && y === null) return 0;
+        if (x === null) return 1;
+        if (y === null) return -1;
+        const c = typeof x === 'string' ? x.localeCompare(String(y)) : x - (y as number);
+        return asc ? c : -c;
+    });
+
+    return {
+        index: snap.index,
+        asOf: snap.generatedAt,
+        loadedInScreener: snap.loadedCount,
+        omittedFromSnapshot: snap.omitted || undefined,
+        matched: matched.length,
+        stocks: matched.slice(0, limit),
     };
 }
 
@@ -302,6 +374,11 @@ export async function runChatTool(
     try {
         let result: unknown;
         switch (name) {
+            case 'query_screener': {
+                if (!ctx.screener) throw new Error('No screener data is available; the user is not on the screener or has loaded nothing');
+                result = queryScreener(args, ctx.screener);
+                break;
+            }
             case 'query_holdings':
             case 'get_holding':
             case 'get_closed_positions': {

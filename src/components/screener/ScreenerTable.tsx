@@ -1048,8 +1048,8 @@ export function ScreenerTable({
                 )}
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between gap-3 flex-shrink-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {/* Footer — right padding keeps the pager clear of the floating AI launcher */}
+            <div className="flex items-center justify-between gap-3 flex-shrink-0 text-xs pr-14 md:pr-24" style={{ color: 'var(--text-muted)' }}>
                 <span>
                     {isPinnedPage && t('screener.countPinned', { count: totalCount.toLocaleString(locale) })}
                     {!isPinnedPage && view === 'all' && !showAll && t('screener.pageOf', { page: curPageIndex + 1, total: pageCount })}

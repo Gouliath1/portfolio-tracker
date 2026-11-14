@@ -6,7 +6,8 @@ import { useTranslation } from '../../i18n';
 import { useOptionalAccount } from '../account/AccountProvider';
 import { useOptionalSync } from '../sync/SyncProvider';
 import { RichText } from '../chat/RichText';
-import type { PortfolioBrief } from './usePortfolioBrief';
+import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
+import type { ScreenerSnapshot } from '../../utils/screenerSnapshot';
 
 /** Mirrors the server's cap so the box can't accept what the API will refuse. */
 const MAX_QUESTION_CHARS = 800;
@@ -23,17 +24,27 @@ type Availability = 'checking' | 'ready' | 'signin' | 'disabled';
 /** The counter only appears once the allowance is nearly gone. */
 const SHOW_LEFT_AT = 5;
 
+/** What one question carries: the brief text plus the structured data the server's tools read. */
+export interface AskContext {
+    markdown: string;
+    snapshot?: PortfolioSnapshot;
+    screener?: ScreenerSnapshot;
+}
+
 interface AskTabProps {
-    /** Brief plus structured snapshot, built on demand; null until the portfolio has loaded. */
-    getBrief: () => PortfolioBrief | null;
-    hasPositions: boolean;
+    /** Built at question time so it reflects the page the user is on; null until there is something to ask about. */
+    getContext: () => AskContext | null;
+    /** Whether there is anything to ask about (positions, or loaded screener stocks). */
+    canAsk: boolean;
+    /** What the questions are about, which decides the hint text and suggestions. */
+    subject: 'portfolio' | 'screener';
     /** Whether this tab is the one on screen (it stays mounted so the conversation survives). */
     active: boolean;
     /** Closes the whole panel, e.g. before opening the sign-in dialog. */
     onClose: () => void;
 }
 
-export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps) {
+export function AskTab({ getContext, canAsk, subject, active, onClose }: AskTabProps) {
     const { t, language } = useTranslation();
     const [availability, setAvailability] = useState<Availability>('checking');
     const [turns, setTurns] = useState<Turn[]>([]);
@@ -82,8 +93,8 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
 
     const ask = useCallback(async (raw: string) => {
         const question = raw.trim();
-        const brief = getBrief();
-        if (!question || busy || !hasPositions || !brief) return;
+        const context = getContext();
+        if (!question || busy || !canAsk || !context) return;
 
         // Failed notices are UI-only; replaying them would put our error text in Claude's mouth.
         const history = turns.filter(m => !m.error && m.content).map(({ role, content }) => ({ role, content }));
@@ -99,7 +110,7 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ brief: brief.markdown, snapshot: brief.snapshot, messages, language }),
+                body: JSON.stringify({ brief: context.markdown, snapshot: context.snapshot, screener: context.screener, messages, language }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) {
@@ -147,7 +158,7 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
             abortRef.current = null;
             setBusy(false);
         }
-    }, [busy, getBrief, hasPositions, language, t, turns]);
+    }, [busy, getContext, canAsk, language, t, turns]);
 
     const reset = () => {
         abortRef.current?.abort();
@@ -163,7 +174,9 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
         }
     };
 
-    const suggestions = [t('chat.suggestion1'), t('chat.suggestion2')];
+    const suggestions = subject === 'screener'
+        ? [t('chat.suggestionScreener1'), t('chat.suggestionScreener2')]
+        : [t('chat.suggestion1'), t('chat.suggestion2')];
 
     return (
         <div className="flex flex-col flex-1 min-h-0">
@@ -175,8 +188,8 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
                                 <p style={{ color: 'var(--text-secondary)' }}>
                                     {availability === 'disabled' ? t('chat.disabled')
                                         : availability === 'signin' ? t('chat.signIn')
-                                        : !hasPositions ? t('chat.noPositions')
-                                        : t('chat.intro')}
+                                        : !canAsk ? t(subject === 'screener' ? 'chat.noScreenerData' : 'chat.noPositions')
+                                        : t(subject === 'screener' ? 'chat.introScreener' : 'chat.intro')}
                                 </p>
                                 {availability === 'signin' && sync && (
                                     <button
@@ -186,7 +199,7 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
                                         {t('chat.signInButton')}
                                     </button>
                                 )}
-                                {availability === 'ready' && hasPositions && (
+                                {availability === 'ready' && canAsk && (
                                     <div className="flex flex-col items-start gap-2">
                                         {suggestions.map(s => (
                                             <button key={s} onClick={() => void ask(s)}
@@ -237,7 +250,7 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
                                 onKeyDown={onKeyDown}
                                 rows={1}
                                 maxLength={MAX_QUESTION_CHARS}
-                                disabled={availability !== 'ready' || !hasPositions}
+                                disabled={availability !== 'ready' || !canAsk}
                                 placeholder={t('chat.placeholder')}
                                 aria-label={t('chat.placeholder')}
                                 className="flex-1 resize-none rounded-lg px-3 py-2 text-base md:text-sm max-h-28 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-[var(--accent)]"
@@ -255,7 +268,7 @@ export function AskTab({ getBrief, hasPositions, active, onClose }: AskTabProps)
                                 </button>
                             ) : (
                                 <button onClick={() => void ask(draft)} aria-label={t('chat.send')}
-                                    disabled={!draft.trim() || availability !== 'ready' || !hasPositions}
+                                    disabled={!draft.trim() || availability !== 'ready' || !canAsk}
                                     className="h-9 w-9 flex items-center justify-center rounded-lg flex-shrink-0 disabled:opacity-40"
                                     style={{ background: 'var(--accent)', color: 'var(--surface)' }}>
                                     <MdArrowUpward size={18} />

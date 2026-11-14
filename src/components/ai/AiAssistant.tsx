@@ -18,7 +18,10 @@ import { MdAutoAwesome, MdClose, MdOpenInFull, MdCloseFullscreen } from 'react-i
 import { useTranslation } from '../../i18n';
 import { getActiveSetId } from '../../utils/localPositions';
 import { readToken, fetchShareStatus } from '../../utils/aiConnection';
-import { AskTab } from './AskTab';
+import { readScreenerState } from '../../utils/screenerState';
+import { readLoadedFundamentals } from '../../hooks/useScreenerFundamentals';
+import { buildScreenerSnapshot, formatScreenerMarkdown, screenerHasData, type ScreenerSnapshot } from '../../utils/screenerSnapshot';
+import { AskTab, type AskContext } from './AskTab';
 import { OwnAiTab } from './OwnAiTab';
 import { usePortfolioBrief } from './usePortfolioBrief';
 
@@ -87,6 +90,29 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
     }, [open]);
 
     const hidden = HIDDEN_ON.some(p => pathname?.startsWith(p));
+
+    // The assistant follows the page: on the screener, questions are about the
+    // stocks being researched there (alongside the portfolio, for comparison).
+    const onScreener = Boolean(pathname?.startsWith('/screener'));
+    const readScreener = useCallback((): ScreenerSnapshot | null => {
+        if (!onScreener) return null;
+        const snapshot = buildScreenerSnapshot(readScreenerState(), readLoadedFundamentals());
+        return screenerHasData(snapshot) ? snapshot : null;
+    }, [onScreener]);
+
+    // Read when the panel opens (not per render): the screener's store lives outside React.
+    const [screenerReady, setScreenerReady] = useState(false);
+    useEffect(() => {
+        if (open) setScreenerReady(readScreener() !== null);
+    }, [open, openCount, readScreener]);
+
+    const getAskContext = useCallback((): AskContext | null => {
+        const portfolio = getBrief();
+        const screener = readScreener();
+        if (!portfolio && !screener) return null;
+        const markdown = [portfolio?.markdown, screener ? formatScreenerMarkdown(screener) : null].filter(Boolean).join('\n\n');
+        return { markdown, snapshot: portfolio?.snapshot, screener: screener ?? undefined };
+    }, [getBrief, readScreener]);
 
     const tabs: { id: AiTab; label: string }[] = [
         { id: 'ask', label: t('ai.tabAsk') },
@@ -180,9 +206,10 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
                     <div role="tabpanel" id="ai-panel-ask" aria-labelledby="ai-tab-ask"
                         className={tab === 'ask' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
                         <AskTab
-                            getBrief={getBrief}
+                            getContext={getAskContext}
                             // Optimistic until the portfolio has loaded, so the "add positions" hint doesn't flash.
-                            hasPositions={!loaded || hasPositions}
+                            canAsk={!loaded || hasPositions || screenerReady}
+                            subject={onScreener ? 'screener' : 'portfolio'}
                             active={open && tab === 'ask'}
                             onClose={close}
                         />

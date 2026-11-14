@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
             : json({ error: 'Chat is temporarily unavailable' }, 503);
     }
 
-    const { brief, messages: history, language, snapshot } = parsed.request;
+    const { brief, messages: history, language, snapshot, screener } = parsed.request;
     const client = new Anthropic();
     const system = buildSystem(brief, language);
     const abort = new AbortController();
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
                         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
                     );
                     const results = await Promise.all(calls.map(async call => {
-                        const out = await runChatTool(call.name, call.input, { snapshot: snapshot ?? null });
+                        const out = await runChatTool(call.name, call.input, { snapshot: snapshot ?? null, screener: screener ?? null });
                         console.info('[chat] tool', call.name, out.isError ? 'error' : 'ok');
                         return {
                             type: 'tool_result' as const,

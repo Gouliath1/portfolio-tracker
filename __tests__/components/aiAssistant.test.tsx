@@ -14,6 +14,13 @@ jest.mock('../../src/components/ai/usePortfolioBrief', () => ({
 const mockCopy = jest.fn(async () => true);
 jest.mock('../../src/utils/clipboard', () => ({ copyToClipboard: (...a: unknown[]) => mockCopy(...(a as [])) }));
 jest.mock('../../src/utils/localPositions', () => ({ getActiveSetId: () => 'set1' }));
+const mockScreenerState = jest.fn();
+const mockFundamentals = jest.fn();
+jest.mock('../../src/utils/screenerState', () => ({
+    ...jest.requireActual('../../src/utils/screenerState'),
+    readScreenerState: () => mockScreenerState(),
+}));
+jest.mock('../../src/hooks/useScreenerFundamentals', () => ({ readLoadedFundamentals: () => mockFundamentals() }));
 
 const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
 const fetchMock = jest.fn();
@@ -21,6 +28,10 @@ beforeEach(() => {
     localStorage.clear();
     mockPathname.mockReturnValue('/');
     mockCopy.mockClear();
+    mockScreenerState.mockReturnValue({ index: 'topix', indexLoaded: true, added: [], pinned: ['4401.T'], alerts: {}, notes: {} });
+    mockFundamentals.mockReturnValue(new Map([['4401.T', { status: 'done', data: {
+        symbol: '4401.T', name: 'Adeka', price: 2500, currency: 'JPY', trailingPE: 9.5, forwardPE: 9, dividendYield: 0.03,
+        priceToBook: 0.9, marketCap: 5e11, sector: 'Chemicals' } }]]));
     mockBrief.mockReturnValue({ getBrief: () => brief, setId: 'set1', loaded: true, hasPositions: true });
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string) => {
@@ -95,6 +106,52 @@ describe('AiAssistant', () => {
         await waitFor(() => {
             const posts = fetchMock.mock.calls.filter(([u, init]) => String(u) === '/api/share' && init?.method === 'POST');
             expect(posts).toHaveLength(1);
+        });
+    });
+
+    describe('on the screener', () => {
+        const posted = () => {
+            const call = fetchMock.mock.calls.find(([u, init]) => String(u) === '/api/chat' && init?.method === 'POST');
+            return call ? JSON.parse(call[1].body) : null;
+        };
+
+        it('is shown, and asks about the screener even with an empty portfolio', async () => {
+            mockPathname.mockReturnValue('/screener');
+            mockBrief.mockReturnValue({ getBrief: () => null, setId: 'set1', loaded: true, hasPositions: false });
+            fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
+                if (init?.method === 'POST') return { ok: false, status: 500, json: async () => ({}) };
+                return json({ enabled: true, signedIn: true, remaining: 20 });
+            });
+            mount();
+            fireEvent.click(screen.getByRole('button', { name: 'Open AI assistant' }));
+            expect(await screen.findByText(/stocks you have loaded in the screener/)).toBeInTheDocument();
+
+            const box = await screen.findByPlaceholderText('Ask a question…');
+            await waitFor(() => expect(box).not.toBeDisabled());
+            fireEvent.change(box, { target: { value: 'cheapest?' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+            await waitFor(() => expect(posted()).not.toBeNull());
+            const body = posted();
+            expect(body.screener.rows[0]).toMatchObject({ symbol: '4401.T', trailingPE: 9.5, dividendYieldPct: 3, pinned: true });
+            expect(body.brief).toContain('# Screener — TOPIX');
+            expect(body.snapshot).toBeUndefined();
+        });
+
+        it('does not send screener data from other pages', async () => {
+            fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
+                if (init?.method === 'POST') return { ok: false, status: 500, json: async () => ({}) };
+                return json({ enabled: true, signedIn: true, remaining: 20 });
+            });
+            mount();
+            fireEvent.click(screen.getByRole('button', { name: 'Open AI assistant' }));
+            const box = await screen.findByPlaceholderText('Ask a question…');
+            await waitFor(() => expect(box).not.toBeDisabled());
+            fireEvent.change(box, { target: { value: 'hi' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+            await waitFor(() => expect(posted()).not.toBeNull());
+            expect(posted().screener).toBeUndefined();
+            expect(posted().brief).toBe('# Portfolio brief');
         });
     });
 

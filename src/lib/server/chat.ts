@@ -14,6 +14,7 @@
  */
 
 import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
+import type { ScreenerSnapshot } from '../../utils/screenerSnapshot';
 import { overLimit } from './requestGuards';
 
 // ── Cost levers ─────────────────────────────────────────────────────────────
@@ -29,6 +30,8 @@ export const MAX_HISTORY_MESSAGES = 8;
 export const MAX_USER_MESSAGE_CHARS = 800;
 /** Serialised size ceiling for the structured snapshot the tools read. */
 export const MAX_SNAPSHOT_CHARS = 120_000;
+/** Same ceiling for the screener snapshot. */
+export const MAX_SCREENER_CHARS = 120_000;
 /** Our own earlier answers, clipped when replayed as history. */
 const MAX_REPLAYED_ASSISTANT_CHARS = 1_500;
 
@@ -58,6 +61,8 @@ export interface ChatRequest {
     language: ChatLanguage;
     /** Structured data for the portfolio tools; absent for older clients. */
     snapshot?: PortfolioSnapshot;
+    /** Stocks the user is researching in the screener; present only on screener pages. */
+    screener?: ScreenerSnapshot;
 }
 
 export type ParsedChat =
@@ -100,11 +105,21 @@ function readSnapshot(raw: unknown): PortfolioSnapshot | undefined {
     };
 }
 
+/** Optional context, like the snapshot: malformed or oversized is dropped, not an error. */
+function readScreener(raw: unknown): ScreenerSnapshot | undefined {
+    if (typeof raw !== 'object' || raw === null) return undefined;
+    const s = raw as Partial<ScreenerSnapshot>;
+    if (!Array.isArray(s.rows) || typeof s.index !== 'string') return undefined;
+    if (JSON.stringify(raw).length > MAX_SCREENER_CHARS) return undefined;
+    const rows = s.rows.filter(r => r && typeof r.symbol === 'string' && r.symbol !== '');
+    return { ...(s as ScreenerSnapshot), rows };
+}
+
 const bad = (error: string, status = 400): ParsedChat => ({ ok: false, status, error });
 
 export function parseChatRequest(body: unknown): ParsedChat {
     if (typeof body !== 'object' || body === null) return bad('Expected a JSON object');
-    const { brief, messages, language, snapshot } = body as Record<string, unknown>;
+    const { brief, messages, language, snapshot, screener } = body as Record<string, unknown>;
 
     if (typeof brief !== 'string' || brief.trim() === '') return bad('Missing portfolio brief');
     if (brief.length > MAX_BRIEF_CHARS) return bad('Portfolio brief too large', 413);
@@ -141,6 +156,8 @@ export function parseChatRequest(body: unknown): ParsedChat {
     const request: ChatRequest = { brief, messages: recent, language: language === 'fr' ? 'fr' : 'en' };
     const parsedSnapshot = readSnapshot(snapshot);
     if (parsedSnapshot) request.snapshot = parsedSnapshot;
+    const parsedScreener = readScreener(screener);
+    if (parsedScreener) request.screener = parsedScreener;
     return { ok: true, request };
 }
 
@@ -148,7 +165,8 @@ export function parseChatRequest(body: unknown): ParsedChat {
 
 const INSTRUCTIONS = [
     'You answer questions about one person\'s investment portfolio, using the brief below and your tools.',
-    'The brief is a summary. Answer from it when it suffices. Call a tool when you need detail it lacks: filtering or ranking holdings, one holding in depth, sales, price moves over any period, valuation ratios, dividend history (market_data, one request per ticker, batched; give the period as from/to dates, resolving "last month", "two months ago" or "the 2 weeks before" from the brief\'s Generated date). Batch independent calls in one turn, and do not narrate before calling a tool.',
+    'The brief is a summary. Answer from it when it suffices. Call a tool when you need detail it lacks: filtering or ranking holdings or screener stocks (query_screener), one holding in depth, sales, price moves over any period, valuation ratios, dividend history (market_data, one request per ticker, batched; give the period as from/to dates, resolving "last month", "two months ago" or "the 2 weeks before" from the brief\'s Generated date). Batch independent calls in one turn, and do not narrate before calling a tool.',
+    'The brief may include a Screener section: stocks the user is researching, which are not holdings unless they also appear in the portfolio. Say which one you are talking about when it could be either.',
     'Tool data is either the user\'s own portfolio or cached market data that may be stale or missing. If a tool reports no data, say so.',
     'Be brief: a direct answer first, then at most a few short supporting points. Quote the numbers you rely on.',
     'If neither the brief nor the tools contain what is needed, say so instead of guessing. Never invent prices, news or figures.',

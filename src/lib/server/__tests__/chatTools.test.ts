@@ -63,6 +63,39 @@ describe('portfolio tools', () => {
     });
 });
 
+describe('query_screener', () => {
+    const row = (symbol: string, over: object = {}) => ({
+        symbol, name: `${symbol} Corp`, sector: 'Chemicals', price: 100, currency: 'JPY', trailingPE: 10, forwardPE: 9,
+        dividendYieldPct: 2, priceToBook: 1, marketCap: 1000, pinned: false, hasNote: false, loaded: true, ...over,
+    });
+    const screener = {
+        generatedAt: '2026-11-14', index: 'topix', loadedCount: 4, pinnedCount: 1, alertCount: 0, omitted: 0,
+        rows: [row('A', { marketCap: 500, trailingPE: 25, dividendYieldPct: 5 }), row('B', { marketCap: 900, trailingPE: 8, sector: 'Banks', pinned: true }),
+            row('C', { marketCap: 100, trailingPE: null }), row('D', { marketCap: 700, trailingPE: -3, dividendYieldPct: 1 })],
+    } as never;
+    const q = (input: object) => runChatTool('query_screener', input, { snapshot: null, screener }).then(r => ({ ...r, data: r.isError ? null : JSON.parse(r.text) }));
+    const symbols = (d: { stocks: { symbol: string }[] }) => d.stocks.map(s => s.symbol);
+
+    it('ranks by market cap by default and by P/E ascending, missing values last', async () => {
+        expect(symbols((await q({})).data)).toEqual(['B', 'D', 'A', 'C']);
+        expect(symbols((await q({ sortBy: 'trailingPE' })).data)).toEqual(['D', 'B', 'A', 'C']);
+    });
+
+    it('filters by sector, pins, yield and P/E (a negative P/E is not cheap)', async () => {
+        expect(symbols((await q({ sector: 'banks' })).data)).toEqual(['B']);
+        expect(symbols((await q({ pinnedOnly: true })).data)).toEqual(['B']);
+        expect(symbols((await q({ minYieldPct: 3 })).data)).toEqual(['A']);
+        expect(symbols((await q({ maxPE: 30, sortBy: 'trailingPE' })).data)).toEqual(['B', 'A']);
+        expect(symbols((await q({ search: 'c corp' })).data)).toEqual(['C']);
+    });
+
+    it('errors cleanly when the user is not on the screener', async () => {
+        const r = await runChatTool('query_screener', {}, { snapshot: null });
+        expect(r.isError).toBe(true);
+        expect(r.text).toMatch(/screener/);
+    });
+});
+
 describe('market_data windows', () => {
     const NOW = new Date(2026, 10, 5, 12);
     const longHistory = (sym = 'AAPL') => new Response(JSON.stringify({
@@ -138,6 +171,16 @@ describe('market_data', () => {
     it('rejects unknown tools and empty requests', async () => {
         expect((await call('drop_tables', {})).isError).toBe(true);
         expect((await call('market_data', {})).isError).toBe(true);
+    });
+});
+
+describe('parseChatRequest screener', () => {
+    const base = { brief: 'b', messages: [{ role: 'user', content: 'hi' }] };
+    it('keeps a screener snapshot and drops a malformed one', () => {
+        const ok = parseChatRequest({ ...base, screener: { index: 'topix', rows: [{ symbol: 'A' }, { symbol: '' }, null] } });
+        expect(ok.ok && ok.request.screener?.rows).toEqual([{ symbol: 'A' }]);
+        const bad = parseChatRequest({ ...base, screener: { rows: 'x' } });
+        expect(bad.ok && bad.request.screener).toBeUndefined();
     });
 });
 
