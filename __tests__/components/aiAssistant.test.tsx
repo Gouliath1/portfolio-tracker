@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AiAssistant, useOptionalAiAssistant } from '../../src/components/ai/AiAssistant';
 import { LanguageProvider } from '../../src/i18n';
+import { useAiActions } from '../../src/components/ai/aiActions';
 
 const mockPathname = jest.fn(() => '/');
 jest.mock('next/navigation', () => ({ usePathname: () => mockPathname(), useRouter: () => ({ push: jest.fn() }) }));
@@ -45,6 +46,11 @@ beforeEach(() => {
 const OpenFromElsewhere = () => {
     const ai = useOptionalAiAssistant();
     return <button onClick={() => ai?.open('own')}>settings-row</button>;
+};
+
+const PageWithActions = ({ disabled = false }: { disabled?: boolean }) => {
+    useAiActions([{ id: 'refresh_prices', label: 'Refresh prices', description: 'Refresh live prices', disabled, run: () => undefined }]);
+    return null;
 };
 
 const mount = () => render(
@@ -155,6 +161,35 @@ describe('AiAssistant', () => {
             await waitFor(() => expect(posted()).not.toBeNull());
             expect(posted().screener).toBeUndefined();
             expect(posted().brief).toBe('# Portfolio brief');
+        });
+    });
+
+    describe('page actions', () => {
+        const questionBody = async () => {
+            const box = await screen.findByPlaceholderText('Ask a question…');
+            await waitFor(() => expect(box).not.toBeDisabled());
+            fireEvent.change(box, { target: { value: 'refresh please' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+            await waitFor(() => expect(fetchMock.mock.calls.some(([, i]) => i?.method === 'POST')).toBe(true));
+            return JSON.parse(fetchMock.mock.calls.find(([, i]) => i?.method === 'POST')![1].body);
+        };
+        beforeEach(() => {
+            fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => init?.method === 'POST'
+                ? { ok: false, status: 500, json: async () => ({}) }
+                : json({ enabled: true, signedIn: true, remaining: 20 }));
+        });
+
+        it('offers the mounted page\'s actions to the model, as id and description only', async () => {
+            render(<LanguageProvider><AiAssistant><PageWithActions /></AiAssistant></LanguageProvider>);
+            fireEvent.click(screen.getByRole('button', { name: 'Open AI assistant' }));
+            expect((await questionBody()).actions).toEqual([{ id: 'refresh_prices', description: 'Refresh live prices' }]);
+        });
+
+        it('does not offer disabled actions, or any when the page has none', async () => {
+            const { unmount } = render(<LanguageProvider><AiAssistant><PageWithActions disabled /></AiAssistant></LanguageProvider>);
+            fireEvent.click(screen.getByRole('button', { name: 'Open AI assistant' }));
+            expect((await questionBody()).actions).toEqual([]);
+            unmount();
         });
     });
 

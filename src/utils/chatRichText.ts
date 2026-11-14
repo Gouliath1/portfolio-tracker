@@ -115,7 +115,9 @@ export type Block =
     | { t: 'table'; head: Inline[][]; rows: Inline[][][] }
     | { t: 'code'; v: string }
     /** `complete` is false while the closing fence has not streamed in yet. */
-    | { t: 'chart'; raw: string; complete: boolean };
+    | { t: 'chart'; raw: string; complete: boolean }
+    /** A proposed page action; shown as a confirm card, never run on its own. */
+    | { t: 'action'; raw: string; complete: boolean };
 
 const BULLET = /^\s*[-*•]\s+(.*)$/;
 const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
@@ -148,8 +150,9 @@ export function parseBlocks(text: string): Block[] {
                 if (/^\s*```\s*$/.test(lines[i])) { closed = true; break; }
                 body.push(lines[i]);
             }
-            blocks.push(fence[1].toLowerCase() === 'chart'
-                ? { t: 'chart', raw: body.join('\n'), complete: closed }
+            const kind = fence[1].toLowerCase();
+            blocks.push(kind === 'chart' || kind === 'action'
+                ? { t: kind, raw: body.join('\n'), complete: closed }
                 : { t: 'code', v: body.join('\n') });
             continue;
         }
@@ -247,5 +250,22 @@ export function formatChartValue(value: number, unit: string, locale = 'en'): st
 }
 
 /** A cell that is a figure (12,400 · +4.2% · ¥1.2M · 500 JPY), not a name like 7203.T. */
+export interface ActionSpec { id: string; reason?: string }
+
+const ACTION_ID = /^[a-z][a-z0-9_]{0,39}$/;
+export const MAX_ACTION_REASON_CHARS = 200;
+
+/** Validates the JSON in an ```action block: an id the page may know, and a short plain-text reason. */
+export function parseActionSpec(raw: string): ActionSpec | null {
+    let value: unknown;
+    try { value = JSON.parse(raw); } catch { return null; }
+    if (typeof value !== 'object' || value === null) return null;
+    const { id, reason } = value as { id?: unknown; reason?: unknown };
+    if (typeof id !== 'string' || !ACTION_ID.test(id)) return null;
+    const clean = typeof reason === 'string'
+        ? reason.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, MAX_ACTION_REASON_CHARS) : '';
+    return clean ? { id, reason: clean } : { id };
+}
+
 export const isNumericText = (text: string): boolean =>
     /^[+\u2212-]?[$€£¥]?\d[\d.,]*\s?(%|[kKMB]|[A-Z]{3})?$/.test(text.trim());

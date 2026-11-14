@@ -20,6 +20,7 @@ import {
 } from '../core/dateWindow';
 import type { PortfolioSnapshot, SnapshotHolding } from '../../utils/portfolioSnapshot';
 import type { ScreenerRow, ScreenerSnapshot } from '../../utils/screenerSnapshot';
+import type { ChatAction } from './chat';
 import { GET as historicalPrices } from '../../app/api/historical-prices/route';
 import { GET as dividends } from '../../app/api/dividends/route';
 import { GET as fxRates } from '../../app/api/fx-rates/route';
@@ -143,7 +144,33 @@ export const CHAT_TOOLS = [
     },
 ];
 
+/**
+ * The tools for one request: the fixed set, plus `propose_action` when the
+ * page offers actions. Its description carries the list, so the model sees
+ * only ids and descriptions, and the id is restricted to that list.
+ */
+export function buildChatTools(actions: ChatAction[] = []) {
+    if (actions.length === 0) return CHAT_TOOLS;
+    return [...CHAT_TOOLS, {
+        name: 'propose_action',
+        description:
+            'Offer the user a one-click action on the page they are on. This does NOT run it: it shows a confirm button ' +
+            'and the action happens only if the user clicks it. Actions available now:\n' +
+            actions.map(a => `- ${a.id}: ${a.description}`).join('\n'),
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                id: { type: 'string', enum: actions.map(a => a.id) },
+                reason: { type: 'string', description: 'One short sentence for the user on why this helps' },
+            },
+            required: ['id'],
+        },
+    }];
+}
+
 export interface ToolContext {
+    /** Actions the current page offers; `propose_action` is refused for anything else. */
+    actions?: ChatAction[];
     snapshot: PortfolioSnapshot | null;
     screener?: ScreenerSnapshot | null;
     /** Injectable clock, so relative periods are testable. */
@@ -363,6 +390,30 @@ async function marketData(input: Record<string, unknown>, now: Date) {
     return Promise.all(list.slice(0, MAX_MARKET_REQUESTS).map(r => marketRequest(r, now)));
 }
 
+// ── Actions ─────────────────────────────────────────────────────────────────
+
+/** Longest reason shown on a confirm card. */
+const MAX_REASON_CHARS = 200;
+
+/**
+ * Nothing runs here. The proposal is written into the answer as an `action`
+ * block, which the browser renders as a confirm card and acts on only when the
+ * user clicks. The model is told so, to keep it from claiming the work is done.
+ */
+function proposeAction(args: Record<string, unknown>, actions: ChatAction[]) {
+    const id = str(args.id);
+    if (!id || !actions.some(a => a.id === id)) {
+        return { text: `Error: unknown action. Available: ${actions.map(a => a.id).join(', ') || 'none'}`, isError: true };
+    }
+    const reason = str(args.reason)?.replace(/[\u0000-\u001f]/g, ' ').slice(0, MAX_REASON_CHARS);
+    const block = `\n\n\`\`\`action\n${JSON.stringify(reason ? { id, reason } : { id })}\n\`\`\`\n\n`;
+    return {
+        text: `A confirm button for "${id}" is now shown to the user. It runs only if they click it. Do not say it has been done; tell them it is waiting for their confirmation.`,
+        isError: false,
+        emit: block,
+    };
+}
+
 // ── Dispatch ────────────────────────────────────────────────────────────────
 
 /**
@@ -374,9 +425,10 @@ export async function runChatTool(
     name: string,
     input: unknown,
     ctx: ToolContext,
-): Promise<{ text: string; isError: boolean }> {
+): Promise<{ text: string; isError: boolean; emit?: string }> {
     const args = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
     try {
+        if (name === 'propose_action') return proposeAction(args, ctx.actions ?? []);
         let result: unknown;
         switch (name) {
             case 'query_screener': {

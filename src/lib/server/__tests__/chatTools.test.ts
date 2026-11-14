@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { runChatTool } from '../chatTools';
+import { CHAT_TOOLS, buildChatTools, runChatTool } from '../chatTools';
 import { parseChatRequest } from '../chat';
 import type { PortfolioSnapshot } from '../../../utils/portfolioSnapshot';
 
@@ -202,5 +202,72 @@ describe('parseChatRequest snapshot', () => {
         expect(lenient.ok && lenient.request.snapshot?.holdings[0].value).toBe(0);
         const dropped = parseChatRequest({ ...base, snapshot: { holdings: 'x' } });
         expect(dropped.ok && dropped.request.snapshot).toBeUndefined();
+    });
+});
+
+describe('page actions', () => {
+    const actions = [
+        { id: 'refresh_pinned', description: 'Refresh pinned stocks' },
+        { id: 'refresh_prices', description: 'Refresh prices' },
+    ];
+
+    it('offers propose_action only when the page has actions, restricted to their ids', () => {
+        expect(buildChatTools()).toBe(CHAT_TOOLS);
+        const tools = buildChatTools(actions);
+        const tool = tools.find(t => t.name === 'propose_action')!;
+        expect((tool.input_schema.properties as Record<string, unknown>).id).toEqual({ type: 'string', enum: ['refresh_pinned', 'refresh_prices'] });
+        expect(tool.description).toContain('does NOT run it');
+        expect(tool.description).toContain('- refresh_pinned: Refresh pinned stocks');
+    });
+
+    it('turns a proposal into an action block for the browser and tells the model nothing ran', async () => {
+        const r = await runChatTool('propose_action', { id: 'refresh_pinned', reason: 'Prices look old' }, { snapshot: null, actions });
+        expect(r.isError).toBe(false);
+        expect(r.emit).toBe('\n\n```action\n{"id":"refresh_pinned","reason":"Prices look old"}\n```\n\n');
+        expect(r.text).toMatch(/only if they click/);
+        expect(r.text).toMatch(/Do not say it has been done/);
+    });
+
+    it('refuses an action the page did not offer', async () => {
+        const r = await runChatTool('propose_action', { id: 'delete_everything' }, { snapshot: null, actions });
+        expect(r.isError).toBe(true);
+        expect(r.emit).toBeUndefined();
+        const none = await runChatTool('propose_action', { id: 'refresh_pinned' }, { snapshot: null });
+        expect(none.isError).toBe(true);
+    });
+
+    it('clips the reason and strips control characters so the block stays one valid line', async () => {
+        const r = await runChatTool('propose_action', { id: 'refresh_prices', reason: `a\n\`\`\`\n${'b'.repeat(500)}` }, { snapshot: null, actions });
+        const json = r.emit!.split('\n')[3];
+        expect(JSON.parse(json).reason.length).toBeLessThanOrEqual(200);
+        expect(r.emit!.match(/```/g)).toHaveLength(3);
+    });
+});
+
+describe('parseChatRequest actions', () => {
+    const base = { brief: 'b', messages: [{ role: 'user', content: 'hi' }] };
+    const parse = (actions: unknown) => {
+        const r = parseChatRequest({ ...base, actions });
+        return r.ok ? r.request.actions : 'rejected';
+    };
+
+    it('keeps valid actions and drops malformed, duplicate or empty ones', () => {
+        expect(parse([
+            { id: 'refresh_prices', description: 'Refresh' }, { id: 'refresh_prices', description: 'dup' },
+            { id: 'Bad Id', description: 'x' }, { id: 'ok_one', description: '   ' }, null, 'x',
+        ])).toEqual([{ id: 'refresh_prices', description: 'Refresh' }]);
+    });
+
+    it('caps the number of actions and clips descriptions', () => {
+        const many = Array.from({ length: 20 }, (_, i) => ({ id: `a${i}`, description: 'd'.repeat(1000) }));
+        const out = parse(many) as { id: string; description: string }[];
+        expect(out).toHaveLength(8);
+        expect(out[0].description).toHaveLength(300);
+    });
+
+    it('is absent when there is nothing valid', () => {
+        expect(parse([])).toBeUndefined();
+        expect(parse('nope')).toBeUndefined();
+        expect(parse(undefined)).toBeUndefined();
     });
 });

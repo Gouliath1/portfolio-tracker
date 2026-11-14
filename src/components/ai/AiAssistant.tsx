@@ -22,6 +22,7 @@ import { readScreenerState } from '../../utils/screenerState';
 import { readLoadedFundamentals } from '../../hooks/useScreenerFundamentals';
 import { buildScreenerSnapshot, formatScreenerMarkdown, screenerHasData, type ScreenerSnapshot } from '../../utils/screenerSnapshot';
 import { AskTab, type AskContext } from './AskTab';
+import { AiActionRegistryContext, createAiActionRegistry } from './aiActions';
 import { OwnAiTab } from './OwnAiTab';
 import { usePortfolioBrief } from './usePortfolioBrief';
 
@@ -50,9 +51,14 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
     // Bumped on every open so the panel re-reads a portfolio that may have changed.
     const [openCount, setOpenCount] = useState(0);
     const launcherRef = useRef<HTMLButtonElement>(null);
+    // Bumped when a confirmed action changes data (fresh prices), so the next answer uses it.
+    const [dataVersion, setDataVersion] = useState(0);
     const everOpened = openCount > 0;
 
-    const { getBrief, setId, loaded, hasPositions } = usePortfolioBrief(everOpened, openCount);
+    const { getBrief, setId, loaded, hasPositions } = usePortfolioBrief(everOpened, openCount + dataVersion);
+
+    // Pages register what they can do here; the chat offers it, the user confirms it.
+    const [actionRegistry] = useState(() => createAiActionRegistry(() => setDataVersion(v => v + 1)));
 
     const show = useCallback((next?: AiTab) => {
         if (next) setTab(next);
@@ -121,6 +127,7 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
 
     return (
         <AiAssistantContext.Provider value={api}>
+            <AiActionRegistryContext.Provider value={actionRegistry}>
             {children}
 
             {!hidden && !open && (
@@ -227,6 +234,7 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
                     </div>
                 </section>
             )}
+            </AiActionRegistryContext.Provider>
         </AiAssistantContext.Provider>
     );
 }

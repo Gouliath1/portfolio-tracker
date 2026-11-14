@@ -33,6 +33,7 @@ import {
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { OwnerBadge } from '../components/account/OwnerBadge';
 import { useTranslation } from '../i18n';
+import { useAiActions } from '../components/ai/aiActions';
 import type { TranslationKey, TranslationParams } from '../i18n';
 
 import ImportSetModal from '../components/management/ImportSetModal';
@@ -177,7 +178,8 @@ export default function Home() {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    const handleRefreshClick = async () => {
+    /** Resolves to whether the refresh worked; the page shows the error itself, a caller may need to know too. */
+    const handleRefreshClick = async (): Promise<boolean> => {
         setRefreshing(true);
         clearChartCache();
         try {
@@ -188,11 +190,13 @@ export default function Home() {
             });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             await loadData(false, false);
+            return true;
         } catch (err) {
             setError({
                 key: 'home.errRefresh',
                 detail: err instanceof Error ? err.message : undefined,
             });
+            return false;
         } finally {
             setRefreshing(false);
         }
@@ -284,6 +288,16 @@ export default function Home() {
         realizedCostJPY: 0, realizedPnlPercentage: 0, totalDividendsJPY: 0,
     };
     const summary = portfolioSummary ?? placeholderSummary;
+
+    // Offered to the AI assistant, which can only propose it: the user confirms.
+    useAiActions([{
+        id: 'refresh_prices',
+        label: t('ai.action.refreshPrices'),
+        detail: t('ai.action.refreshPricesDetail'),
+        description: 'Refresh live prices and recompute the portfolio (the same as the Refresh button on this page).',
+        disabled: refreshing || summary.positions.length === 0,
+        run: async () => { if (!(await handleRefreshClick())) throw new Error('refresh failed'); },
+    }]);
     const isFirstLoad = loading && !portfolioSummary;
 
     const hasStalePrice = summary.positions.some(p => p.currentPrice === null);

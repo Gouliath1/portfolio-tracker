@@ -12,7 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { clientIp, NO_STORE } from '../../../lib/server/requestGuards';
 import { getRequestUser } from '../../../lib/server/authSession';
 import { claimQuestion, refundQuestion, remainingToday } from '../../../lib/server/chatUsageStore';
-import { CHAT_TOOLS, MAX_TOOL_ROUNDS, runChatTool } from '../../../lib/server/chatTools';
+import { MAX_TOOL_ROUNDS, buildChatTools, runChatTool } from '../../../lib/server/chatTools';
 import {
     CHAT_MODEL, MAX_OUTPUT_TOKENS, admitIp, buildSystem, chatEnabled, parseChatRequest,
 } from '../../../lib/server/chat';
@@ -62,10 +62,13 @@ export async function POST(request: NextRequest) {
             : json({ error: 'Chat is temporarily unavailable' }, 503);
     }
 
-    const { brief, messages: history, language, snapshot, screener } = parsed.request;
+    const { brief, messages: history, language, snapshot, screener, actions } = parsed.request;
     const client = new Anthropic();
     const system = buildSystem(brief, language);
+    const tools = buildChatTools(actions);
     const abort = new AbortController();
+    /** One confirm card per action per question, whatever the model asks for. */
+    const proposed = new Set<string>();
 
     const encoder = new TextEncoder();
     const body_ = new ReadableStream<Uint8Array>({
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest) {
                         thinking: { type: 'disabled' },
                         output_config: { effort: 'low' },
                         system,
-                        tools: CHAT_TOOLS,
+                        tools,
                         ...(lastRound ? { tool_choice: { type: 'none' as const } } : {}),
                         messages,
                     }, { signal: abort.signal });
@@ -109,8 +112,17 @@ export async function POST(request: NextRequest) {
                         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
                     );
                     const results = await Promise.all(calls.map(async call => {
-                        const out = await runChatTool(call.name, call.input, { snapshot: snapshot ?? null, screener: screener ?? null });
+                        const out = await runChatTool(call.name, call.input, { snapshot: snapshot ?? null, screener: screener ?? null, actions });
                         console.info('[chat] tool', call.name, out.isError ? 'error' : 'ok');
+                        if (out.emit) {
+                            const id = String((call.input as { id?: unknown }).id);
+                            // The card is part of the answer, so it streams like text.
+                            if (!proposed.has(id)) {
+                                proposed.add(id);
+                                started = true;
+                                controller.enqueue(encoder.encode(out.emit));
+                            }
+                        }
                         return {
                             type: 'tool_result' as const,
                             tool_use_id: call.id,

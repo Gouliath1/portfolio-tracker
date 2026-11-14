@@ -3,8 +3,9 @@
 import { MdOpenInNew } from 'react-icons/md';
 import { useMemo } from 'react';
 import { useTranslation } from '../../i18n';
-import { isNumericText, parseBlocks, parseChartSpec, type Block, type Inline } from '../../utils/chatRichText';
+import { isNumericText, parseActionSpec, parseBlocks, parseChartSpec, type Block, type Inline } from '../../utils/chatRichText';
 import { ChatChart } from './ChatChart';
+import { ActionCard } from '../ai/ActionCard';
 
 /**
  * Renders a chat answer: paragraphs, lists, bold, tables, links and charts.
@@ -91,6 +92,11 @@ function BlockView({ block, streaming }: { block: Block; streaming: boolean }) {
                     </table>
                 </div>
             );
+        case 'action': {
+            // Only a finished, valid block becomes a card; a half-streamed one waits.
+            const spec = block.complete ? parseActionSpec(block.raw) : null;
+            return spec ? <ActionCard id={spec.id} reason={spec.reason} /> : null;
+        }
         case 'chart': {
             const spec = block.complete ? parseChartSpec(block.raw) : null;
             if (spec) return <ChatChart spec={spec} />;

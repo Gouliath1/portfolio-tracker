@@ -6,6 +6,7 @@ import { useTranslation } from '../../i18n';
 import { useOptionalAccount } from '../account/AccountProvider';
 import { useOptionalSync } from '../sync/SyncProvider';
 import { RichText } from '../chat/RichText';
+import { useAiActionRegistry } from './aiActions';
 import type { PortfolioSnapshot } from '../../utils/portfolioSnapshot';
 import type { ScreenerSnapshot } from '../../utils/screenerSnapshot';
 
@@ -53,6 +54,7 @@ export function AskTab({ getContext, canAsk, subject, active, onClose }: AskTabP
     const [remaining, setRemaining] = useState<number | null>(null);
     const account = useOptionalAccount();
     const sync = useOptionalSync();
+    const actionRegistry = useAiActionRegistry();
     const signedInAs = account?.user?.email ?? null;
 
     const abortRef = useRef<AbortController | null>(null);
@@ -104,13 +106,18 @@ export function AskTab({ getContext, canAsk, subject, active, onClose }: AskTabP
         setDraft('');
         setBusy(true);
 
+        // What this page can do, read at question time so it matches what is on screen now.
+        const actions = (actionRegistry?.list() ?? [])
+            .filter(a => !a.disabled)
+            .map(({ id, description }) => ({ id, description }));
+
         const controller = new AbortController();
         abortRef.current = controller;
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ brief: context.markdown, snapshot: context.snapshot, screener: context.screener, messages, language }),
+                body: JSON.stringify({ brief: context.markdown, snapshot: context.snapshot, screener: context.screener, actions, messages, language }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) {
@@ -158,7 +165,7 @@ export function AskTab({ getContext, canAsk, subject, active, onClose }: AskTabP
             abortRef.current = null;
             setBusy(false);
         }
-    }, [busy, getContext, canAsk, language, t, turns]);
+    }, [busy, getContext, canAsk, actionRegistry, language, t, turns]);
 
     const reset = () => {
         abortRef.current?.abort();

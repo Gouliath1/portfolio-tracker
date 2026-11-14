@@ -12,6 +12,7 @@ import { useActiveSetName } from '../../../hooks/useActiveSetName';
 import { useTaxFeatureEnabled } from '../../../hooks/useTaxFeatureEnabled';
 import { usePortfolioSummaryData } from '../../../hooks/usePortfolioSummaryData';
 import { useTranslation } from '../../../i18n';
+import { useAiActions } from '../../../components/ai/aiActions';
 
 // ── Date helpers ─────────────────────────────────────────────
 const parseDate = (s: string) => new Date(s.replace(/\//g, '-'));
@@ -86,7 +87,15 @@ export default function DeepDivePage() {
     const { currency, setCurrency, formatValue, hydrated: currencyHydrated } = useBaseCurrency();
     const activeSetName = useActiveSetName();
     const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled } = useTaxFeatureEnabled();
-    const { summary, loading, error } = usePortfolioSummaryData(currency, currencyHydrated);
+    const { summary, loading, error, refresh } = usePortfolioSummaryData(currency, currencyHydrated);
+    useAiActions([{
+        id: 'refresh_prices',
+        label: t('ai.action.refreshPrices'),
+        detail: t('ai.action.refreshPricesDetail'),
+        description: 'Refresh live prices and recompute the portfolio analysis on this page.',
+        disabled: !summary || loading,
+        run: refresh,
+    }]);
     const router = useRouter();
 
     useEffect(() => { setMounted(true); }, []);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { calculatePortfolioSummary } from '@portfolio/core';
 import { PortfolioSummary as PortfolioSummaryType } from '@portfolio/types';
 import { loadPositions } from '../utils/positions';
@@ -70,5 +70,17 @@ export function usePortfolioSummaryData(currency: string, currencyHydrated: bool
         return () => { cancelled = true; };
     }, [currency, currencyHydrated, refreshKey]);
 
-    return { summary, loading, error };
+    /**
+     * Recompute with fresh prices, bypassing the day's cache. Rejects on failure
+     * so a caller that asked for it (a button, a confirmed AI action) can say so.
+     */
+    const refresh = useCallback(async () => {
+        const positions = await loadPositions();
+        const fresh = await calculatePortfolioSummary(positions, true, currency);
+        setSummary(fresh);
+        writeCachedSummary(positions, currency, fresh);
+        setError(null);
+    }, [currency]);
+
+    return { summary, loading, error, refresh };
 }

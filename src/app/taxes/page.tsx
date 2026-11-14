@@ -25,6 +25,7 @@ import { useTaxFeatureEnabled } from '../../hooks/useTaxFeatureEnabled';
 import { formatCurrencyValue } from '../../components/tables/positionsTable/currencyUtils';
 import { estimateCapitalGainsTax, estimateDividendTax, TAX_RULES_AS_OF, DEFAULT_ACCOUNT_TAX_SETTING, TAX_COUNTRIES, type TaxCountry } from '@portfolio/core';
 import { useTranslation } from '../../i18n';
+import { useAiActions } from '../../components/ai/aiActions';
 
 /** Both date conventions in use ('YYYY/MM/DD' transactions, 'YYYY-MM-DD' dividend ex-dates) start with the year — reading it directly avoids timezone-dependent Date parsing. */
 function yearOf(dateStr: string): number {
@@ -41,7 +42,15 @@ export default function TaxesPage() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const { currency, setCurrency } = useBaseCurrency();
     const activeSetName = useActiveSetName();
-    const { summary } = usePortfolioSummaryData('JPY');
+    const { summary, refresh } = usePortfolioSummaryData('JPY');
+    useAiActions([{
+        id: 'refresh_prices',
+        label: t('ai.action.refreshPrices'),
+        detail: t('ai.action.refreshPricesDetail'),
+        description: 'Refresh live prices and recompute the tax estimates on this page.',
+        disabled: !summary,
+        run: refresh,
+    }]);
     const { residenceCountry, setResidenceCountry } = useTaxResidence();
     const { settings, updateAccountSetting } = useAccountTaxSettings();
     const { enabled: taxFeatureEnabled, setEnabled: setTaxFeatureEnabled, hydrated: taxFeatureHydrated } = useTaxFeatureEnabled();

@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import {
-    formatChartValue, isNumericText, parseBlocks, parseChartSpec, parseInline, sanitizeHref, MAX_CHART_POINTS,
+    formatChartValue, isNumericText, parseActionSpec, parseBlocks, parseChartSpec, parseInline, sanitizeHref, MAX_ACTION_REASON_CHARS, MAX_CHART_POINTS,
 } from '../chatRichText';
 
 describe('sanitizeHref', () => {
@@ -138,5 +138,38 @@ describe('isNumericText', () => {
     it('recognises figures but not tickers or names', () => {
         for (const ok of ['12,400', '+24.1%', '-8.3%', '¥1.2M', '500 JPY', '−$1,200']) expect(isNumericText(ok)).toBe(true);
         for (const no of ['7203.T', 'AAPL', 'Toyota', '2020-2021', '']) expect(isNumericText(no)).toBe(false);
+    });
+});
+
+describe('action blocks', () => {
+    it('parses a fenced action block, complete or still streaming', () => {
+        const done = parseBlocks('Sure.\n\n```action\n{"id":"refresh_prices"}\n```\n\nDone.');
+        expect(done.map(b => b.t)).toEqual(['p', 'action', 'p']);
+        expect(done[1]).toEqual({ t: 'action', raw: '{"id":"refresh_prices"}', complete: true });
+        const partial = parseBlocks('```action\n{"id":"refr');
+        expect(partial[0]).toMatchObject({ t: 'action', complete: false });
+    });
+
+    it('accepts a valid id with a short plain reason', () => {
+        expect(parseActionSpec('{"id":"refresh_pinned","reason":"Prices look old"}')).toEqual({ id: 'refresh_pinned', reason: 'Prices look old' });
+        expect(parseActionSpec('{"id":"refresh_pinned"}')).toEqual({ id: 'refresh_pinned' });
+    });
+
+    it('clips the reason and strips control characters', () => {
+        const spec = parseActionSpec(JSON.stringify({ id: 'a', reason: `x\n${'y'.repeat(MAX_ACTION_REASON_CHARS * 2)}` }))!;
+        expect(spec.reason!.length).toBeLessThanOrEqual(MAX_ACTION_REASON_CHARS);
+        expect(spec.reason).not.toMatch(/[\u0000-\u001f]/);
+    });
+
+    it.each([
+        ['not json', 'refresh'],
+        ['array', '[1]'],
+        ['no id', '{"reason":"x"}'],
+        ['numeric id', '{"id":5}'],
+        ['uppercase id', '{"id":"Refresh"}'],
+        ['id with path chars', '{"id":"../etc"}'],
+        ['id too long', `{"id":"${'a'.repeat(41)}"}`],
+    ])('rejects %s', (_n, raw) => {
+        expect(parseActionSpec(raw)).toBeNull();
     });
 });

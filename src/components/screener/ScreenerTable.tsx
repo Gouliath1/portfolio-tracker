@@ -22,11 +22,14 @@ import {
 import type { IndexConstituent, StockFundamentals, PriceAlert } from '../../types/screener';
 import { useScreenerFundamentals, type FundEntry } from '../../hooks/useScreenerFundamentals';
 import { useTranslation } from '../../i18n';
+import { useAiActions } from '../ai/aiActions';
 import { isPriceStale, marketDay } from '../../utils/marketDay';
 import type { TranslationKey } from '../../i18n';
 
 const columnHelper = createColumnHelper<IndexConstituent>();
 const PAGE_SIZE = 50;
+/** Most stocks one confirmed AI action may refresh. */
+const MAX_AI_REFRESH = 50;
 
 type View = 'all' | 'loaded' | 'unloaded' | 'stale' | 'pinned' | 'alerts' | 'notes';
 
@@ -566,6 +569,29 @@ export function ScreenerTable({
         }
         return { current, stale: staleSymbols.length, notLoaded, staleSymbols };
     })();
+    // What the AI assistant may propose here. Both go through the same loadMany as
+    // the Refresh menu, are capped, and run only when the user confirms the card.
+    const pinnedToRefresh = [...pinnedSymbols].slice(0, MAX_AI_REFRESH);
+    const staleToRefresh = freshness.staleSymbols.slice(0, MAX_AI_REFRESH);
+    const loadingNow = progress !== null;
+    useAiActions([
+        {
+            id: 'refresh_pinned',
+            label: t('ai.action.refreshPinned', { count: pinnedToRefresh.length }),
+            detail: t('ai.action.refreshPinnedDetail'),
+            description: 'Fetch fresh quotes and ratios for the user\'s pinned stocks (at most 50).',
+            disabled: pinnedToRefresh.length === 0 || loadingNow,
+            run: () => { loadMany(pinnedToRefresh); return 'started'; },
+        },
+        {
+            id: 'refresh_stale',
+            label: t('ai.action.refreshStale', { count: staleToRefresh.length }),
+            detail: t('ai.action.refreshStaleDetail'),
+            description: 'Re-fetch loaded stocks in the current view whose price is from an earlier market day or whose ratios are over a week old (at most 50).',
+            disabled: staleToRefresh.length === 0 || loadingNow,
+            run: () => { loadMany(staleToRefresh); return 'started'; },
+        },
+    ]);
     const marketDayLabel = new Date(marketDay() + 'T12:00:00').toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
     const sortableColumns = table.getAllLeafColumns().filter(c => c.getCanSort());
