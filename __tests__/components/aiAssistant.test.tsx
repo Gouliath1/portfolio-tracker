@@ -28,7 +28,7 @@ beforeEach(() => {
     localStorage.clear();
     mockPathname.mockReturnValue('/');
     mockCopy.mockClear();
-    mockScreenerState.mockReturnValue({ index: 'topix', indexLoaded: true, added: [], pinned: ['4401.T'], alerts: {}, notes: {} });
+    mockScreenerState.mockReturnValue({ index: 'topix', indexLoaded: true, added: [], pinned: ['4401.T'], alerts: {}, notes: { '4401.T': 'cheap, check margins' } });
     mockFundamentals.mockReturnValue(new Map([['4401.T', { status: 'done', data: {
         symbol: '4401.T', name: 'Adeka', price: 2500, currency: 'JPY', trailingPE: 9.5, forwardPE: 9, dividendYield: 0.03,
         priceToBook: 0.9, marketCap: 5e11, sector: 'Chemicals' } }]]));
@@ -136,6 +136,9 @@ describe('AiAssistant', () => {
             expect(body.screener.rows[0]).toMatchObject({ symbol: '4401.T', trailingPE: 9.5, dividendYieldPct: 3, pinned: true });
             expect(body.brief).toContain('# Screener — TOPIX');
             expect(body.snapshot).toBeUndefined();
+            expect(body.screener.rows[0].note).toBe('cheap, check margins');
+            expect(body.brief).toContain('- 4401.T: cheap, check margins');
+            expect(screen.getByText(/your notes on them are sent to Claude/)).toBeInTheDocument();
         });
 
         it('does not send screener data from other pages', async () => {

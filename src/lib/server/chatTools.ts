@@ -29,6 +29,8 @@ import { GET as screenerQuotes } from '../../app/api/screener/quotes/route';
 
 /** Upper bound on one tool result, in characters. */
 export const MAX_TOOL_RESULT_CHARS = 6_000;
+/** query_screener returns notes, so it gets a bit more room than the other portfolio tools. */
+export const MAX_SCREENER_RESULT_CHARS = 10_000;
 /** The market_data tool batches many lookups, so it gets a larger budget. */
 export const MAX_MARKET_RESULT_CHARS = 20_000;
 /** Lookups per market_data call. */
@@ -71,12 +73,13 @@ export const CHAT_TOOLS = [
         name: 'query_screener',
         description:
             'Filter and rank the stocks the user is researching in the screener (not their holdings): loaded fundamentals ' +
-            'such as P/E, yield, P/B, market cap and sector, plus pins and price alerts. Use for "cheapest by P/E", ' +
+            'such as P/E, yield, P/B, market cap and sector, plus pins, price alerts and the user\'s own notes. Use for "cheapest by P/E", ' +
             '"highest yield in a sector", "which pinned stocks have alerts", or looking up one stock by name or code.',
         input_schema: {
             type: 'object' as const,
             properties: {
-                search: { type: 'string', description: 'Case-insensitive match on name or symbol' },
+                search: { type: 'string', description: 'Case-insensitive match on name, symbol or the user\'s note' },
+                hasNote: { type: 'boolean', description: 'Only stocks the user wrote a note on; the note text is in the result' },
                 sector: { type: 'string', description: 'Exact sector name' },
                 pinnedOnly: { type: 'boolean' },
                 hasAlert: { type: 'boolean' },
@@ -238,7 +241,8 @@ function queryScreener(input: Record<string, unknown>, snap: ScreenerSnapshot) {
     const maxPB = typeof input.maxPriceToBook === 'number' ? input.maxPriceToBook : null;
 
     const matched = snap.rows.filter(r =>
-        (!search || r.name.toLowerCase().includes(search) || r.symbol.toLowerCase().includes(search))
+        (!search || r.name.toLowerCase().includes(search) || r.symbol.toLowerCase().includes(search) || r.note?.toLowerCase().includes(search))
+        && (input.hasNote !== true || r.hasNote)
         && (!sector || r.sector?.toLowerCase() === sector)
         && (input.pinnedOnly !== true || r.pinned)
         && (input.hasAlert !== true || r.alert !== undefined)
@@ -262,6 +266,7 @@ function queryScreener(input: Record<string, unknown>, snap: ScreenerSnapshot) {
         asOf: snap.generatedAt,
         loadedInScreener: snap.loadedCount,
         omittedFromSnapshot: snap.omitted || undefined,
+        notesOmitted: snap.notesOmitted || undefined,
         matched: matched.length,
         stocks: matched.slice(0, limit),
     };
@@ -392,7 +397,8 @@ export async function runChatTool(
             default: throw new Error(`Unknown tool: ${name}`);
         }
         let text = JSON.stringify(result);
-        const cap = name === 'market_data' ? MAX_MARKET_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
+        const cap = name === 'market_data' ? MAX_MARKET_RESULT_CHARS
+            : name === 'query_screener' ? MAX_SCREENER_RESULT_CHARS : MAX_TOOL_RESULT_CHARS;
         if (text.length > cap) {
             text = `${text.slice(0, cap)}… [truncated; narrow the query]`;
         }

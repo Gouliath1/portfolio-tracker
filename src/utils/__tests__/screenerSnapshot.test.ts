@@ -1,4 +1,4 @@
-import { buildScreenerSnapshot, formatScreenerMarkdown, MAX_SCREENER_ROWS, screenerHasData } from '../screenerSnapshot';
+import { buildScreenerSnapshot, formatScreenerMarkdown, MAX_NOTE_CHARS, MAX_NOTES_TOTAL_CHARS, MAX_SCREENER_ROWS, screenerHasData } from '../screenerSnapshot';
 import { DEFAULT_SCREENER_STATE, type ScreenerState } from '../screenerState';
 import type { StockFundamentals } from '../../types/screener';
 
@@ -32,15 +32,36 @@ describe('buildScreenerSnapshot', () => {
         expect(snap.loadedCount).toBe(1);
     });
 
-    it('carries alerts and whether a note exists, but never the note text', () => {
+    it('carries alerts and the user\'s notes, ignoring blank ones', () => {
         const snap = buildScreenerSnapshot(
-            state({ alerts: { X: { targetAbove: 150 } }, notes: { X: 'my private thesis', Y: '   ' } }),
+            state({ alerts: { X: { targetAbove: 150 } }, notes: { X: '  my thesis: cheap vs peers  ', Y: '   ' } }),
             new Map([['X', done(fund('X'))], ['Y', done(fund('Y'))]]), NOW);
         const x = snap.rows.find(r => r.symbol === 'X')!;
         expect(x.alert).toEqual({ above: 150, below: undefined });
-        expect(x.hasNote).toBe(true);
-        expect(snap.rows.find(r => r.symbol === 'Y')!.hasNote).toBe(false);
-        expect(JSON.stringify(snap)).not.toContain('private thesis');
+        expect(x).toMatchObject({ hasNote: true, note: 'my thesis: cheap vs peers' });
+        expect(snap.rows.find(r => r.symbol === 'Y')).toMatchObject({ hasNote: false });
+        expect(snap.rows.find(r => r.symbol === 'Y')!.note).toBeUndefined();
+    });
+
+    it('clips long notes', () => {
+        const snap = buildScreenerSnapshot(state({ notes: { X: 'a'.repeat(MAX_NOTE_CHARS + 100) } }), new Map([['X', done(fund('X'))]]), NOW);
+        expect(snap.rows[0].note).toHaveLength(MAX_NOTE_CHARS + 1);
+        expect(snap.rows[0].note!.endsWith('…')).toBe(true);
+    });
+
+    it('stops attaching notes once the total budget is spent, pinned stocks first', () => {
+        const count = Math.ceil(MAX_NOTES_TOTAL_CHARS / MAX_NOTE_CHARS) + 3;
+        const symbols = Array.from({ length: count }, (_, i) => `S${i}`);
+        const notes = Object.fromEntries(symbols.map(sym => [sym, 'n'.repeat(MAX_NOTE_CHARS)]));
+        const snap = buildScreenerSnapshot(
+            state({ notes, pinned: ['S0'] }),
+            new Map(symbols.map((sym, i) => [sym, done(fund(sym, { marketCap: i }))] as const)), NOW);
+        expect(snap.rows[0]).toMatchObject({ symbol: 'S0', pinned: true });
+        expect(snap.rows[0].note).toBeDefined();
+        expect(snap.notesOmitted).toBeGreaterThan(0);
+        const kept = snap.rows.filter(r => r.note);
+        expect(kept.length).toBeLessThan(count);
+        expect(snap.rows.every(r => r.hasNote)).toBe(true);
     });
 
     it('caps the rows by market cap and says how many were left out', () => {
@@ -63,5 +84,14 @@ describe('formatScreenerMarkdown', () => {
         expect(md).toContain('| A | A Corp |');
         expect(md).toContain('≤90');
         expect(md).not.toContain('| B |');
+    });
+
+    it('quotes notes on pinned stocks, flattened to one line', () => {
+        const md = formatScreenerMarkdown(buildScreenerSnapshot(
+            state({ pinned: ['A'], notes: { A: 'buy below 90\nwatch margins', B: 'unpinned note' } }),
+            new Map([['A', done(fund('A'))], ['B', done(fund('B'))]]), NOW));
+        expect(md).toContain('## Notes on pinned stocks');
+        expect(md).toContain('- A: buy below 90 watch margins');
+        expect(md).not.toContain('unpinned note');
     });
 });

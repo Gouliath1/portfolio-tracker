@@ -70,7 +70,7 @@ describe('query_screener', () => {
     });
     const screener = {
         generatedAt: '2026-11-14', index: 'topix', loadedCount: 4, pinnedCount: 1, alertCount: 0, omitted: 0,
-        rows: [row('A', { marketCap: 500, trailingPE: 25, dividendYieldPct: 5 }), row('B', { marketCap: 900, trailingPE: 8, sector: 'Banks', pinned: true }),
+        rows: [row('A', { marketCap: 500, trailingPE: 25, dividendYieldPct: 5 }), row('B', { marketCap: 900, trailingPE: 8, sector: 'Banks', pinned: true, hasNote: true, note: 'Watching the dividend cut risk' }),
             row('C', { marketCap: 100, trailingPE: null }), row('D', { marketCap: 700, trailingPE: -3, dividendYieldPct: 1 })],
     } as never;
     const q = (input: object) => runChatTool('query_screener', input, { snapshot: null, screener }).then(r => ({ ...r, data: r.isError ? null : JSON.parse(r.text) }));
@@ -87,6 +87,14 @@ describe('query_screener', () => {
         expect(symbols((await q({ minYieldPct: 3 })).data)).toEqual(['A']);
         expect(symbols((await q({ maxPE: 30, sortBy: 'trailingPE' })).data)).toEqual(['B', 'A']);
         expect(symbols((await q({ search: 'c corp' })).data)).toEqual(['C']);
+    });
+
+    it('finds stocks by what the user wrote, and returns the note', async () => {
+        const byNote = (await q({ search: 'dividend cut' })).data;
+        expect(symbols(byNote)).toEqual(['B']);
+        expect(byNote.stocks[0].note).toBe('Watching the dividend cut risk');
+        const noted = (await q({ hasNote: true })).data;
+        expect(symbols(noted)).toEqual(['B']);
     });
 
     it('errors cleanly when the user is not on the screener', async () => {

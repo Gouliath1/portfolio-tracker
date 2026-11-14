@@ -7,8 +7,10 @@
  * been loaded, plus the user's pins and price alerts.
  *
  * Two choices worth preserving:
- *  - **Notes stay out.** They are the user's own writing; the assistant only
- *    learns that a stock has one.
+ *  - **Notes are the user's own writing**, so they only go along because the
+ *    user asked the assistant to read them, and the chat says so in its privacy
+ *    line. Each is clipped, and the total is budgeted so a few long notes can't
+ *    crowd out the numbers.
  *  - **Bounded.** A universe can be well over a thousand names. Pinned stocks
  *    always make the cut, the rest are the largest by market cap, and the
  *    snapshot says when it was cut so the assistant can say so too.
@@ -32,6 +34,8 @@ export interface ScreenerRow {
     pinned: boolean;
     alert?: { above?: number; below?: number };
     hasNote: boolean;
+    /** The user's note on this stock, clipped to `MAX_NOTE_CHARS`; absent when none or over the budget. */
+    note?: string;
     /** Whether fundamentals are loaded; pinned stocks without them appear as bare rows. */
     loaded: boolean;
 }
@@ -44,10 +48,16 @@ export interface ScreenerSnapshot {
     alertCount: number;
     /** Rows beyond `MAX_SCREENER_ROWS` that were left out. */
     omitted: number;
+    /** Notes that exist but were left out to stay within the notes budget. */
+    notesOmitted: number;
     rows: ScreenerRow[];
 }
 
 export const MAX_SCREENER_ROWS = 400;
+/** One note is clipped to this many characters. */
+export const MAX_NOTE_CHARS = 500;
+/** All notes together; pinned stocks come first, so they are the last to lose theirs. */
+export const MAX_NOTES_TOTAL_CHARS = 40_000;
 
 /** The part of the fundamentals store this needs: loaded entries only. */
 export type LoadedFundamentals = ReadonlyMap<string, { status: string; data?: StockFundamentals }>;
@@ -97,6 +107,18 @@ export function buildScreenerSnapshot(
     rows.sort((a, b) =>
         Number(b.pinned) - Number(a.pinned) || (b.marketCap ?? -1) - (a.marketCap ?? -1) || a.symbol.localeCompare(b.symbol));
 
+    // Attach notes in that order until the budget runs out.
+    let budget = MAX_NOTES_TOTAL_CHARS;
+    let notesOmitted = 0;
+    for (const row of rows.slice(0, MAX_SCREENER_ROWS)) {
+        const text = state.notes[row.symbol]?.trim();
+        if (!text) continue;
+        const clipped = text.length > MAX_NOTE_CHARS ? `${text.slice(0, MAX_NOTE_CHARS)}…` : text;
+        if (clipped.length > budget) { notesOmitted++; continue; }
+        budget -= clipped.length;
+        row.note = clipped;
+    }
+
     return {
         generatedAt: now.toISOString().slice(0, 10),
         index: state.index,
@@ -104,6 +126,7 @@ export function buildScreenerSnapshot(
         pinnedCount: state.pinned.length,
         alertCount: Object.keys(state.alerts).length,
         omitted: Math.max(0, rows.length - MAX_SCREENER_ROWS),
+        notesOmitted,
         rows: rows.slice(0, MAX_SCREENER_ROWS),
     };
 }
@@ -126,7 +149,7 @@ export function formatScreenerMarkdown(s: ScreenerSnapshot): string {
     lines.push(
         `Stocks the user is researching, not holdings (unless also in the portfolio). ` +
         `${s.loadedCount} have fundamentals loaded, ${s.pinnedCount} pinned, ${s.alertCount} with price alerts. ` +
-        `Use the query_screener tool to filter, rank or look up any of them.`,
+        `Use the query_screener tool to filter, rank or look up any of them, including by what the user wrote in their notes.`,
     );
     const pinned = s.rows.filter(r => r.pinned);
     if (pinned.length > 0) {
@@ -144,6 +167,13 @@ export function formatScreenerMarkdown(s: ScreenerSnapshot): string {
                 `${r.forwardPE ?? 'n/a'} | ${r.dividendYieldPct == null ? 'n/a' : `${r.dividendYieldPct}%`} | ${r.priceToBook ?? 'n/a'} | ${compact(r.marketCap)} | ${alert} |`,
             );
         }
+    }
+    const noted = pinned.filter(r => r.note);
+    if (noted.length > 0) {
+        lines.push('');
+        lines.push('## Notes on pinned stocks (the user\'s own words)');
+        lines.push('');
+        for (const r of noted.slice(0, 30)) lines.push(`- ${r.symbol}: ${r.note!.replace(/\s*\n\s*/g, ' ')}`);
     }
     return lines.join('\n');
 }

@@ -277,7 +277,7 @@ export function AskTab({ getContext, canAsk, subject, active, onClose }: AskTabP
                         </div>
                         <p className="mt-2 text-xs flex items-center justify-between gap-2" style={{ color: 'var(--text-muted)' }}>
                             <span>
-                                {t('chat.privacy')}
+                                {t(subject === 'screener' ? 'chat.privacyScreener' : 'chat.privacy')}
                                 {availability === 'ready' && remaining !== null && remaining <= SHOW_LEFT_AT && (
                                     <> {t('chat.left', { count: String(remaining) })}</>
                                 )}
