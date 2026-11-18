@@ -271,3 +271,35 @@ describe('parseChatRequest actions', () => {
         expect(parse(undefined)).toBeUndefined();
     });
 });
+
+describe('query_dividends', () => {
+    const snap = {
+        ...snapshot,
+        dividendEvents: [
+            { ticker: '7203.T', name: 'Toyota', account: 'NISA', ccy: 'JPY', exDate: '2025-12-30', amount: 500 },
+            { ticker: '7203.T', name: 'Toyota', account: 'NISA', ccy: 'JPY', exDate: '2026-03-30', amount: 1000 },
+            { ticker: '8306.T', name: 'MUFG', account: 'NISA', ccy: 'JPY', exDate: '2026-09-29', amount: 250.5 },
+            { ticker: 'AAPL', name: 'Apple', account: 'IBKR', ccy: 'USD', exDate: '2026-05-10', amount: 80 },
+        ],
+    } as unknown as PortfolioSnapshot;
+    const q = (input: object, s: PortfolioSnapshot | null = snap) =>
+        runChatTool('query_dividends', input, { snapshot: s });
+
+    it('totals a calendar year for one currency', async () => {
+        const r = await q({ from: '2026-01-01', to: '2026-12-31', currency: 'jpy' });
+        const d = JSON.parse(r.text);
+        expect(d.total).toBe(1250.5);
+        expect(d.payments).toBe(2);
+        expect(d.byTicker[0].ticker).toBe('7203.T');
+        expect(d.byMonth.map((m: { month: string }) => m.month)).toEqual(['2026-03', '2026-09']);
+    });
+
+    it('covers all time without a period', async () => {
+        expect(JSON.parse((await q({})).text).total).toBe(1830.5);
+    });
+
+    it('rejects bad dates and missing history', async () => {
+        expect((await q({ from: '2026' })).isError).toBe(true);
+        expect((await q({}, { ...snap, dividendEvents: undefined } as PortfolioSnapshot)).isError).toBe(true);
+    });
+});

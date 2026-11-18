@@ -110,9 +110,22 @@ function readSnapshot(raw: unknown): PortfolioSnapshot | undefined {
             }
             return clean as unknown as PortfolioSnapshot['holdings'][number];
         });
+    const dividendEvents = Array.isArray(s.dividendEvents)
+        ? s.dividendEvents.filter(d => d && typeof d.ticker === 'string' && typeof d.exDate === 'string'
+            && /^\d{4}-\d{2}-\d{2}$/.test(d.exDate))
+            .map(d => ({
+                ticker: d.ticker,
+                name: typeof d.name === 'string' ? d.name : '',
+                account: typeof d.account === 'string' ? d.account : '',
+                ccy: typeof d.ccy === 'string' ? d.ccy : '',
+                exDate: d.exDate,
+                amount: typeof d.amount === 'number' && Number.isFinite(d.amount) ? d.amount : 0,
+            }))
+        : undefined;
     return {
         ...(s as PortfolioSnapshot),
         holdings,
+        dividendEvents,
         closedCount: typeof s.closedCount === 'number' ? s.closedCount : s.recentClosed.length,
     };
 }

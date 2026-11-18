@@ -88,6 +88,17 @@ export interface SnapshotClosed {
     realizedPnlPct: number;
 }
 
+/** One dividend payment (ex-date), summed across lots of a holding, base currency. */
+export interface SnapshotDividend {
+    ticker: string;
+    name: string;
+    account: string;
+    /** Listing currency of the security (JPY for Japanese stocks). */
+    ccy: string;
+    exDate: string;
+    amount: number;
+}
+
 export interface PortfolioSnapshot {
     /** ISO date the brief was produced — an assistant needs to know staleness. */
     generatedAt: string;
@@ -104,6 +115,11 @@ export interface PortfolioSnapshot {
     closedCount: number;
     /** Most recent closes only — the full history is rarely worth the tokens. */
     recentClosed: SnapshotClosed[];
+    /**
+     * Every dividend received (open and closed lots), one row per
+     * ticker/account/ex-date, oldest first. Optional: older clients omit it.
+     */
+    dividendEvents?: SnapshotDividend[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -258,6 +274,24 @@ export function buildSnapshot(
             };
         });
 
+    // Per-event dividends across open and closed lots, merged per
+    // (ticker, account, ex-date) so lots bought on different days collapse.
+    const divRows = new Map<string, SnapshotDividend>();
+    for (const p of [...summary.positions, ...summary.closedPositions]) {
+        for (const e of p.dividendEvents ?? []) {
+            const key = `${String(p.ticker)}|${p.account}|${e.exDate}`;
+            const row = divRows.get(key);
+            if (row) row.amount += e.amountInBase;
+            else divRows.set(key, {
+                ticker: String(p.ticker), name: p.fullName, account: p.account,
+                ccy: p.stockCcy, exDate: e.exDate, amount: e.amountInBase,
+            });
+        }
+    }
+    const dividendEvents = [...divRows.values()]
+        .map(d => ({ ...d, amount: roundMoney(d.amount, baseCurrency) }))
+        .sort((a, b) => a.exDate.localeCompare(b.exDate));
+
     return {
         generatedAt: now.toISOString().slice(0, 10),
         baseCurrency,
@@ -280,6 +314,7 @@ export function buildSnapshot(
         top5Pct: round2(holdings.slice(0, 5).reduce((s, h) => s + h.weightPct, 0)),
         closedCount: summary.closedPositions.length,
         recentClosed,
+        dividendEvents,
     };
 }
 
