@@ -111,6 +111,24 @@ export const CHAT_TOOLS = [
         },
     },
     {
+        name: 'query_dividends',
+        description:
+            'Dividends the user actually received (from their holdings, open and sold), for any period, in base currency. ' +
+            'Use for "total dividends in 2026", "dividends from Japanese stocks this year", "what did X pay me". ' +
+            'Returns the total, a breakdown by ticker and by month, and the individual payments (latest first). ' +
+            'Japan = currency JPY. Resolve relative periods from the brief\'s Generated date.',
+        input_schema: {
+            type: 'object' as const,
+            properties: {
+                from: { type: 'string', description: 'Period start, YYYY-MM-DD inclusive (default: all time)' },
+                to: { type: 'string', description: 'Period end, YYYY-MM-DD inclusive (default: all time)' },
+                currency: { type: 'string', description: 'Listing currency, e.g. JPY for Japan, USD for US' },
+                ticker: { type: 'string', description: 'Only this ticker' },
+                account: { type: 'string', description: 'Exact account name from the brief' },
+            },
+        },
+    },
+    {
         name: 'market_data',
         description:
             'Read-only market data from the app\'s own API, for any ticker (held or not). Give the period as `from`/`to` ' +
@@ -246,6 +264,49 @@ function closedPositions(input: Record<string, unknown>, snap: PortfolioSnapshot
         note: snap.closedCount > snap.recentClosed.length
             ? `Only the ${snap.recentClosed.length} most recent sales are available.` : undefined,
         sales: snap.recentClosed.filter(c => !ticker || c.ticker.toLowerCase() === ticker),
+    };
+}
+
+/** Individual payments listed in a query_dividends answer. */
+const MAX_DIVIDEND_ROWS = 40;
+
+function queryDividends(input: Record<string, unknown>, snap: PortfolioSnapshot) {
+    if (!snap.dividendEvents) throw new Error('Dividend history is not available in this snapshot; use the brief totals');
+    const from = str(input.from), to = str(input.to);
+    for (const d of [from, to]) {
+        if (d && !DATE_KEY.test(d)) throw new Error('from/to must be YYYY-MM-DD');
+    }
+    const ccy = str(input.currency)?.toUpperCase();
+    const ticker = str(input.ticker)?.toLowerCase();
+    const acct = str(input.account)?.toLowerCase();
+
+    const rows = snap.dividendEvents.filter(d =>
+        (!from || d.exDate >= from) && (!to || d.exDate <= to)
+        && (!ccy || d.ccy.toUpperCase() === ccy)
+        && (!ticker || d.ticker.toLowerCase() === ticker)
+        && (!acct || d.account.toLowerCase() === acct));
+
+    const byTicker = new Map<string, { ticker: string; name: string; total: number; payments: number }>();
+    const byMonth = new Map<string, number>();
+    let total = 0;
+    for (const d of rows) {
+        total += d.amount;
+        const t = byTicker.get(d.ticker) ?? { ticker: d.ticker, name: d.name, total: 0, payments: 0 };
+        t.total += d.amount; t.payments++;
+        byTicker.set(d.ticker, t);
+        const m = d.exDate.slice(0, 7);
+        byMonth.set(m, (byMonth.get(m) ?? 0) + d.amount);
+    }
+    const sorted = [...rows].sort((a, b) => b.exDate.localeCompare(a.exDate));
+    return {
+        baseCurrency: snap.baseCurrency,
+        period: { from: from ?? 'all', to: to ?? 'all' },
+        note: 'Dates are ex-dividend dates; amounts are gross dividends converted to base currency at each ex-date.',
+        total: num(total),
+        payments: rows.length,
+        byTicker: [...byTicker.values()].map(t => ({ ...t, total: num(t.total) })).sort((a, b) => (b.total ?? 0) - (a.total ?? 0)),
+        byMonth: [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, v]) => ({ month, total: num(v) })),
+        latestPayments: sorted.slice(0, MAX_DIVIDEND_ROWS).map(d => ({ date: d.exDate, ticker: d.ticker, account: d.account, amount: d.amount })),
     };
 }
 
@@ -443,6 +504,11 @@ export async function runChatTool(
                 result = name === 'query_holdings' ? queryHoldings(args, ctx.snapshot)
                     : name === 'get_holding' ? getHolding(args, ctx.snapshot)
                     : closedPositions(args, ctx.snapshot);
+                break;
+            }
+            case 'query_dividends': {
+                if (!ctx.snapshot) throw new Error('Structured portfolio data is not available; use the brief');
+                result = queryDividends(args, ctx.snapshot);
                 break;
             }
             case 'market_data': result = await marketData(args, ctx.now ?? new Date()); break;
